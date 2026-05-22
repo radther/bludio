@@ -1,0 +1,13 @@
+[package]
+name = "bludio"
+version = "0.1.0"
+edition = "2024"
+description = "A GPUI application shell"
+
+[[bin]]
+name = "bludio"
+path = "src/main.rs"
+
+[dependencies]
+gpui-unofficial = "1.2.7"
+gpui-platform-gpui-unofficial = { version = "1.2.7", features = ["font-kit", "x11", "wayland"] }
