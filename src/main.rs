@@ -1,11 +1,163 @@
+mod actions;
+mod bluetooth;
+mod device_list;
+
+use std::sync::LazyLock;
+
+use bluetooth::BluetoothState;
+use futures::channel::oneshot;
 use gpui::{
-    App, Bounds, Context, FocusHandle, Focusable, IntoElement, Render, Window, WindowBounds,
-    WindowOptions, div, hsla, prelude::*, px, size,
+    App, Bounds, Context, CursorStyle, FocusHandle, Focusable, FontWeight, IntoElement,
+    MouseButton, MouseUpEvent, Render, SharedString, Window, WindowBounds, WindowOptions, div,
+    hsla, prelude::*, px, rgba, size,
 };
 use gpui_platform_gpui_unofficial::application;
 
-struct BludioApp {
+// ── Tokio bridge ───────────────────────────────────────────────────────────
+
+/// Global Tokio runtime for all BlueZ D-Bus operations.
+///
+/// gpui-unofficial's executor is not Tokio-based, but `bluer` requires a
+/// Tokio 1.x reactor. We spin up a dedicated runtime and route all Bluetooth
+/// work through `tokio_task()`.
+static TOKIO: LazyLock<tokio::runtime::Runtime> =
+    LazyLock::new(|| tokio::runtime::Runtime::new().expect("Failed to create tokio runtime"));
+
+pub(crate) fn tokio_task<F, T>(f: F) -> oneshot::Receiver<T>
+where
+    F: std::future::Future<Output = T> + Send + 'static,
+    T: Send + 'static,
+{
+    let (tx, rx) = oneshot::channel();
+    TOKIO.spawn(async move {
+        let _ = tx.send(f.await);
+    });
+    rx
+}
+
+// ── App state ──────────────────────────────────────────────────────────────
+
+pub(crate) struct BludioApp {
+    bt_state: BluetoothState,
+    bt_agent: Option<bluetooth::agent::AgentHandle>,
+    initialized: bool,
     _focus_handle: FocusHandle,
+}
+
+impl BludioApp {
+    fn new(cx: &mut Context<Self>) -> Self {
+        cx.spawn(async move |this, cx| {
+            // ── Init ──
+            let rx = tokio_task(async {
+                let state = BluetoothState::new().await?;
+                let agent = bluetooth::agent::register_agent(
+                    state.session.as_ref().unwrap(),
+                )
+                .await;
+                Ok::<_, String>((state, agent))
+            });
+            let adapter = match rx.await {
+                Ok(Ok((state, agent))) => {
+                    let adapter = state.adapter.clone().unwrap();
+                    this.update(cx, |this, cx| {
+                        this.bt_state = state;
+                        this.initialized = true;
+                        this.bt_agent = agent.ok();
+                        cx.notify();
+                    })
+                    .ok();
+                    adapter
+                }
+                Ok(Err(e)) => {
+                    this.update(cx, |this, cx| {
+                        this.bt_state.error = Some(e);
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+                Err(_) => {
+                    this.update(cx, |this, cx| {
+                        this.bt_state.error =
+                            Some("Bluetooth initialization cancelled".into());
+                        cx.notify();
+                    })
+                    .ok();
+                    return;
+                }
+            };
+
+            // ── Background monitoring (signals + fallback poll) ──
+            let (monitor_tx, mut change_rx) =
+                tokio::sync::mpsc::unbounded_channel();
+            let monitor_adapter = adapter.clone();
+            TOKIO.spawn(async move {
+                bluetooth::monitor::run_monitor(&monitor_adapter, monitor_tx).await;
+            });
+
+            // Enter Tokio context so mpsc::recv works on this thread.
+            let _tokio_guard = TOKIO.enter();
+
+            loop {
+                let discovering = this
+                    .read_with(cx, |app, _| app.bt_state.discovering)
+                    .unwrap_or(false);
+                if discovering {
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(1000))
+                        .await;
+                    continue;
+                }
+
+                // Wait for a D-Bus signal or a 10s fallback timer.
+                let signal_addr: Option<bluer::Address> = tokio::select! {
+                    Some(addr) = change_rx.recv() => Some(addr),
+                    _ = cx.background_executor()
+                        .timer(std::time::Duration::from_secs(10)) => None,
+                };
+
+                let a = adapter.clone();
+                if let Some(addr) = signal_addr {
+                    // Single-device quick refresh from D-Bus signal.
+                    if let Ok(Some(device)) =
+                        tokio_task(async move { crate::actions::quick_device_status(&a, addr).await }).await
+                    {
+                        let _ = this.update(cx, |this, cx| {
+                            this.bt_state.upsert_device(device);
+                            cx.notify();
+                        });
+                    }
+                } else {
+                    // 10s fallback: full list refresh.
+                    if let Ok(Some(fresh)) = tokio_task(async move {
+                        bluetooth::discovery::refresh_device_list(&a).await
+                    })
+                    .await
+                    {
+                        let changed = this
+                            .read_with(cx, |app, _| {
+                                devices_changed(&app.bt_state.devices, &fresh)
+                            })
+                            .unwrap_or(true);
+                        if changed {
+                            let _ = this.update(cx, |this, cx| {
+                                this.bt_state.replace_devices(fresh);
+                                cx.notify();
+                            });
+                        }
+                    }
+                }
+            }
+        })
+        .detach();
+
+        Self {
+            bt_state: BluetoothState::default(),
+            bt_agent: None,
+            initialized: false,
+            _focus_handle: cx.focus_handle(),
+        }
+    }
 }
 
 impl Focusable for BludioApp {
@@ -15,17 +167,176 @@ impl Focusable for BludioApp {
 }
 
 impl Render for BludioApp {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let discovering = self.bt_state.discovering;
+        let error = self.bt_state.error.clone();
+        let initialized = self.initialized;
+
+        let bg = hsla(0.0, 0.0, 0.08, 1.0);
+        let surface = hsla(0.0, 0.0, 0.14, 1.0);
+        let text = hsla(0.0, 0.0, 0.95, 1.0);
+        let text_secondary = hsla(0.0, 0.0, 0.6, 1.0);
+        let accent = hsla(210.0 / 360.0, 0.7, 0.55, 1.0);
+        let accent_hover = hsla(210.0 / 360.0, 0.7, 0.45, 1.0);
+        let danger = hsla(0.0, 0.7, 0.55, 1.0);
+        let danger_hover = hsla(0.0, 0.7, 0.45, 1.0);
+
         div()
             .size_full()
             .flex()
-            .items_center()
-            .justify_center()
-            .bg(hsla(0.0, 0.0, 0.0, 1.0))
-            .text_color(hsla(0.0, 0.0, 1.0, 1.0))
-            .child("bludio")
+            .flex_col()
+            .bg(bg)
+            .text_color(text)
+            // ── Header ──
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .justify_between()
+                    .px_4()
+                    .py_2()
+                    .bg(surface)
+                    .border_b_1()
+                    .border_color(hsla(0.0, 0.0, 0.25, 1.0))
+                    .child(div().font_weight(FontWeight::BOLD).child("bluetooth"))
+                    .child(scan_button(discovering, danger, accent, danger_hover, accent_hover, cx)),
+            )
+            // ── Error / Loading / Device list ──
+            .when_some(error, |el, err| {
+                el.child(error_banner(err))
+            })
+            .when(!initialized && self.bt_state.error.is_none(), |el| {
+                el.child(loading_indicator(text_secondary))
+            })
+            .when(initialized, |el| {
+                el.child(device_list::device_list_view(&self.bt_state, cx))
+            })
     }
 }
+
+// ── Header sub-components ──────────────────────────────────────────────────
+
+fn scan_button(
+    discovering: bool,
+    danger: gpui::Hsla,
+    accent: gpui::Hsla,
+    danger_hover: gpui::Hsla,
+    accent_hover: gpui::Hsla,
+    cx: &mut Context<BludioApp>,
+) -> impl IntoElement {
+    div()
+        .px_3()
+        .py_1()
+        .rounded_md()
+        .bg(if discovering { danger } else { accent })
+        .cursor(CursorStyle::PointingHand)
+        .hover(|el| el.bg(if discovering { danger_hover } else { accent_hover }))
+        .child(if discovering { "stop" } else { "scan" })
+        .on_mouse_up(MouseButton::Left, cx.listener(
+            |this, _: &MouseUpEvent, _window, cx| {
+                if this.bt_state.discovering {
+                    this.bt_state.discovering = false;
+                } else {
+                    this.bt_state.discovering = true;
+                    cx.spawn(async move |this, cx| {
+                        run_discovery(this, cx).await;
+                    })
+                    .detach();
+                }
+                cx.notify();
+            },
+        ))
+}
+
+fn error_banner(err: String) -> impl IntoElement {
+    div()
+        .px_4()
+        .py_2()
+        .bg(rgba(0xff3c3c33))
+        .text_color(hsla(0.0, 0.8, 0.75, 1.0))
+        .child(SharedString::from(format!("Error: {}", err)))
+}
+
+fn loading_indicator(text_secondary: gpui::Hsla) -> impl IntoElement {
+    div()
+        .flex()
+        .items_center()
+        .justify_center()
+        .flex_1()
+        .text_color(text_secondary)
+        .child("Connecting to Bluetooth...")
+}
+
+// ── Discovery orchestration ────────────────────────────────────────────────
+
+async fn run_discovery(this: gpui::WeakEntity<BludioApp>, cx: &mut gpui::AsyncApp) {
+    let _tokio_guard = TOKIO.enter();
+
+    let adapter = match this.read_with(cx, |app, _| app.bt_state.adapter.clone()) {
+        Ok(Some(a)) => a,
+        _ => return,
+    };
+
+    let mut rx = bluetooth::discovery::start_scan(&adapter);
+
+    while let Some(event) = rx.recv().await {
+        match event {
+            bluetooth::discovery::DiscoveryEvent::DeviceAdded(device) => {
+                let _ = this.update(cx, |this, cx| {
+                    this.bt_state.upsert_device(device);
+                    cx.notify();
+                });
+                if !this
+                    .read_with(cx, |app, _| app.bt_state.discovering)
+                    .unwrap_or(false)
+                {
+                    break;
+                }
+            }
+            bluetooth::discovery::DiscoveryEvent::Done => break,
+        }
+    }
+
+    let a = adapter;
+    if let Ok(Some(devices)) =
+        tokio_task(async move { bluetooth::discovery::refresh_device_list(&a).await }).await
+    {
+        let _ = this.update(cx, |this, cx| {
+            this.bt_state.replace_devices(devices);
+            this.bt_state.discovering = false;
+            cx.notify();
+        });
+        return;
+    }
+
+    let _ = this.update(cx, |this, cx| {
+        this.bt_state.discovering = false;
+        cx.notify();
+    });
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+
+fn devices_changed(
+    old: &[bluetooth::device::BluetoothDevice],
+    new: &[bluetooth::device::BluetoothDevice],
+) -> bool {
+    if old.len() != new.len() {
+        return true;
+    }
+    for (a, b) in old.iter().zip(new.iter()) {
+        if a.address != b.address
+            || a.paired != b.paired
+            || a.connected != b.connected
+        {
+            return true;
+        }
+    }
+    false
+}
+
+// ── Entry point ────────────────────────────────────────────────────────────
 
 fn main() {
     application().run(|cx: &mut App| {
@@ -37,11 +348,7 @@ fn main() {
                 app_id: Some("com.bludio.app".to_string()),
                 ..Default::default()
             },
-            |_window, cx| {
-                cx.new(|cx| BludioApp {
-                    _focus_handle: cx.focus_handle(),
-                })
-            },
+            |_window, cx| cx.new(BludioApp::new),
         )
         .unwrap();
 

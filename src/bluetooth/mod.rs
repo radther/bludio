@@ -1,0 +1,158 @@
+pub mod agent;
+pub mod device;
+pub mod discovery;
+pub(crate) mod monitor;
+pub(crate) mod properties;
+
+use device::BluetoothDevice;
+
+/// Holds the Bluetooth session and adapter state shared with the UI.
+#[derive(Clone, Default)]
+pub struct BluetoothState {
+    /// The BlueZ session connection (None until initialized).
+    pub session: Option<bluer::Session>,
+    /// Handle to the default Bluetooth adapter (None until initialized).
+    pub adapter: Option<bluer::Adapter>,
+    /// Whether a device discovery scan is currently active.
+    pub discovering: bool,
+    /// List of known Bluetooth devices (sorted: paired → connected → alpha).
+    pub devices: Vec<BluetoothDevice>,
+    /// Human-readable error message if Bluetooth is unavailable.
+    pub error: Option<String>,
+}
+
+impl BluetoothState {
+    /// Connect to BlueZ, get the default adapter, power on, and enumerate
+    /// currently paired devices.
+    pub async fn new() -> Result<Self, String> {
+        let session = bluer::Session::new()
+            .await
+            .map_err(|e| format!("Failed to connect to BlueZ: {}", e))?;
+
+        let adapter = session
+            .default_adapter()
+            .await
+            .map_err(|e| format!("No Bluetooth adapter found: {}", e))?;
+
+        adapter
+            .set_powered(true)
+            .await
+            .map_err(|e| format!("Failed to power on adapter: {}", e))?;
+
+        adapter
+            .set_pairable(true)
+            .await
+            .map_err(|e| format!("Failed to set pairable: {}", e))?;
+
+        let mut state = Self {
+            session: Some(session),
+            adapter: Some(adapter),
+            discovering: false,
+            devices: Vec::new(),
+            error: None,
+        };
+
+        state.list_devices().await?;
+
+        Ok(state)
+    }
+
+    /// Re-enumerate all known devices from the adapter.
+    pub async fn list_devices(&mut self) -> Result<(), String> {
+        let adapter = self
+            .adapter
+            .as_ref()
+            .expect("BluetoothState not initialized");
+
+        let addresses = adapter
+            .device_addresses()
+            .await
+            .map_err(|e| format!("Failed to list devices: {}", e))?;
+
+        let mut devices = Vec::new();
+        for addr in addresses {
+            match build_device_info(adapter, addr).await {
+                Ok(d) => devices.push(d),
+                Err(e) => eprintln!("Skipping device {}: {}", addr, e),
+            }
+        }
+        device::sort_devices(&mut devices);
+        self.devices = devices;
+        Ok(())
+    }
+
+    /// Replace the entire device list (keeps it sorted).
+    pub fn replace_devices(&mut self, devices: Vec<BluetoothDevice>) {
+        self.devices = devices;
+        device::sort_devices(&mut self.devices);
+    }
+
+    /// Insert or update a device, then re-sort.
+    pub fn upsert_device(&mut self, device: BluetoothDevice) {
+        if let Some(existing) = self
+            .devices
+            .iter_mut()
+            .find(|d| d.address == device.address)
+        {
+            *existing = device;
+        } else {
+            self.devices.push(device);
+        }
+        device::sort_devices(&mut self.devices);
+    }
+
+    /// Remove a device by address (no re-sort needed).
+    pub fn remove_device(&mut self, addr: bluer::Address) {
+        self.devices.retain(|d| d.address != addr);
+    }
+}
+
+/// Build a `BluetoothDevice` from an address. Returns `Err` for devices
+/// that should be hidden (unnamed + unpaired).
+async fn build_device_info(
+    adapter: &bluer::Adapter,
+    address: bluer::Address,
+) -> Result<BluetoothDevice, String> {
+    let device = adapter
+        .device(address)
+        .map_err(|e| format!("Device error: {}", e))?;
+
+    let props = properties::fetch_properties(&device, properties::PropertyTimeouts::default()).await;
+    properties::build_device(address, &props, true, false)
+        .ok_or_else(|| String::from("unnamed"))
+}
+
+/// Resolve a human-readable display name for a Bluetooth device.
+///
+/// Logic (matching blueman's default):
+/// 1. Broadcast name (D-Bus `Name` property) → use it if present
+/// 2. Alias that differs from the raw MAC address → use alias
+/// 3. Paired device with no name → fall back to MAC address
+/// 4. Unpaired device with no name → return None (hide it)
+///
+/// The MAC comparison normalises dash/colon separators and is case-insensitive,
+/// matching blueman's `alias.replace("-", ":") == address` check.
+pub fn resolve_display_name(
+    name: Option<String>,
+    alias: Option<String>,
+    paired: bool,
+    addr_str: &str,
+) -> Option<String> {
+    match name.filter(|n| !n.is_empty()) {
+        Some(n) => Some(n),
+        None => {
+            let alias_matches_mac = alias.as_ref().is_some_and(|a| {
+                a.replace('-', ":").to_lowercase() == addr_str.to_lowercase()
+            });
+            if alias_matches_mac {
+                if paired { Some(addr_str.into()) } else { None }
+            } else {
+                match alias {
+                    Some(a) if !a.is_empty() => Some(a),
+                    _ if paired => Some(addr_str.into()),
+                    _ => None,
+                }
+            }
+        }
+    }
+}
