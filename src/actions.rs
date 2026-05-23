@@ -1,6 +1,6 @@
+use crate::app::BludioApp;
 use crate::bluetooth::{self, device, properties};
-use crate::device_list::Action;
-use crate::BludioApp;
+use crate::ui::bluetooth_page::Action;
 use gpui::{AsyncApp, WeakEntity};
 
 /// Execute a device action (connect / disconnect / forget / pair+trust)
@@ -45,8 +45,7 @@ pub(crate) async fn execute(
 
     // ── 2. Quick status update ──
     let a = adapter.clone();
-    let quick =
-        crate::tokio_task(async move { quick_device_status(&a, addr).await });
+    let quick = crate::tokio_task(async move { quick_device_status(&a, addr).await });
     if let Ok(Some(device)) = quick.await {
         let _ = this.update(cx, |this, cx| {
             this.bt_state.upsert_device(device);

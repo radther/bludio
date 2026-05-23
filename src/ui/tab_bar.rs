@@ -4,7 +4,8 @@
 //! SVG icon. The active tab is visually highlighted; all inactive tabs show a
 //! hover effect. Click callbacks are wired through closures.
 
-use gpui::{CursorStyle, IntoElement, MouseButton, MouseUpEvent, SharedString, div, hsla, prelude::*, px};
+use crate::ui::v_flex;
+use gpui::{CursorStyle, Div, MouseButton, MouseUpEvent, SharedString, div, hsla, prelude::*, px};
 
 /// The width of the tab bar column.
 pub const TAB_BAR_WIDTH: f32 = 48.0;
@@ -29,14 +30,12 @@ pub fn tab_bar_view(
     tabs: &[Tab],
     active_index: usize,
     on_click: impl Fn(usize, &mut gpui::Window, &mut gpui::App) + 'static,
-) -> impl IntoElement {
+) -> Div {
     let bg = hsla(0.0, 0.0, 0.12, 1.0);
     let hover_color = hsla(0.0, 0.0, 1.0, 0.06);
     let highlight = hsla(210.0 / 360.0, 0.5, 0.35, 0.5);
 
-    div()
-        .flex()
-        .flex_col()
+    v_flex()
         .w(px(TAB_BAR_WIDTH))
         .h_full()
         .bg(bg)
@@ -58,7 +57,7 @@ pub fn tab_bar_view(
                     .h(px(TAB_HEIGHT))
                     .cursor(CursorStyle::PointingHand)
                     .when(is_active, |el| el.bg(highlight))
-                    .tooltip(crate::tooltip::tooltip_text(tab.tooltip))
+                    .tooltip(crate::ui::tooltip::tooltip_text(tab.tooltip))
                     .hover(move |el| {
                         if is_active {
                             el.bg(highlight)
