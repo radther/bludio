@@ -1,10 +1,4 @@
-# app-shell
-
-## Purpose
-
-The minimal GPUI application shell that opens a window and renders the app identity. This is the visual foundation all future features compose into.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Application launches and opens a window
 
@@ -20,6 +14,14 @@ The system SHALL compile as a Rust binary that, when executed, opens a native OS
 - **WHEN** the compiled binary is executed
 - **THEN** a native OS window opens with no terminal output errors
 
+### Requirement: Window displays centered "bludio" text
+
+**REMOVED** — The centered "bludio" text is no longer the primary app shell content. The app header title moves to the Bluetooth page view.
+
+**Reason**: The app shell is restructured from a single full-screen view to a horizontal layout with left tab bar and content area. The "bluetooth" branding text is page-specific, not global shell chrome.
+
+**Migration**: The "bluetooth" title text previously rendered in `main.rs` header is now rendered within the Bluetooth devices page view. No external API surface is affected.
+
 ### Requirement: Window uses reasonable default dimensions
 
 The system SHALL open the window with dimensions of 1100 pixels wide by 700 pixels tall, centered on the primary display.
@@ -30,6 +32,8 @@ The system SHALL open the window with dimensions of 1100 pixels wide by 700 pixe
 - **THEN** the window is 1100×700 pixels
 - **THEN** the window is centered on the display
 - **THEN** the window has an app identity string (e.g., `"com.bludio.app"`)
+
+## ADDED Requirements
 
 ### Requirement: App shell renders a horizontal two-column layout
 

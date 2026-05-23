@@ -1,6 +1,9 @@
 mod actions;
 mod bluetooth;
 mod device_list;
+mod icons;
+mod tab_bar;
+mod tooltip;
 
 use std::sync::LazyLock;
 
@@ -35,12 +38,22 @@ where
     rx
 }
 
+// ── Page navigation ───────────────────────────────────────────────────────
+
+/// Available pages in the application.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Page {
+    BluetoothDevices,
+    Page2,
+}
+
 // ── App state ──────────────────────────────────────────────────────────────
 
 pub(crate) struct BludioApp {
     bt_state: BluetoothState,
     bt_agent: Option<bluetooth::agent::AgentHandle>,
     initialized: bool,
+    active_page: Page,
     _focus_handle: FocusHandle,
 }
 
@@ -155,6 +168,7 @@ impl BludioApp {
             bt_state: BluetoothState::default(),
             bt_agent: None,
             initialized: false,
+            active_page: Page::BluetoothDevices,
             _focus_handle: cx.focus_handle(),
         }
     }
@@ -171,6 +185,7 @@ impl Render for BludioApp {
         let discovering = self.bt_state.discovering;
         let error = self.bt_state.error.clone();
         let initialized = self.initialized;
+        let active_page = self.active_page;
 
         let bg = hsla(0.0, 0.0, 0.08, 1.0);
         let surface = hsla(0.0, 0.0, 0.14, 1.0);
@@ -181,37 +196,108 @@ impl Render for BludioApp {
         let danger = hsla(0.0, 0.7, 0.55, 1.0);
         let danger_hover = hsla(0.0, 0.7, 0.45, 1.0);
 
+        let this = cx.weak_entity();
+
+        let tabs = [
+            tab_bar::Tab {
+                icon: icons::bluetooth,
+                tooltip: "Bluetooth Devices",
+            },
+            tab_bar::Tab {
+                icon: icons::page_placeholder,
+                tooltip: "Page 2",
+            },
+        ];
+        let active_tab_index = match active_page {
+            Page::BluetoothDevices => 0,
+            Page::Page2 => 1,
+        };
+
         div()
             .size_full()
             .flex()
-            .flex_col()
+            .flex_row()
             .bg(bg)
             .text_color(text)
-            // ── Header ──
+            // ── Left tab bar ──
+            .child(tab_bar::tab_bar_view(&tabs, active_tab_index, {
+                let this = this.clone();
+                move |idx: usize, _window: &mut Window, app: &mut gpui::App| {
+                    if let Some(this) = this.upgrade() {
+                        let new_page = match idx {
+                            0 => Page::BluetoothDevices,
+                            _ => Page::Page2,
+                        };
+                        this.update(app, |this, cx| {
+                            if this.active_page != new_page {
+                                this.active_page = new_page;
+                                cx.notify();
+                            }
+                        });
+                    }
+                }
+            }))
+            // ── Right content area ──
             .child(
                 div()
+                    .flex_1()
                     .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_between()
-                    .px_4()
-                    .py_2()
-                    .bg(surface)
-                    .border_b_1()
-                    .border_color(hsla(0.0, 0.0, 0.25, 1.0))
-                    .child(div().font_weight(FontWeight::BOLD).child("bluetooth"))
-                    .child(scan_button(discovering, danger, accent, danger_hover, accent_hover, cx)),
+                    .flex_col()
+                    .child(match active_page {
+                        Page::BluetoothDevices => {
+                            div()
+                                .flex_1()
+                                .flex()
+                                .flex_col()
+                                // ── Bluetooth header ──
+                                .child(
+                                    div()
+                                        .flex()
+                                        .flex_row()
+                                        .items_center()
+                                        .justify_between()
+                                        .px_4()
+                                        .py_2()
+                                        .bg(surface)
+                                        .border_b_1()
+                                        .border_color(hsla(0.0, 0.0, 0.25, 1.0))
+                                        .child(
+                                            div().font_weight(FontWeight::BOLD).child("bluetooth"),
+                                        )
+                                        .child(scan_button(
+                                            discovering,
+                                            danger,
+                                            accent,
+                                            danger_hover,
+                                            accent_hover,
+                                            cx,
+                                        )),
+                                )
+                                // ── Error / Loading / Device list ──
+                                .when_some(error, |el, err| el.child(error_banner(err)))
+                                .when(
+                                    !initialized && self.bt_state.error.is_none(),
+                                    |el| el.child(loading_indicator(text_secondary)),
+                                )
+                                .when(initialized, |el| {
+                                    el.child(device_list::device_list_view(
+                                        &self.bt_state,
+                                        cx,
+                                    ))
+                                })
+                                .into_any_element()
+                        }
+                        Page::Page2 => div()
+                            .flex_1()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(text_secondary)
+                            .child("Page 2")
+                            .into_any_element(),
+                    })
+                    .into_any_element(),
             )
-            // ── Error / Loading / Device list ──
-            .when_some(error, |el, err| {
-                el.child(error_banner(err))
-            })
-            .when(!initialized && self.bt_state.error.is_none(), |el| {
-                el.child(loading_indicator(text_secondary))
-            })
-            .when(initialized, |el| {
-                el.child(device_list::device_list_view(&self.bt_state, cx))
-            })
     }
 }
 
@@ -226,6 +312,7 @@ fn scan_button(
     cx: &mut Context<BludioApp>,
 ) -> impl IntoElement {
     div()
+        .id("scan-btn")
         .px_3()
         .py_1()
         .rounded_md()
