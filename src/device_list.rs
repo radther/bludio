@@ -8,7 +8,7 @@ pub(crate) const ROW_HEIGHT: f32 = 64.0;
 
 // ── Action type ────────────────────────────────────────────────────────────
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Action {
     Connect,
     Disconnect,
@@ -55,6 +55,7 @@ pub(crate) fn device_list_view(
             let connected = device.connected;
 
             div()
+                .id(SharedString::from(format!("device-{addr}")))
                 .flex()
                 .flex_row()
                 .items_center()
@@ -151,6 +152,7 @@ fn action_btn(
     cx: &mut Context<crate::BludioApp>,
 ) -> impl IntoElement {
     div()
+        .id(SharedString::from(format!("btn-{addr}-{action:?}")))
         .px_2()
         .py_1()
         .rounded_sm()
