@@ -31,8 +31,7 @@ pub(crate) fn start_scan(
         };
 
         use futures::StreamExt;
-        let deadline =
-            tokio::time::Instant::now() + std::time::Duration::from_secs(30);
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);
 
         loop {
             if tokio::time::Instant::now() >= deadline {
@@ -40,12 +39,7 @@ pub(crate) fn start_scan(
                 break;
             }
 
-            match tokio::time::timeout(
-                std::time::Duration::from_millis(250),
-                events.next(),
-            )
-            .await
-            {
+            match tokio::time::timeout(std::time::Duration::from_millis(250), events.next()).await {
                 Ok(Some(bluer::AdapterEvent::DeviceAdded(addr))) => {
                     if let Some(info) = fetch_device_info(&a, addr).await {
                         let _ = tx.send(DiscoveryEvent::DeviceAdded(info));
@@ -74,8 +68,7 @@ async fn fetch_device_info(
     addr: bluer::Address,
 ) -> Option<device::BluetoothDevice> {
     let device = adapter.device(addr).ok()?;
-    let props =
-        properties::fetch_properties(&device, PropertyTimeouts::SCAN).await;
+    let props = properties::fetch_properties(&device, PropertyTimeouts::SCAN).await;
     properties::build_device(addr, &props, true, true)
 }
 
@@ -83,16 +76,13 @@ async fn fetch_device_info(
 
 /// Full device list refresh: enumerate all known devices, filter by RSSI
 /// (in-range only, unless paired) and name (blueman default), then sort.
-pub(crate) async fn refresh_device_list(
-    adapter: &Adapter,
-) -> Option<Vec<device::BluetoothDevice>> {
+pub(crate) async fn refresh_device_list(adapter: &Adapter) -> Option<Vec<device::BluetoothDevice>> {
     let addresses = adapter.device_addresses().await.ok()?;
     let mut devices = Vec::new();
 
     for addr in addresses {
         let device = adapter.device(addr).ok()?;
-        let props =
-            properties::fetch_properties(&device, PropertyTimeouts::default()).await;
+        let props = properties::fetch_properties(&device, PropertyTimeouts::default()).await;
 
         if !props.paired && props.rssi.is_none() {
             continue;

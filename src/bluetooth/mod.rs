@@ -117,9 +117,9 @@ async fn build_device_info(
         .device(address)
         .map_err(|e| format!("Device error: {}", e))?;
 
-    let props = properties::fetch_properties(&device, properties::PropertyTimeouts::default()).await;
-    properties::build_device(address, &props, true, false)
-        .ok_or_else(|| String::from("unnamed"))
+    let props =
+        properties::fetch_properties(&device, properties::PropertyTimeouts::default()).await;
+    properties::build_device(address, &props, true, false).ok_or_else(|| String::from("unnamed"))
 }
 
 /// Resolve a human-readable display name for a Bluetooth device.
@@ -141,9 +141,9 @@ pub fn resolve_display_name(
     match name.filter(|n| !n.is_empty()) {
         Some(n) => Some(n),
         None => {
-            let alias_matches_mac = alias.as_ref().is_some_and(|a| {
-                a.replace('-', ":").to_lowercase() == addr_str.to_lowercase()
-            });
+            let alias_matches_mac = alias
+                .as_ref()
+                .is_some_and(|a| a.replace('-', ":").to_lowercase() == addr_str.to_lowercase());
             if alias_matches_mac {
                 if paired { Some(addr_str.into()) } else { None }
             } else {
