@@ -14,7 +14,7 @@ The system SHALL render a fixed-width vertical tab bar on the left side of the a
 
 - **WHEN** the application starts
 - **THEN** a vertical bar SHALL appear on the left side of the window
-- **THEN** the bar SHALL contain at least two icon buttons (tabs)
+- **THEN** the bar SHALL contain at least three icon buttons (tabs): Bluetooth, Output Devices, and Input Devices
 - **THEN** the bar SHALL be 48 pixels wide
 
 #### Scenario: Tab bar icons are loaded from SVG files
@@ -65,15 +65,37 @@ The system SHALL set the Bluetooth devices page as the active page on applicatio
 - **THEN** the Bluetooth devices page SHALL be rendered in the main content area
 - **THEN** the first tab (Bluetooth icon) SHALL be visually highlighted as active
 
-### Requirement: Placeholder page renders centered text
+### Requirement: Output Devices tab navigates to output device page
 
-The system SHALL include a second tab that, when active, displays a centered text placeholder in the main content area. This page SHALL have no functional behavior beyond displaying the placeholder text.
+The system SHALL provide an "Output Devices" tab in the tab bar. When clicked, the main content area SHALL render the output devices page showing all PulseAudio sinks with their properties and controls.
 
-#### Scenario: Placeholder page displays centered text
+#### Scenario: Output Devices tab is present in tab bar
 
-- **WHEN** the user clicks the second tab
-- **THEN** the main content area SHALL display the text "Page 2" centered horizontally and vertically
-- **THEN** the first tab SHALL no longer be highlighted
+- **WHEN** the application starts
+- **THEN** a tab with an audio device icon SHALL appear in the tab bar at index 1
+- **THEN** the tab SHALL have the tooltip "Output Devices"
+
+#### Scenario: Clicking Output Devices tab renders output page
+
+- **WHEN** the user clicks the Output Devices tab
+- **THEN** the main content area SHALL render the output devices list
+- **THEN** the Output Devices tab SHALL be visually highlighted as active
+
+### Requirement: Input Devices tab navigates to input device page
+
+The system SHALL provide an "Input Devices" tab in the tab bar. When clicked, the main content area SHALL render the input devices page showing all PulseAudio sources with their properties and controls.
+
+#### Scenario: Input Devices tab is present in tab bar
+
+- **WHEN** the application starts
+- **THEN** a tab with a microphone icon SHALL appear in the tab bar at index 2
+- **THEN** the tab SHALL have the tooltip "Input Devices"
+
+#### Scenario: Clicking Input Devices tab renders input page
+
+- **WHEN** the user clicks the Input Devices tab
+- **THEN** the main content area SHALL render the input devices list
+- **THEN** the Input Devices tab SHALL be visually highlighted as active
 
 ### Requirement: Tab bar is reusable and self-contained
 

@@ -1,5 +1,6 @@
 mod actions;
 mod app;
+mod audio;
 mod bluetooth;
 mod ui;
 
@@ -43,7 +44,7 @@ fn main() {
                 app_id: Some("com.bludio.app".to_string()),
                 ..Default::default()
             },
-            |_window, cx| cx.new(app::BludioApp::new),
+            |window, cx| cx.new(|cx| app::BludioApp::new(window, cx)),
         )
         .unwrap();
 

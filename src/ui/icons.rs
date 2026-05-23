@@ -22,6 +22,22 @@ pub fn bluetooth() -> gpui::Svg {
 }
 
 /// Placeholder page icon (plus — generic add/new page indicator).
+#[allow(dead_code)]
 pub fn page_placeholder() -> gpui::Svg {
     icon("plus")
+}
+
+/// Audio output icon (speaker — Lucide's volume-2 approximates a speaker).
+pub fn audio_output() -> gpui::Svg {
+    icon("bolt") // TODO: replace with proper speaker icon
+}
+
+/// Audio input icon (mic — Lucide's mic approximates a microphone).
+pub fn audio_input() -> gpui::Svg {
+    icon("plus") // TODO: replace with proper mic icon
+}
+
+/// Text field test page icon.
+pub fn text_field_test() -> gpui::Svg {
+    icon("inbox")
 }

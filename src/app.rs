@@ -3,10 +3,18 @@
 //! Follows Zed's pattern where the entry point (`main.rs`) is thin and the
 //! app entity lives in its own module.
 
+use crate::audio::AudioState;
+use crate::audio::DeviceKind;
 use crate::bluetooth::BluetoothState;
 use crate::ui;
-use gpui::{App, Context, FocusHandle, Focusable, IntoElement, Render, Window, hsla, prelude::*};
-use ui::{h_flex, icons, tab_bar, v_flex};
+use crate::ui::audio::audio_page::AudioPage;
+use crate::ui::icons;
+use crate::ui::tab_bar;
+use crate::ui::text_field_test::TextFieldTestPage;
+use crate::ui::{h_flex, v_flex};
+use gpui::{
+    App, Context, Entity, FocusHandle, Focusable, IntoElement, Render, Window, hsla, prelude::*,
+};
 
 // ── Page navigation ───────────────────────────────────────────────────────
 
@@ -14,7 +22,9 @@ use ui::{h_flex, icons, tab_bar, v_flex};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Page {
     BluetoothDevices,
-    Page2,
+    AudioOutputs,
+    AudioInputs,
+    TextFieldTest,
 }
 
 // ── App state ──────────────────────────────────────────────────────────────
@@ -23,12 +33,55 @@ pub(crate) struct BludioApp {
     pub(crate) bt_state: BluetoothState,
     pub(crate) bt_agent: Option<crate::bluetooth::agent::AgentHandle>,
     pub(crate) initialized: bool,
+    pub(crate) audio_state: AudioState,
+    /// Self-contained page entities.
+    audio_output_page: Entity<AudioPage>,
+    audio_input_page: Entity<AudioPage>,
+    /// Test page: self-contained entity.
+    text_field_test_page: Entity<TextFieldTestPage>,
     active_page: Page,
     _focus_handle: FocusHandle,
 }
 
 impl BludioApp {
-    pub(crate) fn new(cx: &mut Context<Self>) -> Self {
+    pub(crate) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // ── Audio init: spawn PA thread and state polling ──
+        let (audio_cmd_tx, audio_cmd_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (audio_state_tx, audio_state_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (wakeup_tx, wakeup_rx) = std::sync::mpsc::channel();
+
+        std::thread::spawn(move || {
+            crate::audio::pulse::run_pa_thread_from_channels(
+                audio_cmd_rx,
+                audio_state_tx,
+                wakeup_tx,
+            );
+        });
+
+        // Receive the wakeup handle (block briefly, PA thread sends it immediately).
+        // If this fails (Err), PA init failed — the pages will show an error.
+        let pa_wakeup = wakeup_rx.recv().ok();
+        let pa_init_error = pa_wakeup
+            .is_none()
+            .then(|| "PulseAudio failed to initialize".to_string());
+
+        cx.spawn_in(window, async move |this, cx| {
+            let _tokio_guard = crate::TOKIO.enter();
+            let mut rx = audio_state_rx;
+            while let Some(state) = rx.recv().await {
+                let _ = this.update_in(cx, |this, window, cx| {
+                    this.audio_state = state.clone();
+                    this.audio_output_page
+                        .update(cx, |page, cx| page.sync_rows(&state, window, cx));
+                    this.audio_input_page
+                        .update(cx, |page, cx| page.sync_rows(&state, window, cx));
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
+
+        // ── Bluetooth init ──
         cx.spawn(async move |this, cx| {
             // ── Init ──
             let rx = crate::tokio_task(async {
@@ -130,10 +183,26 @@ impl BludioApp {
         })
         .detach();
 
+        // ── Create page entities ──
+        let audio_output_page =
+            cx.new(|cx| AudioPage::new(DeviceKind::Output, audio_cmd_tx.clone(), pa_wakeup, cx));
+        let audio_input_page =
+            cx.new(|cx| AudioPage::new(DeviceKind::Input, audio_cmd_tx.clone(), pa_wakeup, cx));
+        let text_field_test_page = cx.new(TextFieldTestPage::new);
+
+        let mut audio_state = AudioState::default();
+        if let Some(err) = pa_init_error {
+            audio_state.error = Some(err);
+        }
+
         Self {
             bt_state: BluetoothState::default(),
             bt_agent: None,
             initialized: false,
+            audio_state,
+            audio_output_page,
+            audio_input_page,
+            text_field_test_page,
             active_page: Page::BluetoothDevices,
             _focus_handle: cx.focus_handle(),
         }
@@ -152,7 +221,7 @@ impl Render for BludioApp {
 
         let bg = hsla(0.0, 0.0, 0.08, 1.0);
         let text = hsla(0.0, 0.0, 0.95, 1.0);
-        let text_secondary = hsla(0.0, 0.0, 0.6, 1.0);
+        let _text_secondary = hsla(0.0, 0.0, 0.6, 1.0);
 
         let this = cx.weak_entity();
 
@@ -162,13 +231,23 @@ impl Render for BludioApp {
                 tooltip: "Bluetooth Devices",
             },
             tab_bar::Tab {
-                icon: icons::page_placeholder,
-                tooltip: "Page 2",
+                icon: icons::audio_output,
+                tooltip: "Output Devices",
+            },
+            tab_bar::Tab {
+                icon: icons::audio_input,
+                tooltip: "Input Devices",
+            },
+            tab_bar::Tab {
+                icon: icons::text_field_test,
+                tooltip: "Text Field Test",
             },
         ];
         let active_tab_index = match active_page {
             Page::BluetoothDevices => 0,
-            Page::Page2 => 1,
+            Page::AudioOutputs => 1,
+            Page::AudioInputs => 2,
+            Page::TextFieldTest => 3,
         };
 
         h_flex()
@@ -183,7 +262,10 @@ impl Render for BludioApp {
                     if let Some(this) = this.upgrade() {
                         let new_page = match idx {
                             0 => Page::BluetoothDevices,
-                            _ => Page::Page2,
+                            1 => Page::AudioOutputs,
+                            2 => Page::AudioInputs,
+                            3 => Page::TextFieldTest,
+                            _ => Page::BluetoothDevices,
                         };
                         this.update(app, |this, cx| {
                             if this.active_page != new_page {
@@ -203,12 +285,9 @@ impl Render for BludioApp {
                             ui::bluetooth_page::bluetooth_page_view(&self.bt_state, cx)
                                 .into_any_element()
                         }
-                        Page::Page2 => h_flex()
-                            .flex_1()
-                            .justify_center()
-                            .text_color(text_secondary)
-                            .child("Page 2")
-                            .into_any_element(),
+                        Page::AudioOutputs => self.audio_output_page.clone().into_any_element(),
+                        Page::AudioInputs => self.audio_input_page.clone().into_any_element(),
+                        Page::TextFieldTest => self.text_field_test_page.clone().into_any_element(),
                     })
                     .into_any_element(),
             )
