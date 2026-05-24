@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bluer::{Adapter, DeviceProperty};
-use futures::{channel::mpsc, StreamExt};
+use futures::{StreamExt, channel::mpsc};
 use tokio::task::JoinHandle;
 
 /// Start background D-Bus property-change monitoring.

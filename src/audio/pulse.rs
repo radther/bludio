@@ -13,6 +13,7 @@ use pulse::mainloop::api::MainloopInnerType;
 use pulse::mainloop::standard::IterateResult;
 use pulse::mainloop::standard::Mainloop;
 use pulse::proplist::Proplist;
+use pulse::proplist::properties;
 use pulse::volume::Volume;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -360,7 +361,11 @@ fn build_audio_state(
                 let vol = si.volume.get().first().copied().unwrap_or(Volume(0));
                 sinks.borrow_mut().push(SinkInfo {
                     index: si.index,
-                    name: si.name.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
+                    name: si
+                        .name
+                        .as_ref()
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or_default(),
                     description: si
                         .description
                         .as_ref()
@@ -389,7 +394,11 @@ fn build_audio_state(
                 let vol = si.volume.get().first().copied().unwrap_or(Volume(0));
                 sources.borrow_mut().push(SourceInfo {
                     index: si.index,
-                    name: si.name.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
+                    name: si
+                        .name
+                        .as_ref()
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or_default(),
                     description: si
                         .description
                         .as_ref()
@@ -421,7 +430,11 @@ fn build_audio_state(
                     .profiles
                     .iter()
                     .map(|p| ProfileInfo {
-                        name: p.name.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
+                        name: p
+                            .name
+                            .as_ref()
+                            .map(std::string::ToString::to_string)
+                            .unwrap_or_default(),
                         description: p
                             .description
                             .as_ref()
@@ -430,9 +443,15 @@ fn build_audio_state(
                         available: p.available,
                     })
                     .collect();
+                let description = ci.proplist.get_str(properties::DEVICE_DESCRIPTION);
                 cards.borrow_mut().push(CardInfo {
                     index: ci.index,
-                    name: ci.name.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
+                    name: ci
+                        .name
+                        .as_ref()
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or_default(),
+                    description,
                     active_profile,
                     profiles,
                 });
@@ -449,8 +468,14 @@ fn build_audio_state(
         let intro = pa_ctx.borrow().introspect();
         let d = done.clone();
         let _op = intro.get_server_info(move |info| {
-            *ds.borrow_mut() = info.default_sink_name.as_ref().map(std::string::ToString::to_string);
-            *ds2.borrow_mut() = info.default_source_name.as_ref().map(std::string::ToString::to_string);
+            *ds.borrow_mut() = info
+                .default_sink_name
+                .as_ref()
+                .map(std::string::ToString::to_string);
+            *ds2.borrow_mut() = info
+                .default_source_name
+                .as_ref()
+                .map(std::string::ToString::to_string);
             *d.borrow_mut() = true;
         });
         spin_until(ml, done);

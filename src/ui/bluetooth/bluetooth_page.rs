@@ -152,9 +152,7 @@ impl Render for BluetoothPage {
             // ── Loading indicator ──
             .when(!initialized && self.error.is_none(), |el| {
                 el.child(
-                    div()
-                        .flex()
-                        .items_center()
+                    h_flex()
                         .justify_center()
                         .flex_1()
                         .text_color(text_secondary)
@@ -170,9 +168,7 @@ impl Render for BluetoothPage {
                         .overflow_y_scroll()
                         .when(self.rows.is_empty(), |el| {
                             el.child(
-                                div()
-                                    .flex()
-                                    .items_center()
+                                h_flex()
                                     .justify_center()
                                     .h(px(200.0))
                                     .text_color(text_secondary)

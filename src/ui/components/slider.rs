@@ -247,7 +247,6 @@ impl RenderOnce for SliderBar {
                 h_flex()
                     .id("slider-bar-container")
                     .w_full()
-                    .items_center()
                     .on_mouse_down(
                         MouseButton::Left,
                         window.listener_for(

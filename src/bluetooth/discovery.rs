@@ -105,7 +105,9 @@ pub(crate) async fn run_discovery(
     this: WeakEntity<crate::app::BludioApp>,
     cx: &mut AsyncWindowContext,
 ) {
-    let Ok(Some(adapter)) = this.read_with(cx, |app, _| app.bt_state.adapter.clone()) else { return };
+    let Ok(Some(adapter)) = this.read_with(cx, |app, _| app.bt_state.adapter.clone()) else {
+        return;
+    };
 
     let mut rx = start_scan(&adapter);
 

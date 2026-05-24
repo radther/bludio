@@ -123,7 +123,7 @@ The display name resolution and filtering logic matches [blueman](https://github
 
 ### Layout conventions
 - Always use `h_flex()` and `v_flex()` free functions over raw `div().flex().flex_row()` / `div().flex().flex_col()`. They are more readable and match Zed's conventions.
-- `h_flex()` defaults to `items_center()` (cross-axis centering). When this isn't desired, override with one of:
+- `h_flex()` defaults to `items_center()` so this isn't needed (cross-axis centering). When this isn't desired, override with one of:
   - `.items_start()` — align children to the top/left
   - `.items_stretch()` — restore default flex cross-axis stretch (use for root containers where children should fill the cross-axis)
 - `v_flex()` doesn't set any items alignment — add `.items_center()` etc. as needed.

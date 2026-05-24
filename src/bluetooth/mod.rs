@@ -152,7 +152,9 @@ pub fn resolve_display_name(
     paired: bool,
     addr_str: &str,
 ) -> Option<String> {
-    if let Some(n) = name.filter(|n| !n.is_empty()) { Some(n) } else {
+    if let Some(n) = name.filter(|n| !n.is_empty()) {
+        Some(n)
+    } else {
         let alias_matches_mac = alias
             .as_ref()
             .is_some_and(|a| a.replace('-', ":").to_lowercase() == addr_str.to_lowercase());

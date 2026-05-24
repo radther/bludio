@@ -37,6 +37,11 @@ pub fn audio_input() -> gpui::Svg {
     icon("plus") // TODO: replace with proper mic icon
 }
 
+/// Audio card configuration icon (settings gear).
+pub fn audio_card() -> gpui::Svg {
+    icon("settings")
+}
+
 /// Text field test page icon.
 pub fn text_field_test() -> gpui::Svg {
     icon("inbox")

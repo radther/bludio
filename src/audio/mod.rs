@@ -18,8 +18,7 @@ pub(crate) enum DeviceKind {
 pub(crate) struct AudioState {
     pub(crate) sinks: Vec<SinkInfo>,
     pub(crate) sources: Vec<SourceInfo>,
-    /// Card info is folded into sink profiles; kept for future use.
-    #[allow(dead_code)]
+    /// Card info for the Configuration page and sink profile decoration.
     pub(crate) cards: Vec<CardInfo>,
     pub(crate) connected: bool,
     pub(crate) error: Option<String>,
@@ -66,9 +65,10 @@ pub(crate) struct SourceInfo {
 #[derive(Clone, Debug)]
 pub(crate) struct CardInfo {
     pub(crate) index: u32,
-    /// Card hardware name (kept for future display).
-    #[allow(dead_code)]
+    /// Card hardware name (fallback when `description` is not set).
     pub(crate) name: String,
+    /// Human-readable description from proplist `device.description`.
+    pub(crate) description: Option<String>,
     pub(crate) active_profile: Option<String>,
     pub(crate) profiles: Vec<ProfileInfo>,
 }

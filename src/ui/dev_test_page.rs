@@ -87,7 +87,6 @@ impl Render for DevTestPage {
                     .child(
                         h_flex()
                             .gap_2()
-                            .items_center()
                             .bg(hsla(0.0, 0.0, 0.18, 1.0))
                             .rounded_md()
                             .border_1()
@@ -157,9 +156,7 @@ impl Render for DevTestPage {
                     }))
                     .when(self.confirmed_texts.is_empty(), |el| {
                         el.child(
-                            div()
-                                .flex()
-                                .items_center()
+                            h_flex()
                                 .justify_center()
                                 .h(px(120.))
                                 .text_color(text_secondary)

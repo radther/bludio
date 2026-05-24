@@ -5,11 +5,12 @@
 //!
 //! Based on gpui's `input.rs` example and Zed's `ui_input`/`editor` crates.
 
+use crate::ui::h_flex;
 use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, Entity, EntityInputHandler, EventEmitter,
     FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
     Pixels, Point, Render, RenderOnce, ShapedLine, SharedString, TextAlign, TextRun, Window,
-    canvas, div, hsla, point, prelude::*, px, size,
+    canvas, hsla, point, prelude::*, px, size,
 };
 use std::ops::Range;
 use std::time::Duration;
@@ -583,10 +584,9 @@ impl RenderOnce for TextFieldComponent {
         let entity_for_mouse = entity.clone();
         let entity_for_paint = entity.clone();
 
-        div()
+        h_flex()
             .track_focus(&focus_handle)
             .cursor(CursorStyle::IBeam)
-            .flex()
             .justify_center()
             .flex_grow()
             .px_1()

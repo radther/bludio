@@ -369,7 +369,6 @@ impl AudioDeviceRow {
         h_flex()
             .w_full()
             .gap_2()
-            .items_center()
             // ── Volume slider ──
             .child(self.slider.clone())
             // ── Inline text field for numeric volume ──

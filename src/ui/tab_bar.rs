@@ -4,8 +4,9 @@
 //! SVG icon. The active tab is visually highlighted; all inactive tabs show a
 //! hover effect. Click callbacks are wired through closures.
 
+use crate::ui::h_flex;
 use crate::ui::v_flex;
-use gpui::{CursorStyle, Div, MouseButton, MouseUpEvent, SharedString, div, hsla, prelude::*, px};
+use gpui::{CursorStyle, Div, MouseButton, MouseUpEvent, SharedString, hsla, prelude::*, px};
 
 /// The width of the tab bar column.
 pub const TAB_BAR_WIDTH: f32 = 48.0;
@@ -48,10 +49,8 @@ pub fn tab_bar_view(
                 let icon_fn = tab.icon;
                 let on_click = on_click.clone();
 
-                div()
+                h_flex()
                     .id(SharedString::from(format!("tab-{i}")))
-                    .flex()
-                    .items_center()
                     .justify_center()
                     .w(px(TAB_BAR_WIDTH))
                     .h(px(TAB_HEIGHT))

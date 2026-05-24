@@ -78,7 +78,8 @@ impl Dropdown {
     pub fn selected_text(&self) -> SharedString {
         self.items
             .get(self.selected_index)
-            .cloned().map_or_else(|| self.placeholder.clone(), SharedString::from)
+            .cloned()
+            .map_or_else(|| self.placeholder.clone(), SharedString::from)
     }
 
     /// Whether the dropdown has any items to show.

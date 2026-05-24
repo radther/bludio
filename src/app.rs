@@ -10,6 +10,7 @@ use crate::bluetooth::device::{
     DeviceRowAction, PairingStatus, devices_changed, execute_device_action, quick_device_status,
 };
 use crate::ui::audio::audio_page::AudioPage;
+use crate::ui::audio::configuration_page::ConfigurationPage;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::bluetooth_page::BluetoothPage;
 use crate::ui::dev_test_page::DevTestPage;
@@ -29,6 +30,7 @@ pub(crate) enum Page {
     BluetoothDevices,
     AudioOutputs,
     AudioInputs,
+    Configuration,
     DevTest,
 }
 
@@ -41,6 +43,7 @@ pub(crate) struct BludioApp {
     /// Self-contained page entities.
     audio_output_page: Entity<AudioPage>,
     audio_input_page: Entity<AudioPage>,
+    configuration_page: Entity<ConfigurationPage>,
     /// Developer test page: self-contained entity.
     dev_test_page: Entity<DevTestPage>,
     /// Bluetooth device page: self-contained entity.
@@ -83,6 +86,8 @@ impl BludioApp {
             cx.new(|cx| AudioPage::new(DeviceKind::Output, audio_cmd_tx.clone(), pa_wakeup, cx));
         let audio_input_page =
             cx.new(|cx| AudioPage::new(DeviceKind::Input, audio_cmd_tx.clone(), pa_wakeup, cx));
+        let configuration_page =
+            cx.new(|cx| ConfigurationPage::new(audio_cmd_tx.clone(), pa_wakeup, cx));
         let dev_test_page = cx.new(DevTestPage::new);
 
         Self::spawn_bluetooth_command_handler(bt_cmd_rx, window, cx);
@@ -98,6 +103,7 @@ impl BludioApp {
             audio_state,
             audio_output_page,
             audio_input_page,
+            configuration_page,
             dev_test_page,
             bluetooth_page,
             active_page: Page::BluetoothDevices,
@@ -122,6 +128,8 @@ impl BludioApp {
                         .update(cx, |page, cx| page.sync_rows(&state, window, cx));
                     this.audio_input_page
                         .update(cx, |page, cx| page.sync_rows(&state, window, cx));
+                    this.configuration_page
+                        .update(cx, |page, cx| page.sync_cards(&state, window, cx));
                     cx.notify();
                 });
             }
@@ -595,6 +603,10 @@ impl Render for BludioApp {
                 tooltip: "Input Devices",
             },
             tab_bar::Tab {
+                icon: icons::audio_card,
+                tooltip: "Configuration",
+            },
+            tab_bar::Tab {
                 icon: icons::text_field_test,
                 tooltip: "Text Field Test",
             },
@@ -603,7 +615,8 @@ impl Render for BludioApp {
             Page::BluetoothDevices => 0,
             Page::AudioOutputs => 1,
             Page::AudioInputs => 2,
-            Page::DevTest => 3,
+            Page::Configuration => 3,
+            Page::DevTest => 4,
         };
 
         h_flex()
@@ -620,6 +633,7 @@ impl Render for BludioApp {
                             0 => Page::BluetoothDevices,
                             1 => Page::AudioOutputs,
                             2 => Page::AudioInputs,
+                            3 => Page::Configuration,
                             _ => Page::DevTest,
                         };
                         this.update(app, |this, cx| {
@@ -639,6 +653,7 @@ impl Render for BludioApp {
                         Page::BluetoothDevices => self.bluetooth_page.clone().into_any_element(),
                         Page::AudioOutputs => self.audio_output_page.clone().into_any_element(),
                         Page::AudioInputs => self.audio_input_page.clone().into_any_element(),
+                        Page::Configuration => self.configuration_page.clone().into_any_element(),
                         Page::DevTest => self.dev_test_page.clone().into_any_element(),
                     })
                     .into_any_element(),
