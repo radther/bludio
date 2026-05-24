@@ -1,7 +1,7 @@
 //! Self-contained, single-line text input component.
 //!
 //! Drop-in entity that handles all keyboard and IME input internally.
-//! Emits `TextFieldEvent`s via `cx.emit()` (EventEmitter pattern).
+//! Emits `TextFieldEvent`s via `cx.emit()` (`EventEmitter` pattern).
 //!
 //! Based on gpui's `input.rs` example and Zed's `ui_input`/`editor` crates.
 
@@ -22,7 +22,7 @@ const CURSOR_BLINK_INTERVAL: Duration = Duration::from_millis(500);
 
 // ── Events ─────────────────────────────────────────────────────────────────
 
-/// Events emitted by the TextField for parent views to handle.
+/// Events emitted by the `TextField` for parent views to handle.
 #[derive(Clone, Debug)]
 pub(crate) enum TextFieldEvent {
     /// User pressed Enter. Contains the current text content.
@@ -186,14 +186,12 @@ impl TextField {
             .char_indices()
             .rev()
             .find(|(_, c)| !c.is_alphanumeric())
-            .map(|(i, _)| i + 1)
-            .unwrap_or(0);
+            .map_or(0, |(i, _)| i + 1);
         // Find end of word
         let end = self.content[clamped..]
             .char_indices()
             .find(|(_, c)| !c.is_alphanumeric())
-            .map(|(i, _)| clamped + i)
-            .unwrap_or(len);
+            .map_or(len, |(i, _)| clamped + i);
         start..end
     }
 
@@ -560,7 +558,7 @@ impl Focusable for TextField {
 
 // ── TextFieldComponent (RenderOnce element) ───────────────────────────────
 
-/// The visual representation of a TextField.
+/// The visual representation of a `TextField`.
 ///
 /// Handles text layout, selection/cursor painting, IME input, and keyboard/mouse
 /// event dispatch via `window.listener_for`. Text is rendered via `ShapedLine`

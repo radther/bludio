@@ -1,7 +1,7 @@
 //! Audio device page: shared view for output and input devices.
 //!
 //! Ownership chain:
-//!   BludioApp → Entity<AudioPage> → Vec<Entity<AudioDeviceRow>>
+//!   `BludioApp` → Entity<AudioPage> → Vec<Entity<AudioDeviceRow>>
 //!     → Entity<TextField> + Entity<Dropdown>
 
 use crate::audio::pulse::PaWakeup;
@@ -143,7 +143,7 @@ impl Render for AudioPage {
                         .py_2()
                         .bg(gpui::rgba(0xff3c3c33))
                         .text_color(hsla(0.0, 0.8, 0.75, 1.0))
-                        .child(SharedString::from(format!("Error: {}", err))),
+                        .child(SharedString::from(format!("Error: {err}"))),
                 )
             })
             .when(!self.connected, |el| {

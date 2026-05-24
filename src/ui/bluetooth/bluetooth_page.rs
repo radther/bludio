@@ -1,7 +1,7 @@
 //! Bluetooth page entity: header (scan button) + error/loading states + device list.
 //!
 //! Ownership chain:
-//!   BludioApp → Entity<BluetoothPage> → Vec<Entity<BluetoothDeviceRow>>
+//!   `BludioApp` → Entity<BluetoothPage> → Vec<Entity<BluetoothDeviceRow>>
 
 use crate::bluetooth::BluetoothState;
 use crate::ui::bluetooth::BluetoothPageCommand;
@@ -146,7 +146,7 @@ impl Render for BluetoothPage {
                         .py_2()
                         .bg(gpui::rgba(0xff3c3c33))
                         .text_color(hsla(0.0, 0.8, 0.75, 1.0))
-                        .child(gpui::SharedString::from(format!("Error: {}", err))),
+                        .child(gpui::SharedString::from(format!("Error: {err}"))),
                 )
             })
             // ── Loading indicator ──

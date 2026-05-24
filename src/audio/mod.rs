@@ -1,4 +1,4 @@
-//! Audio device management: data types for PulseAudio sinks, sources, and cards.
+//! Audio device management: data types for `PulseAudio` sinks, sources, and cards.
 
 pub(crate) mod pulse;
 
@@ -13,7 +13,7 @@ pub(crate) enum DeviceKind {
 
 // ── Audio state ────────────────────────────────────────────────────────────
 
-/// Complete snapshot of the PulseAudio audio state.
+/// Complete snapshot of the `PulseAudio` audio state.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct AudioState {
     pub(crate) sinks: Vec<SinkInfo>,
@@ -30,11 +30,11 @@ pub(crate) struct AudioState {
 #[derive(Clone, Debug)]
 pub(crate) struct SinkInfo {
     pub(crate) index: u32,
-    /// PulseAudio sink name (e.g., "alsa_output.pci-0000_00_1f.3.analog-stereo").
+    /// `PulseAudio` sink name (e.g., "alsa_output.pci-0000_00_1f.3.analog-stereo").
     pub(crate) name: String,
     /// Human-readable description (e.g., "Built-in Audio Analog Stereo").
     pub(crate) description: String,
-    /// Average volume across all channels, 0.0–1.0 (mapped from PA_VOLUME_NORM).
+    /// Average volume across all channels, 0.0–1.0 (mapped from `PA_VOLUME_NORM`).
     pub(crate) volume: f64,
     pub(crate) muted: bool,
     /// Whether this sink is the system default output.
@@ -86,8 +86,8 @@ pub(crate) struct ProfileInfo {
 
 // ── Commands (UI → PA thread) ──────────────────────────────────────────────
 
-/// Commands sent from the UI to the PulseAudio backend thread.
-/// The `Set` prefix is intentional — these map to PulseAudio operations.
+/// Commands sent from the UI to the `PulseAudio` backend thread.
+/// The `Set` prefix is intentional — these map to `PulseAudio` operations.
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug)]
 pub(crate) enum AudioCommand {

@@ -4,12 +4,12 @@
 //! (background track + bordered fill). Supports click-to-jump and
 //! click-and-hold drag with out-of-bounds clamping.
 //!
-//! Emits `SliderEvent`s via `cx.emit()` (EventEmitter pattern).
-//! Follows gpui-component's `SliderState` + `Slider` (RenderOnce) pattern.
+//! Emits `SliderEvent`s via `cx.emit()` (`EventEmitter` pattern).
+//! Follows gpui-component's `SliderState` + `Slider` (`RenderOnce`) pattern.
 //!
 //! Architecture:
 //!   Slider (Entity) — holds state, emits events
-//!   SliderBar (RenderOnce) — renders the visual track + fill
+//!   `SliderBar` (`RenderOnce`) — renders the visual track + fill
 
 use gpui::{
     App, Bounds, Context, DragMoveEvent, Entity, EntityId, EventEmitter, FocusHandle, Focusable,
@@ -140,7 +140,7 @@ impl Slider {
         };
         let inner_x = (position.x - bounds.left()).clamp(px(0.0), bounds.size.width);
         let percentage = inner_x / bounds.size.width;
-        self.value = self.percentage_to_value(percentage as f64);
+        self.value = self.percentage_to_value(f64::from(percentage));
         cx.emit(SliderEvent::Change(self.value));
         cx.notify();
     }
@@ -300,7 +300,7 @@ impl RenderOnce for SliderBar {
                                             slider.bounds = Some(bounds);
                                         });
                                     },
-                                    |_, _, _, _| {},
+                                    |_, (), _, _| {},
                                 )
                                 .absolute()
                                 .size_full(),

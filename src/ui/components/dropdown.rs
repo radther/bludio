@@ -5,7 +5,7 @@
 //! content instead of pushing it around.
 //!
 //! Matches the `TextField` pattern: emits `DropdownEvent`s via `cx.emit()`
-//! (EventEmitter pattern).
+//! (`EventEmitter` pattern).
 
 use gpui::{
     Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity, EventEmitter, FocusHandle,
@@ -32,7 +32,7 @@ pub(crate) enum DropdownEvent {
 ///
 /// Renders a trigger button inline. When clicked, shows a floating options
 /// list positioned at the trigger. Emits `DropdownEvent`s via `cx.emit()`
-/// (EventEmitter pattern).
+/// (`EventEmitter` pattern).
 pub(crate) struct Dropdown {
     items: Vec<String>,
     selected_index: usize,
@@ -78,9 +78,7 @@ impl Dropdown {
     pub fn selected_text(&self) -> SharedString {
         self.items
             .get(self.selected_index)
-            .cloned()
-            .map(SharedString::from)
-            .unwrap_or_else(|| self.placeholder.clone())
+            .cloned().map_or_else(|| self.placeholder.clone(), SharedString::from)
     }
 
     /// Whether the dropdown has any items to show.
@@ -192,7 +190,7 @@ impl RenderOnce for DropdownComponent {
             Some(
                 canvas(
                     |_, _, _| {},
-                    move |_, _, window, _cx| {
+                    move |_, (), window, _cx| {
                         window.on_mouse_event({
                             let e = e.clone();
                             move |_: &MouseUpEvent, phase, _window, cx| {
@@ -329,8 +327,8 @@ impl RenderOnce for DropdownComponent {
                         ),
                     ),
             )
-            .when_some(menu, |this, menu| this.child(menu))
-            .when_some(click_outside, |this, co| this.child(co))
+            .when_some(menu, gpui::ParentElement::child)
+            .when_some(click_outside, gpui::ParentElement::child)
             .child(
                 // ── Canvas for trigger bounds capture ──
                 canvas(
@@ -339,7 +337,7 @@ impl RenderOnce for DropdownComponent {
                             d.trigger_bounds = Some(bounds);
                         });
                     },
-                    |_, _, _, _| {},
+                    |_, (), _, _| {},
                 )
                 .absolute()
                 .size_full(),

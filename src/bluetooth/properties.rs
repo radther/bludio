@@ -25,7 +25,7 @@ impl Default for PropertyTimeouts {
 }
 
 impl PropertyTimeouts {
-    /// Longer timeouts for scan — BlueZ needs time for SDP lookups.
+    /// Longer timeouts for scan — `BlueZ` needs time for SDP lookups.
     pub(crate) const SCAN: Self = Self {
         name_resolution: Duration::from_millis(1500),
         status: Duration::from_millis(500),
@@ -33,7 +33,7 @@ impl PropertyTimeouts {
     };
 }
 
-/// Raw device properties fetched from BlueZ.
+/// Raw device properties fetched from `BlueZ`.
 pub(crate) struct DeviceProperties {
     pub alias: Option<String>,
     pub name: Option<String>,
@@ -51,36 +51,36 @@ pub(crate) async fn fetch_properties(
     let alias = tokio::time::timeout(timeouts.name_resolution, device.alias())
         .await
         .ok()
-        .and_then(|r| r.ok());
+        .and_then(std::result::Result::ok);
 
     let name = tokio::time::timeout(timeouts.name_resolution, device.name())
         .await
         .ok()
-        .and_then(|r| r.ok())
+        .and_then(std::result::Result::ok)
         .flatten();
 
     let paired = tokio::time::timeout(timeouts.status, device.is_paired())
         .await
         .ok()
-        .and_then(|r| r.ok())
+        .and_then(std::result::Result::ok)
         .unwrap_or(false);
 
     let connected = tokio::time::timeout(timeouts.status, device.is_connected())
         .await
         .ok()
-        .and_then(|r| r.ok())
+        .and_then(std::result::Result::ok)
         .unwrap_or(false);
 
     let trusted = tokio::time::timeout(timeouts.status, device.is_trusted())
         .await
         .ok()
-        .and_then(|r| r.ok())
+        .and_then(std::result::Result::ok)
         .unwrap_or(false);
 
     let rssi = tokio::time::timeout(timeouts.rssi, device.rssi())
         .await
         .ok()
-        .and_then(|r| r.ok())
+        .and_then(std::result::Result::ok)
         .flatten();
 
     DeviceProperties {

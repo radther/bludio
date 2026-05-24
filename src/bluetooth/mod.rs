@@ -9,7 +9,7 @@ use device::BluetoothDevice;
 /// Holds the Bluetooth session and adapter state shared with the UI.
 #[derive(Clone, Default)]
 pub struct BluetoothState {
-    /// The BlueZ session connection (None until initialized).
+    /// The `BlueZ` session connection (None until initialized).
     pub session: Option<bluer::Session>,
     /// Handle to the default Bluetooth adapter (None until initialized).
     pub adapter: Option<bluer::Adapter>,
@@ -22,27 +22,27 @@ pub struct BluetoothState {
 }
 
 impl BluetoothState {
-    /// Connect to BlueZ, get the default adapter, power on, and enumerate
+    /// Connect to `BlueZ`, get the default adapter, power on, and enumerate
     /// currently paired devices.
     pub async fn new() -> Result<Self, String> {
         let session = bluer::Session::new()
             .await
-            .map_err(|e| format!("Failed to connect to BlueZ: {}", e))?;
+            .map_err(|e| format!("Failed to connect to BlueZ: {e}"))?;
 
         let adapter = session
             .default_adapter()
             .await
-            .map_err(|e| format!("No Bluetooth adapter found: {}", e))?;
+            .map_err(|e| format!("No Bluetooth adapter found: {e}"))?;
 
         adapter
             .set_powered(true)
             .await
-            .map_err(|e| format!("Failed to power on adapter: {}", e))?;
+            .map_err(|e| format!("Failed to power on adapter: {e}"))?;
 
         adapter
             .set_pairable(true)
             .await
-            .map_err(|e| format!("Failed to set pairable: {}", e))?;
+            .map_err(|e| format!("Failed to set pairable: {e}"))?;
 
         let mut state = Self {
             session: Some(session),
@@ -67,13 +67,13 @@ impl BluetoothState {
         let addresses = adapter
             .device_addresses()
             .await
-            .map_err(|e| format!("Failed to list devices: {}", e))?;
+            .map_err(|e| format!("Failed to list devices: {e}"))?;
 
         let mut devices = Vec::new();
         for addr in addresses {
             match build_device_info(adapter, addr).await {
                 Ok(d) => devices.push(d),
-                Err(e) => eprintln!("Skipping device {}: {}", addr, e),
+                Err(e) => eprintln!("Skipping device {addr}: {e}"),
             }
         }
         device::sort_devices(&mut devices);
@@ -129,7 +129,7 @@ async fn build_device_info(
 ) -> Result<BluetoothDevice, String> {
     let device = adapter
         .device(address)
-        .map_err(|e| format!("Device error: {}", e))?;
+        .map_err(|e| format!("Device error: {e}"))?;
 
     let props =
         properties::fetch_properties(&device, properties::PropertyTimeouts::default()).await;
@@ -152,20 +152,17 @@ pub fn resolve_display_name(
     paired: bool,
     addr_str: &str,
 ) -> Option<String> {
-    match name.filter(|n| !n.is_empty()) {
-        Some(n) => Some(n),
-        None => {
-            let alias_matches_mac = alias
-                .as_ref()
-                .is_some_and(|a| a.replace('-', ":").to_lowercase() == addr_str.to_lowercase());
-            if alias_matches_mac {
-                if paired { Some(addr_str.into()) } else { None }
-            } else {
-                match alias {
-                    Some(a) if !a.is_empty() => Some(a),
-                    _ if paired => Some(addr_str.into()),
-                    _ => None,
-                }
+    if let Some(n) = name.filter(|n| !n.is_empty()) { Some(n) } else {
+        let alias_matches_mac = alias
+            .as_ref()
+            .is_some_and(|a| a.replace('-', ":").to_lowercase() == addr_str.to_lowercase());
+        if alias_matches_mac {
+            if paired { Some(addr_str.into()) } else { None }
+        } else {
+            match alias {
+                Some(a) if !a.is_empty() => Some(a),
+                _ if paired => Some(addr_str.into()),
+                _ => None,
             }
         }
     }

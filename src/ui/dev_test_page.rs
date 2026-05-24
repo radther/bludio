@@ -2,7 +2,7 @@
 //!
 //! A self-contained entity that owns interactive components and a log of
 //! confirmed entries. Renders an input field + scrollable list of confirmed
-//! entries. Originally built for TextField testing, now a general dev sandbox.
+//! entries. Originally built for `TextField` testing, now a general dev sandbox.
 
 use gpui::{
     App, Context, CursorStyle, Entity, FocusHandle, Focusable, FontWeight, MouseButton,

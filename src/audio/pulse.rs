@@ -1,8 +1,8 @@
-//! PulseAudio backend: connection, listing, command execution, event subscription.
+//! `PulseAudio` backend: connection, listing, command execution, event subscription.
 //!
-//! Runs a dedicated std::thread with its own PA Mainloop. Communicates with
-//! the GPUI thread via tokio::sync::mpsc channels for state updates and commands.
-//! (tokio::sync::mpsc::UnboundedSender works from any thread — only the
+//! Runs a dedicated `std::thread` with its own PA Mainloop. Communicates with
+//! the GPUI thread via `tokio::sync::mpsc` channels for state updates and commands.
+//! (`tokio::sync::mpsc::UnboundedSender` works from any thread — only the
 //! receiver end needs a Tokio runtime.)
 
 use crate::audio::{AudioCommand, AudioState, CardInfo, ProfileInfo, SinkInfo, SourceInfo};
@@ -22,7 +22,7 @@ use tokio::sync::mpsc as tmpsc;
 
 // ── Public entry point ─────────────────────────────────────────────────────
 
-/// Opaque handle for waking the PulseAudio mainloop from another thread.
+/// Opaque handle for waking the `PulseAudio` mainloop from another thread.
 #[derive(Clone, Copy)]
 pub(crate) struct PaWakeup {
     ptr: *mut std::ffi::c_void,
@@ -39,7 +39,7 @@ impl PaWakeup {
     }
 }
 
-/// Run the PulseAudio backend thread.
+/// Run the `PulseAudio` backend thread.
 pub(crate) fn run_pa_thread_from_channels(
     cmd_rx: tmpsc::UnboundedReceiver<AudioCommand>,
     state_tx: tmpsc::UnboundedSender<AudioState>,
@@ -84,7 +84,7 @@ fn run_pa_loop(
     let mut proplist = Proplist::new().ok_or("Failed to create proplist")?;
     proplist
         .set_str(pulse::proplist::properties::APPLICATION_NAME, "Bludio")
-        .map_err(|_| "Failed to set app name")?;
+        .map_err(|()| "Failed to set app name")?;
 
     let mut ctx = Context::new_with_proplist(&mainloop, "Bludio", &proplist)
         .ok_or("Failed to create PA context")?;
@@ -324,7 +324,7 @@ fn volume_f64_to_pa(vol: f64) -> Volume {
 }
 
 fn pa_volume_to_f64(vol: Volume) -> f64 {
-    (vol.0 as f64) / PA_VOLUME_NORM
+    f64::from(vol.0) / PA_VOLUME_NORM
 }
 
 fn make_channel_volumes(v: Volume) -> pulse::volume::ChannelVolumes {
@@ -359,11 +359,11 @@ fn build_audio_state(
                 let vol = si.volume.get().first().copied().unwrap_or(Volume(0));
                 sinks.borrow_mut().push(SinkInfo {
                     index: si.index,
-                    name: si.name.as_ref().map(|s| s.to_string()).unwrap_or_default(),
+                    name: si.name.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
                     description: si
                         .description
                         .as_ref()
-                        .map(|s| s.to_string())
+                        .map(std::string::ToString::to_string)
                         .unwrap_or_default(),
                     volume: pa_volume_to_f64(vol),
                     muted: si.mute,
@@ -389,11 +389,11 @@ fn build_audio_state(
                 let vol = si.volume.get().first().copied().unwrap_or(Volume(0));
                 sources.borrow_mut().push(SourceInfo {
                     index: si.index,
-                    name: si.name.as_ref().map(|s| s.to_string()).unwrap_or_default(),
+                    name: si.name.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
                     description: si
                         .description
                         .as_ref()
-                        .map(|s| s.to_string())
+                        .map(std::string::ToString::to_string)
                         .unwrap_or_default(),
                     volume: pa_volume_to_f64(vol),
                     muted: si.mute,
@@ -417,23 +417,23 @@ fn build_audio_state(
                 let active_profile = ci
                     .active_profile
                     .as_ref()
-                    .and_then(|ap| ap.name.as_ref().map(|s| s.to_string()));
+                    .and_then(|ap| ap.name.as_ref().map(std::string::ToString::to_string));
                 let profiles: Vec<ProfileInfo> = ci
                     .profiles
                     .iter()
                     .map(|p| ProfileInfo {
-                        name: p.name.as_ref().map(|s| s.to_string()).unwrap_or_default(),
+                        name: p.name.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
                         description: p
                             .description
                             .as_ref()
-                            .map(|s| s.to_string())
+                            .map(std::string::ToString::to_string)
                             .unwrap_or_default(),
                         available: p.available,
                     })
                     .collect();
                 cards.borrow_mut().push(CardInfo {
                     index: ci.index,
-                    name: ci.name.as_ref().map(|s| s.to_string()).unwrap_or_default(),
+                    name: ci.name.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
                     active_profile,
                     profiles,
                 });
@@ -451,8 +451,8 @@ fn build_audio_state(
         let intro = pa_ctx.borrow().introspect();
         let d = done.clone();
         let _op = intro.get_server_info(move |info| {
-            *ds.borrow_mut() = info.default_sink_name.as_ref().map(|s| s.to_string());
-            *ds2.borrow_mut() = info.default_source_name.as_ref().map(|s| s.to_string());
+            *ds.borrow_mut() = info.default_sink_name.as_ref().map(std::string::ToString::to_string);
+            *ds2.borrow_mut() = info.default_source_name.as_ref().map(std::string::ToString::to_string);
             *d.borrow_mut() = true;
         });
         spin_until(ml, done);

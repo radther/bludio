@@ -52,7 +52,7 @@ pub(crate) async fn run_monitor(adapter: &Adapter, tx: mpsc::UnboundedSender<blu
                 }
             }
             Err(e) => {
-                eprintln!("Monitor sync error: {}", e);
+                eprintln!("Monitor sync error: {e}");
             }
         }
 

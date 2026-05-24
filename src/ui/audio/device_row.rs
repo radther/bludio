@@ -381,7 +381,7 @@ impl AudioDeviceRow {
             )
             // ── Mute / Unmute button ──
             .child(mute_button(
-                SharedString::from(format!("mute-btn-{}", idx)),
+                SharedString::from(format!("mute-btn-{idx}")),
                 self.muted,
                 {
                     let muted = self.muted;
@@ -460,7 +460,7 @@ fn action_btn(
     on_click: impl Fn() + 'static,
 ) -> Stateful<Div> {
     div()
-        .id(SharedString::from(format!("btn-{}", label)))
+        .id(SharedString::from(format!("btn-{label}")))
         .px_2()
         .py_1()
         .rounded_sm()
@@ -471,6 +471,6 @@ fn action_btn(
         .hover(move |el| el.bg(hover_bg))
         .child(SharedString::from(label.to_string()))
         .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, _window, _cx| {
-            on_click()
+            on_click();
         })
 }

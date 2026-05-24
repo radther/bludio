@@ -25,7 +25,7 @@ pub(crate) fn start_scan(adapter: &Adapter) -> mpsc::UnboundedReceiver<Discovery
         let mut events = match a.discover_devices().await {
             Ok(e) => e,
             Err(e) => {
-                eprintln!("Discovery error: {}", e);
+                eprintln!("Discovery error: {e}");
                 let _ = tx.unbounded_send(DiscoveryEvent::Done);
                 return;
             }

@@ -21,7 +21,7 @@ use crate::ui::{h_flex, v_flex};
 /// A single Bluetooth device row in the list.
 ///
 /// Unlike `AudioDeviceRow`, this row currently has no interactive sub-entities
-/// (TextField, Dropdown, etc.) — only simple action buttons with `on_mouse_up`.
+/// (`TextField`, Dropdown, etc.) — only simple action buttons with `on_mouse_up`.
 /// The `Focusable` impl is omitted intentionally; it will be added when
 /// interactive children are introduced.
 pub(crate) struct BluetoothDeviceRow {

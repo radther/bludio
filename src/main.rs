@@ -11,7 +11,7 @@ use gpui_platform_gpui_unofficial::application;
 
 // ── Tokio bridge ───────────────────────────────────────────────────────────
 
-/// Global Tokio runtime for all BlueZ D-Bus operations.
+/// Global Tokio runtime for all `BlueZ` D-Bus operations.
 ///
 /// gpui-unofficial's executor is not Tokio-based, but `bluer` requires a
 /// Tokio 1.x reactor. We spin up a dedicated runtime and route all Bluetooth

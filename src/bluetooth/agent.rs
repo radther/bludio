@@ -33,12 +33,12 @@ fn create_agent() -> bluer::agent::Agent {
 /// A wrapper for a registered agent handle that can be shared across threads.
 pub type AgentHandle = Arc<tokio::sync::Mutex<Option<bluer::agent::AgentHandle>>>;
 
-/// Register our auto-accept agent with BlueZ and return the handle.
+/// Register our auto-accept agent with `BlueZ` and return the handle.
 pub async fn register_agent(session: &bluer::Session) -> Result<AgentHandle, String> {
     let agent = create_agent();
     let handle = session
         .register_agent(agent)
         .await
-        .map_err(|e| format!("Failed to register pairing agent: {}", e))?;
+        .map_err(|e| format!("Failed to register pairing agent: {e}"))?;
     Ok(Arc::new(tokio::sync::Mutex::new(Some(handle))))
 }
