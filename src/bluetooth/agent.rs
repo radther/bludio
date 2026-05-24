@@ -10,7 +10,7 @@ fn create_agent() -> bluer::agent::Agent {
         request_default: true,
         // Provide a fixed passkey for KeyboardOnly peripherals.
         request_passkey: Some(Box::new(|_req: RequestPasskey| {
-            Box::pin(async move { Ok(123456u32) })
+            Box::pin(async move { Ok(123_456_u32) })
         })),
         // Auto-accept numeric comparison confirmations.
         request_confirmation: Some(Box::new(|_req: RequestConfirmation| {

@@ -49,7 +49,7 @@ impl BluetoothPage {
         cx: &mut Context<Self>,
     ) {
         self.discovering = state.discovering;
-        self.error = state.error.clone();
+        self.error.clone_from(&state.error);
         self.initialized = state.adapter.is_some();
 
         let cmd_tx = self.cmd_tx.clone();
@@ -144,7 +144,7 @@ impl Render for BluetoothPage {
                     div()
                         .px_4()
                         .py_2()
-                        .bg(gpui::rgba(0xff3c3c33))
+                        .bg(gpui::rgba(0xff3c_3c33))
                         .text_color(hsla(0.0, 0.8, 0.75, 1.0))
                         .child(gpui::SharedString::from(format!("Error: {err}"))),
                 )

@@ -220,6 +220,7 @@ impl RenderOnce for SliderBar {
         let entity = self.entity.clone();
         let entity_id = entity.entity_id();
         let fill = entity.read(cx).fill_fraction();
+        #[allow(clippy::cast_possible_truncation)]
         let fill_w = relative(fill as f32);
 
         // Entity clones for event handlers (each needs ownership for 'static lifetime)

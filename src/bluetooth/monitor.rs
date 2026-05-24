@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use bluer::Adapter;
-use futures::channel::mpsc;
+use bluer::{Adapter, DeviceProperty};
+use futures::{channel::mpsc, StreamExt};
 use tokio::task::JoinHandle;
 
 /// Start background D-Bus property-change monitoring.
@@ -23,20 +23,15 @@ pub(crate) async fn run_monitor(adapter: &Adapter, tx: mpsc::UnboundedSender<blu
                         continue;
                     }
                     let tx = tx.clone();
-                    let device = match a.device(addr) {
-                        Ok(d) => d,
-                        Err(_) => continue,
-                    };
+                    let Ok(device) = a.device(addr) else { continue };
                     handles.insert(
                         addr,
                         tokio::spawn(async move {
                             let Ok(mut events) = device.events().await else {
                                 return;
                             };
-                            use futures::StreamExt;
                             while let Some(evt) = events.next().await {
                                 let bluer::DeviceEvent::PropertyChanged(prop) = evt;
-                                use bluer::DeviceProperty;
                                 match prop {
                                     DeviceProperty::Connected(_)
                                     | DeviceProperty::Paired(_)

@@ -46,7 +46,7 @@ pub(crate) struct BludioApp {
     /// Bluetooth device page: self-contained entity.
     pub(crate) bluetooth_page: Entity<BluetoothPage>,
     active_page: Page,
-    _focus_handle: FocusHandle,
+    focus_handle: FocusHandle,
 }
 
 impl BludioApp {
@@ -59,8 +59,8 @@ impl BludioApp {
         std::thread::spawn(move || {
             crate::audio::pulse::run_pa_thread_from_channels(
                 audio_cmd_rx,
-                audio_state_tx,
-                wakeup_tx,
+                &audio_state_tx,
+                &wakeup_tx,
             );
         });
 
@@ -101,7 +101,7 @@ impl BludioApp {
             dev_test_page,
             bluetooth_page,
             active_page: Page::BluetoothDevices,
-            _focus_handle: cx.focus_handle(),
+            focus_handle: cx.focus_handle(),
         }
     }
 
@@ -250,13 +250,9 @@ impl BludioApp {
         cx.spawn_in(window, async move |this, cx| {
             let mut bt_cmd_rx = bt_cmd_rx;
             while let Some(cmd) = bt_cmd_rx.next().await {
-                let adapter = match this
+                let Some(adapter) = this
                     .read_with(cx, |app, _| app.bt_state.adapter.clone())
-                    .unwrap_or(None)
-                {
-                    Some(a) => a,
-                    None => continue,
-                };
+                    .unwrap_or(None) else { continue };
                 match cmd {
                     BluetoothPageCommand::ToggleScan => {
                         let _ = this.update_in(cx, |this, window, cx| {
@@ -433,35 +429,31 @@ impl BludioApp {
 
                                     // Refresh device state (regardless of success/failure).
                                     let a2 = a.clone();
-                                    match crate::tokio_task(async move {
+                                    if let Ok(Some(device)) = crate::tokio_task(async move {
                                         quick_device_status(&a2, addr).await
                                     })
                                     .await
                                     {
-                                        Ok(Some(device)) => {
-                                            let _ =
-                                                this.update_in(cx, |this, window, cx| {
-                                                    this.bt_state.upsert_device(device);
-                                                    this.bluetooth_page.update(
-                                                        cx,
-                                                        |page, cx| {
-                                                            page.sync_state(
-                                                                &this.bt_state,
-                                                                window,
-                                                                cx,
-                                                            );
-                                                        },
-                                                    );
-                                                    cx.notify();
-                                                });
-                                        }
-                                        Ok(None) => {}
-                                        Err(_) => {}
+                                        let _ =
+                                            this.update_in(cx, |this, window, cx| {
+                                                this.bt_state.upsert_device(device);
+                                                this.bluetooth_page.update(
+                                                    cx,
+                                                    |page, cx| {
+                                                        page.sync_state(
+                                                            &this.bt_state,
+                                                            window,
+                                                            cx,
+                                                        );
+                                                    },
+                                                );
+                                                cx.notify();
+                                            });
                                     }
 
                                     // Full list refresh (delayed)
                                     let a2 = a.clone();
-                                    match crate::tokio_task(async move {
+                                    if let Ok(Some(devices)) = crate::tokio_task(async move {
                                         tokio::time::sleep(
                                             std::time::Duration::from_millis(500),
                                         )
@@ -471,25 +463,21 @@ impl BludioApp {
                                     })
                                     .await
                                     {
-                                        Ok(Some(devices)) => {
-                                            let _ =
-                                                this.update_in(cx, |this, window, cx| {
-                                                    this.bt_state.replace_devices(devices);
-                                                    this.bluetooth_page.update(
-                                                        cx,
-                                                        |page, cx| {
-                                                            page.sync_state(
-                                                                &this.bt_state,
-                                                                window,
-                                                                cx,
-                                                            );
-                                                        },
-                                                    );
-                                                    cx.notify();
-                                                });
-                                        }
-                                        Ok(None) => {}
-                                        Err(_) => {}
+                                        let _ =
+                                            this.update_in(cx, |this, window, cx| {
+                                                this.bt_state.replace_devices(devices);
+                                                this.bluetooth_page.update(
+                                                    cx,
+                                                    |page, cx| {
+                                                        page.sync_state(
+                                                            &this.bt_state,
+                                                            window,
+                                                            cx,
+                                                        );
+                                                    },
+                                                );
+                                                cx.notify();
+                                            });
                                     }
                                 })
                                 .detach();
@@ -516,35 +504,31 @@ impl BludioApp {
                                     }
 
                                     let a3 = a2.clone();
-                                    match crate::tokio_task(async move {
+                                    if let Ok(Some(device)) = crate::tokio_task(async move {
                                         quick_device_status(&a3, addr).await
                                     })
                                     .await
                                     {
-                                        Ok(Some(device)) => {
-                                            let _ =
-                                                this.update_in(cx, |this, window, cx| {
-                                                    this.bt_state.upsert_device(device);
-                                                    this.bluetooth_page.update(
-                                                        cx,
-                                                        |page, cx| {
-                                                            page.sync_state(
-                                                                &this.bt_state,
-                                                                window,
-                                                                cx,
-                                                            );
-                                                        },
-                                                    );
-                                                    cx.notify();
-                                                });
-                                        }
-                                        Ok(None) => {}
-                                        Err(_) => {}
+                                        let _ =
+                                            this.update_in(cx, |this, window, cx| {
+                                                this.bt_state.upsert_device(device);
+                                                this.bluetooth_page.update(
+                                                    cx,
+                                                    |page, cx| {
+                                                        page.sync_state(
+                                                            &this.bt_state,
+                                                            window,
+                                                            cx,
+                                                        );
+                                                    },
+                                                );
+                                                cx.notify();
+                                            });
                                     }
 
                                     // Full list refresh (delayed)
                                     let a3 = a2.clone();
-                                    match crate::tokio_task(async move {
+                                    if let Ok(Some(devices)) = crate::tokio_task(async move {
                                         tokio::time::sleep(
                                             std::time::Duration::from_millis(500),
                                         )
@@ -554,25 +538,21 @@ impl BludioApp {
                                     })
                                     .await
                                     {
-                                        Ok(Some(devices)) => {
-                                            let _ =
-                                                this.update_in(cx, |this, window, cx| {
-                                                    this.bt_state.replace_devices(devices);
-                                                    this.bluetooth_page.update(
-                                                        cx,
-                                                        |page, cx| {
-                                                            page.sync_state(
-                                                                &this.bt_state,
-                                                                window,
-                                                                cx,
-                                                            );
-                                                        },
-                                                    );
-                                                    cx.notify();
-                                                });
-                                        }
-                                        Ok(None) => {}
-                                        Err(_) => {}
+                                        let _ =
+                                            this.update_in(cx, |this, window, cx| {
+                                                this.bt_state.replace_devices(devices);
+                                                this.bluetooth_page.update(
+                                                    cx,
+                                                    |page, cx| {
+                                                        page.sync_state(
+                                                            &this.bt_state,
+                                                            window,
+                                                            cx,
+                                                        );
+                                                    },
+                                                );
+                                                cx.notify();
+                                            });
                                     }
                                 })
                                 .detach();
@@ -588,7 +568,7 @@ impl BludioApp {
 
 impl Focusable for BludioApp {
     fn focus_handle(&self, _: &App) -> FocusHandle {
-        self._focus_handle.clone()
+        self.focus_handle.clone()
     }
 }
 
@@ -640,7 +620,6 @@ impl Render for BludioApp {
                             0 => Page::BluetoothDevices,
                             1 => Page::AudioOutputs,
                             2 => Page::AudioInputs,
-                            3 => Page::DevTest,
                             _ => Page::DevTest,
                         };
                         this.update(app, |this, cx| {

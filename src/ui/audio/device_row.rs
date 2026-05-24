@@ -38,9 +38,12 @@ pub(crate) struct AudioDeviceRow {
     cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
     wakeup: PaWakeup,
     focus_handle: FocusHandle,
-    _slider_sub: Subscription,
-    _text_field_sub: Subscription,
-    _dropdown_sub: Subscription,
+    #[allow(dead_code)]
+    slider_sub: Subscription,
+    #[allow(dead_code)]
+    text_field_sub: Subscription,
+    #[allow(dead_code)]
+    dropdown_sub: Subscription,
 }
 
 /// Bundled parameters for the shared `new_impl` constructor.
@@ -158,7 +161,7 @@ impl AudioDeviceRow {
         });
 
         // ── Subscriptions ──
-        let _slider_sub = cx.subscribe_in(&slider, window, {
+        let slider_sub = cx.subscribe_in(&slider, window, {
             let cmd_tx = cmd_tx.clone();
             move |this, _sl, event: &SliderEvent, _window, _cx| {
                 let kind = this.kind;
@@ -177,7 +180,7 @@ impl AudioDeviceRow {
                 }
             }
         });
-        let _text_field_sub = cx.subscribe_in(&text_field, window, {
+        let text_field_sub = cx.subscribe_in(&text_field, window, {
             move |this, _tf, event: &TextFieldEvent, window, cx| match event {
                 TextFieldEvent::Confirmed(text) => {
                     if let Ok(val) = text.parse::<f64>() {
@@ -210,7 +213,7 @@ impl AudioDeviceRow {
                 }
             }
         });
-        let _dropdown_sub = cx.subscribe_in(&profile_dropdown, window, {
+        let dropdown_sub = cx.subscribe_in(&profile_dropdown, window, {
             let cmd_tx = cmd_tx.clone();
             move |this, _dd, event: &DdEvt, _window, _cx| {
                 if let DdEvt::Selected(_idx, profile) = event
@@ -237,9 +240,9 @@ impl AudioDeviceRow {
             cmd_tx,
             wakeup,
             focus_handle: cx.focus_handle(),
-            _slider_sub,
-            _text_field_sub,
-            _dropdown_sub,
+            slider_sub,
+            text_field_sub,
+            dropdown_sub,
         }
     }
 
@@ -250,8 +253,8 @@ impl AudioDeviceRow {
         cx: &mut Context<Self>,
     ) {
         self.card_index = sink.card_index;
-        self.display_name = sink.description.clone();
-        self.pa_name = sink.name.clone();
+        self.display_name.clone_from(&sink.description);
+        self.pa_name.clone_from(&sink.name);
         self.volume = sink.volume;
 
         let profiles: Vec<String> = sink
@@ -265,7 +268,7 @@ impl AudioDeviceRow {
             .and_then(|active| profiles.iter().position(|p| p == active))
             .unwrap_or(0);
         self.profile_dropdown
-            .update(cx, |d, cx| d.set_items(profiles, selected_idx, cx));
+            .update(cx, |d, cx| d.set_items(&profiles, selected_idx, cx));
         self.slider.update(cx, |s, cx| s.set_value(sink.volume, cx));
         cx.notify();
     }
@@ -276,8 +279,8 @@ impl AudioDeviceRow {
         source: &crate::audio::SourceInfo,
         cx: &mut Context<Self>,
     ) {
-        self.display_name = source.description.clone();
-        self.pa_name = source.name.clone();
+        self.display_name.clone_from(&source.description);
+        self.pa_name.clone_from(&source.name);
         self.volume = source.volume;
         self.muted = source.muted;
         self.is_default = source.is_default;

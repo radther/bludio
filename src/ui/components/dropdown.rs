@@ -67,8 +67,8 @@ impl Dropdown {
     }
 
     /// Replace the item list and selection. Closes the dropdown if open.
-    pub fn set_items(&mut self, items: Vec<String>, selected_index: usize, cx: &mut Context<Self>) {
-        self.items = items.clone();
+    pub fn set_items(&mut self, items: &[String], selected_index: usize, cx: &mut Context<Self>) {
+        self.items = items.to_vec();
         self.selected_index = selected_index.clamp(0, items.len().saturating_sub(1));
         self.is_open = false;
         cx.notify();

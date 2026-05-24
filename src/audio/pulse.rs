@@ -42,8 +42,8 @@ impl PaWakeup {
 /// Run the `PulseAudio` backend thread.
 pub(crate) fn run_pa_thread_from_channels(
     cmd_rx: tmpsc::UnboundedReceiver<AudioCommand>,
-    state_tx: tmpsc::UnboundedSender<AudioState>,
-    wakeup_tx: mpsc::Sender<PaWakeup>,
+    state_tx: &tmpsc::UnboundedSender<AudioState>,
+    wakeup_tx: &mpsc::Sender<PaWakeup>,
 ) {
     if let Err(e) = run_pa_loop(cmd_rx, state_tx, wakeup_tx) {
         eprintln!("[audio] PulseAudio thread error: {e}");
@@ -76,8 +76,8 @@ fn spin_until(ml: &Rc<RefCell<Mainloop>>, done: &DoneFlag) {
 
 fn run_pa_loop(
     mut cmd_rx: tmpsc::UnboundedReceiver<AudioCommand>,
-    state_tx: tmpsc::UnboundedSender<AudioState>,
-    wakeup_tx: mpsc::Sender<PaWakeup>,
+    state_tx: &tmpsc::UnboundedSender<AudioState>,
+    wakeup_tx: &mpsc::Sender<PaWakeup>,
 ) -> Result<(), String> {
     let mut mainloop = Mainloop::new().ok_or("Failed to create PA mainloop")?;
 
@@ -319,6 +319,7 @@ fn execute_command(
 const PA_VOLUME_NORM: f64 = 65536.0;
 
 fn volume_f64_to_pa(vol: f64) -> Volume {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let raw = (vol * PA_VOLUME_NORM) as u32;
     Volume(raw.clamp(0, Volume::MAX.0))
 }
@@ -373,8 +374,7 @@ fn build_audio_state(
                     available_profiles: Vec::new(),
                 });
             }
-            ListResult::End => *d.borrow_mut() = true,
-            ListResult::Error => *d.borrow_mut() = true,
+            ListResult::End | ListResult::Error => *d.borrow_mut() = true,
         });
         spin_until(ml, done);
     }
@@ -401,8 +401,7 @@ fn build_audio_state(
                     is_monitor: si.monitor_of_sink.is_some(),
                 });
             }
-            ListResult::End => *d.borrow_mut() = true,
-            ListResult::Error => *d.borrow_mut() = true,
+            ListResult::End | ListResult::Error => *d.borrow_mut() = true,
         });
         spin_until(ml, done);
     }
@@ -438,8 +437,7 @@ fn build_audio_state(
                     profiles,
                 });
             }
-            ListResult::End => *d.borrow_mut() = true,
-            ListResult::Error => *d.borrow_mut() = true,
+            ListResult::End | ListResult::Error => *d.borrow_mut() = true,
         });
         spin_until(ml, done);
     }
@@ -471,8 +469,8 @@ fn build_audio_state(
         if let Some(card_idx) = sink.card_index
             && let Some(card) = card_map.get(&card_idx)
         {
-            sink.active_profile = card.active_profile.clone();
-            sink.available_profiles = card.profiles.clone();
+            sink.active_profile.clone_from(&card.active_profile);
+            sink.available_profiles.clone_from(&card.profiles);
         }
         sink.is_default = ds.as_ref() == Some(&sink.name);
     }

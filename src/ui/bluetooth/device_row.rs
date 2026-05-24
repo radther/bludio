@@ -58,10 +58,10 @@ impl BluetoothDeviceRow {
         &mut self,
         device: &crate::bluetooth::device::BluetoothDevice,
     ) {
-        self.display_name = device.display_name.clone();
+        self.display_name.clone_from(&device.display_name);
         self.paired = device.paired;
         self.connected = device.connected;
-        self.pairing_status = device.pairing_status.clone();
+        self.pairing_status.clone_from(&device.pairing_status);
     }
 }
 

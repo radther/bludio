@@ -45,7 +45,6 @@ pub(crate) fn start_scan(adapter: &Adapter) -> mpsc::UnboundedReceiver<Discovery
                         let _ = tx.unbounded_send(DiscoveryEvent::DeviceAdded(info));
                     }
                 }
-                Ok(Some(bluer::AdapterEvent::DeviceRemoved(_))) => {}
                 Ok(None) => {
                     let _ = tx.unbounded_send(DiscoveryEvent::Done);
                     break;
@@ -106,10 +105,7 @@ pub(crate) async fn run_discovery(
     this: WeakEntity<crate::app::BludioApp>,
     cx: &mut AsyncWindowContext,
 ) {
-    let adapter = match this.read_with(cx, |app, _| app.bt_state.adapter.clone()) {
-        Ok(Some(a)) => a,
-        _ => return,
-    };
+    let Ok(Some(adapter)) = this.read_with(cx, |app, _| app.bt_state.adapter.clone()) else { return };
 
     let mut rx = start_scan(&adapter);
 

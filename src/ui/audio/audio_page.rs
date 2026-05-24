@@ -49,7 +49,7 @@ impl AudioPage {
         cx: &mut Context<Self>,
     ) {
         self.connected = state.connected;
-        self.error = state.error.clone();
+        self.error.clone_from(&state.error);
 
         match self.kind {
             DeviceKind::Output => self.sync_output_rows(state, window, cx),
@@ -141,7 +141,7 @@ impl Render for AudioPage {
                     div()
                         .px_4()
                         .py_2()
-                        .bg(gpui::rgba(0xff3c3c33))
+                        .bg(gpui::rgba(0xff3c_3c33))
                         .text_color(hsla(0.0, 0.8, 0.75, 1.0))
                         .child(SharedString::from(format!("Error: {err}"))),
                 )
