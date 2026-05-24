@@ -4,11 +4,14 @@
 //!   BludioApp → Entity<BluetoothPage> → Vec<Entity<BluetoothDeviceRow>>
 
 use crate::bluetooth::BluetoothState;
-use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
 use crate::ui::bluetooth::BluetoothPageCommand;
+use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
 use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
-use gpui::{Context, CursorStyle, Entity, FontWeight, MouseButton, MouseUpEvent, Render, Window, div, hsla, prelude::*, px};
+use gpui::{
+    Context, CursorStyle, Entity, FontWeight, MouseButton, MouseUpEvent, Render, Window, div, hsla,
+    prelude::*, px,
+};
 
 // ── Page entity ────────────────────────────────────────────────────────────
 
@@ -52,7 +55,11 @@ impl BluetoothPage {
         let cmd_tx = self.cmd_tx.clone();
 
         for device in &state.devices {
-            if let Some(row) = self.rows.iter().find(|r| r.read(cx).address == device.address) {
+            if let Some(row) = self
+                .rows
+                .iter()
+                .find(|r| r.read(cx).address == device.address)
+            {
                 row.update(cx, |row, _cx| {
                     row.update_from_device(device);
                 });
@@ -70,8 +77,12 @@ impl BluetoothPage {
                 self.rows.push(row);
             }
         }
-        self.rows
-            .retain(|r| state.devices.iter().any(|d| d.address == r.read(cx).address));
+        self.rows.retain(|r| {
+            state
+                .devices
+                .iter()
+                .any(|d| d.address == r.read(cx).address)
+        });
     }
 }
 
@@ -118,15 +129,12 @@ impl Render for BluetoothPage {
                                 })
                             })
                             .child(if discovering { "stop" } else { "scan" })
-                            .on_mouse_up(
-                                MouseButton::Left,
-                                {
-                                    let cmd_tx = cmd_tx.clone();
-                                    move |_: &MouseUpEvent, _window, _app| {
-                                        let _ = cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
-                                    }
-                                },
-                            ),
+                            .on_mouse_up(MouseButton::Left, {
+                                let cmd_tx = cmd_tx.clone();
+                                move |_: &MouseUpEvent, _window, _app| {
+                                    let _ = cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
+                                }
+                            }),
                     ),
             )
             // ── Error banner ──

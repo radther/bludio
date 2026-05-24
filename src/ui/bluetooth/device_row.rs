@@ -8,11 +8,12 @@
 use bluer::Address;
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
-    Context, CursorStyle, FontWeight, MouseButton, MouseUpEvent, Render,
-    SharedString, Window, div, hsla, prelude::*, px,
+    Context, CursorStyle, FontWeight, MouseButton, MouseUpEvent, Render, SharedString, Window, div,
+    hsla, prelude::*, px,
 };
 
-use super::{BluetoothPageCommand, DeviceRowAction};
+use super::BluetoothPageCommand;
+use crate::bluetooth::device::DeviceRowAction;
 use crate::ui::{h_flex, v_flex};
 
 // ── Row entity ─────────────────────────────────────────────────────────────
@@ -50,7 +51,10 @@ impl BluetoothDeviceRow {
     }
 
     /// Update the device state from a `BluetoothDevice`.
-    pub(crate) fn update_from_device(&mut self, device: &crate::bluetooth::device::BluetoothDevice) {
+    pub(crate) fn update_from_device(
+        &mut self,
+        device: &crate::bluetooth::device::BluetoothDevice,
+    ) {
         self.display_name = device.display_name.clone();
         self.paired = device.paired;
         self.connected = device.connected;
@@ -182,13 +186,10 @@ fn action_btn(
         .cursor(CursorStyle::PointingHand)
         .hover(move |el| el.bg(hover_bg))
         .child(SharedString::from(label.to_string()))
-        .on_mouse_up(
-            MouseButton::Left,
-            move |_: &MouseUpEvent, _window, _app| {
-                let _ = cmd_tx.unbounded_send(BluetoothPageCommand::DeviceAction {
-                    addr,
-                    action: action_clone,
-                });
-            },
-        )
+        .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, _window, _app| {
+            let _ = cmd_tx.unbounded_send(BluetoothPageCommand::DeviceAction {
+                addr,
+                action: action_clone,
+            });
+        })
 }

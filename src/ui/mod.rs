@@ -6,11 +6,11 @@
 pub mod audio;
 pub mod bluetooth;
 pub mod components;
+pub mod dev_test_page;
 pub mod ext;
 pub mod icons;
 pub mod stack;
 pub mod tab_bar;
-pub mod dev_test_page;
 pub mod tooltip;
 
 pub use stack::{h_flex, v_flex};

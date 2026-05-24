@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bluer::Adapter;
-use tokio::sync::mpsc;
+use futures::channel::mpsc;
 use tokio::task::JoinHandle;
 
 /// Start background D-Bus property-change monitoring.
@@ -42,7 +42,7 @@ pub(crate) async fn run_monitor(adapter: &Adapter, tx: mpsc::UnboundedSender<blu
                                     | DeviceProperty::Paired(_)
                                     | DeviceProperty::Name(_)
                                     | DeviceProperty::Alias(_) => {
-                                        let _ = tx.send(addr);
+                                        let _ = tx.unbounded_send(addr);
                                     }
                                     _ => {}
                                 }
