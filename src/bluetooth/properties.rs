@@ -123,5 +123,6 @@ pub(crate) fn build_device(
         paired: props.paired,
         connected: props.connected,
         trusted: props.trusted,
+        pairing_status: None,
     })
 }

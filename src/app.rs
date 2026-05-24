@@ -6,7 +6,9 @@
 use crate::audio::AudioState;
 use crate::audio::DeviceKind;
 use crate::bluetooth::BluetoothState;
-use crate::bluetooth::device::{devices_changed, execute_device_action, quick_device_status};
+use crate::bluetooth::device::{
+    DeviceRowAction, PairingStatus, devices_changed, execute_device_action, quick_device_status,
+};
 use crate::ui::audio::audio_page::AudioPage;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::bluetooth_page::BluetoothPage;
@@ -273,42 +275,312 @@ impl BludioApp {
                         });
                     }
                     BluetoothPageCommand::DeviceAction { addr, action } => {
-                        // Route D-Bus operations through the Tokio runtime.
+                        // Dispatch D-Bus work as a detached background task —
+                        // never block the command loop awaiting BlueZ.
                         let a = adapter.clone();
-                        let _ = crate::tokio_task(async move {
-                            execute_device_action(&a, addr, action).await;
-                        })
-                        .await;
-                        // Quick status update (also via Tokio).
-                        let a = adapter.clone();
-                        if let Ok(Some(device)) =
-                            crate::tokio_task(async move { quick_device_status(&a, addr).await })
-                                .await
-                        {
-                            let _ = this.update_in(cx, |this, window, cx| {
-                                this.bt_state.upsert_device(device);
-                                this.bluetooth_page.update(cx, |page, cx| {
-                                    page.sync_state(&this.bt_state, window, cx);
-                                });
-                                cx.notify();
-                            });
-                        }
-                        // Full list refresh (delayed)
-                        let a = adapter.clone();
-                        if let Ok(Some(devices)) = crate::tokio_task(async move {
-                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                            crate::bluetooth::discovery::refresh_device_list(&a).await
-                        })
-                        .await
-                        {
-                            let _ = this.update_in(cx, |this, window, cx| {
-                                this.bt_state.replace_devices(devices);
-                                this.bluetooth_page.update(cx, |page, cx| {
-                                    page.sync_state(&this.bt_state, window, cx);
-                                });
-                                cx.notify();
-                            });
-                        }
+                        let _ = this.update_in(cx, |this, window, cx| {
+                            match action {
+                                DeviceRowAction::PairAndTrust => {
+                                    eprintln!("[bluetooth] dispatching PairAndTrust for {addr}");
+
+                                    // Set initial status immediately (synchronous).
+                                    if let Some(existing) =
+                                        this.bt_state.devices.iter_mut().find(|d| d.address == addr)
+                                    {
+                                        existing.pairing_status =
+                                            Some(PairingStatus::Connecting);
+                                    }
+                                    this.bluetooth_page.update(cx, |page, cx| {
+                                        page.sync_state(&this.bt_state, window, cx);
+                                    });
+                                    cx.notify();
+
+                                    // Spawn the full chain as a background task.
+                                    cx.spawn_in(window, async move |this, cx| {
+                                        // ── Helper: push a pairing status update ──
+                                        let mut push_status =
+                                            |status: Option<PairingStatus>| {
+                                                let _ =
+                                                    this.update_in(cx, |this, window, cx| {
+                                                        if let Some(existing) = this
+                                                            .bt_state
+                                                            .devices
+                                                            .iter_mut()
+                                                            .find(|d| d.address == addr)
+                                                        {
+                                                            existing.pairing_status = status;
+                                                        }
+                                                        this.bluetooth_page.update(
+                                                            cx,
+                                                            |page, cx| {
+                                                                page.sync_state(
+                                                                    &this.bt_state,
+                                                                    window,
+                                                                    cx,
+                                                                );
+                                                            },
+                                                        );
+                                                        cx.notify();
+                                                    });
+                                            };
+
+                                        // ── Step-by-step chain with proper double-Result flattening ──
+                                        // tokio_task wraps in oneshot: Result<Result<T,E>, Canceled>
+                                        // We must match both layers to catch D-Bus errors.
+                                        let mut ok = true;
+
+                                        // 1. Connecting (status already set in outer update_in)
+                                        if ok {
+                                            let a2 = a.clone();
+                                            ok = match crate::tokio_task(async move {
+                                                let device = a2.device(addr)?;
+                                                device.connect().await
+                                            })
+                                            .await
+                                            {
+                                                Ok(Ok(())) => true,
+                                                Ok(Err(e)) => {
+                                                    eprintln!(
+                                                        "[bluetooth] Pairing failed for {addr}: connect error: {e}"
+                                                    );
+                                                    push_status(Some(PairingStatus::Failed(
+                                                        "connection failed".into(),
+                                                    )));
+                                                    false
+                                                }
+                                                Err(_) => {
+                                                    eprintln!(
+                                                        "[bluetooth] Pairing failed for {addr}: connect task cancelled"
+                                                    );
+                                                    push_status(Some(PairingStatus::Failed(
+                                                        "internal error".into(),
+                                                    )));
+                                                    false
+                                                }
+                                            };
+                                        }
+
+                                        // 2. Pairing
+                                        if ok {
+                                            push_status(Some(PairingStatus::Pairing));
+                                            let a2 = a.clone();
+                                            ok = match crate::tokio_task(async move {
+                                                let device = a2.device(addr)?;
+                                                device.pair().await
+                                            })
+                                            .await
+                                            {
+                                                Ok(Ok(())) => true,
+                                                Ok(Err(e)) => {
+                                                    eprintln!(
+                                                        "[bluetooth] Pairing failed for {addr}: pair error: {e}"
+                                                    );
+                                                    push_status(Some(PairingStatus::Failed(
+                                                        "pairing failed".into(),
+                                                    )));
+                                                    false
+                                                }
+                                                Err(_) => {
+                                                    eprintln!(
+                                                        "[bluetooth] Pairing failed for {addr}: pair task cancelled"
+                                                    );
+                                                    push_status(Some(PairingStatus::Failed(
+                                                        "internal error".into(),
+                                                    )));
+                                                    false
+                                                }
+                                            };
+                                        }
+
+                                        // 3. Trusting
+                                        if ok {
+                                            push_status(Some(PairingStatus::Trusting));
+                                            let a2 = a.clone();
+                                            ok = match crate::tokio_task(async move {
+                                                let device = a2.device(addr)?;
+                                                device.set_trusted(true).await?;
+                                                device.connect().await
+                                            })
+                                            .await
+                                            {
+                                                Ok(Ok(())) => true,
+                                                Ok(Err(e)) => {
+                                                    eprintln!(
+                                                        "[bluetooth] Pairing partially succeeded for {addr}: trust/connect error: {e}"
+                                                    );
+                                                    push_status(Some(PairingStatus::Failed(
+                                                        "trust failed".into(),
+                                                    )));
+                                                    false
+                                                }
+                                                Err(_) => {
+                                                    eprintln!(
+                                                        "[bluetooth] Pairing failed for {addr}: trust task cancelled"
+                                                    );
+                                                    push_status(Some(PairingStatus::Failed(
+                                                        "internal error".into(),
+                                                    )));
+                                                    false
+                                                }
+                                            };
+                                        }
+
+                                        if ok {
+                                            eprintln!(
+                                                "[bluetooth] PairAndTrust succeeded for {addr}"
+                                            );
+                                            push_status(None);
+                                        }
+
+                                        // Refresh device state (regardless of success/failure).
+                                        let a2 = a.clone();
+                                        match crate::tokio_task(async move {
+                                            quick_device_status(&a2, addr).await
+                                        })
+                                        .await
+                                        {
+                                            Ok(Some(device)) => {
+                                                let _ =
+                                                    this.update_in(cx, |this, window, cx| {
+                                                        this.bt_state.upsert_device(device);
+                                                        this.bluetooth_page.update(
+                                                            cx,
+                                                            |page, cx| {
+                                                                page.sync_state(
+                                                                    &this.bt_state,
+                                                                    window,
+                                                                    cx,
+                                                                );
+                                                            },
+                                                        );
+                                                        cx.notify();
+                                                    });
+                                            }
+                                            Ok(None) => {}
+                                            Err(_) => {}
+                                        }
+
+                                        // Full list refresh (delayed)
+                                        let a2 = a.clone();
+                                        match crate::tokio_task(async move {
+                                            tokio::time::sleep(
+                                                std::time::Duration::from_millis(500),
+                                            )
+                                            .await;
+                                            crate::bluetooth::discovery::refresh_device_list(&a2)
+                                                .await
+                                        })
+                                        .await
+                                        {
+                                            Ok(Some(devices)) => {
+                                                let _ =
+                                                    this.update_in(cx, |this, window, cx| {
+                                                        this.bt_state.replace_devices(devices);
+                                                        this.bluetooth_page.update(
+                                                            cx,
+                                                            |page, cx| {
+                                                                page.sync_state(
+                                                                    &this.bt_state,
+                                                                    window,
+                                                                    cx,
+                                                                );
+                                                            },
+                                                        );
+                                                        cx.notify();
+                                                    });
+                                            }
+                                            Ok(None) => {}
+                                            Err(_) => {}
+                                        }
+                                    })
+                                    .detach();
+                                }
+                                _ => {
+                                    eprintln!(
+                                        "[bluetooth] dispatching {action:?} for {addr}"
+                                    );
+                                    // Spawn simple action + post-action refresh.
+                                    let a2 = a.clone();
+                                    cx.spawn_in(window, async move |this, cx| {
+                                        let a3 = a2.clone();
+                                        let action_result = crate::tokio_task(async move {
+                                            execute_device_action(&a3, addr, action).await;
+                                        })
+                                        .await;
+
+                                        match action_result {
+                                            Ok(()) => {}
+                                            Err(_) => {
+                                                eprintln!(
+                                                    "[bluetooth] {action:?} for {addr}: tokio task cancelled"
+                                                );
+                                            }
+                                        }
+
+                                        let a3 = a2.clone();
+                                        match crate::tokio_task(async move {
+                                            quick_device_status(&a3, addr).await
+                                        })
+                                        .await
+                                        {
+                                            Ok(Some(device)) => {
+                                                let _ =
+                                                    this.update_in(cx, |this, window, cx| {
+                                                        this.bt_state.upsert_device(device);
+                                                        this.bluetooth_page.update(
+                                                            cx,
+                                                            |page, cx| {
+                                                                page.sync_state(
+                                                                    &this.bt_state,
+                                                                    window,
+                                                                    cx,
+                                                                );
+                                                            },
+                                                        );
+                                                        cx.notify();
+                                                    });
+                                            }
+                                            Ok(None) => {}
+                                            Err(_) => {}
+                                        }
+
+                                        // Full list refresh (delayed)
+                                        let a3 = a2.clone();
+                                        match crate::tokio_task(async move {
+                                            tokio::time::sleep(
+                                                std::time::Duration::from_millis(500),
+                                            )
+                                            .await;
+                                            crate::bluetooth::discovery::refresh_device_list(&a3)
+                                                .await
+                                        })
+                                        .await
+                                        {
+                                            Ok(Some(devices)) => {
+                                                let _ =
+                                                    this.update_in(cx, |this, window, cx| {
+                                                        this.bt_state.replace_devices(devices);
+                                                        this.bluetooth_page.update(
+                                                            cx,
+                                                            |page, cx| {
+                                                                page.sync_state(
+                                                                    &this.bt_state,
+                                                                    window,
+                                                                    cx,
+                                                                );
+                                                            },
+                                                        );
+                                                        cx.notify();
+                                                    });
+                                            }
+                                            Ok(None) => {}
+                                            Err(_) => {}
+                                        }
+                                    })
+                                    .detach();
+                                }
+                            }
+                        });
                     }
                 }
             }

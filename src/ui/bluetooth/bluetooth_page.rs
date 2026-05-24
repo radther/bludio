@@ -70,6 +70,7 @@ impl BluetoothPage {
                         device.display_name.clone(),
                         device.paired,
                         device.connected,
+                        device.pairing_status.clone(),
                         cmd_tx.clone(),
                         row_cx,
                     )

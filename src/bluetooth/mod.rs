@@ -82,19 +82,32 @@ impl BluetoothState {
     }
 
     /// Replace the entire device list (keeps it sorted).
-    pub fn replace_devices(&mut self, devices: Vec<BluetoothDevice>) {
+    /// Clears any stale `pairing_status` — a full refresh means
+    /// no operation is still in progress.
+    pub fn replace_devices(&mut self, mut devices: Vec<BluetoothDevice>) {
+        for d in &mut devices {
+            d.pairing_status = None;
+        }
         self.devices = devices;
         device::sort_devices(&mut self.devices);
     }
 
     /// Insert or update a device, then re-sort.
-    pub fn upsert_device(&mut self, device: BluetoothDevice) {
+    /// Preserves an existing `pairing_status` if the incoming device
+    /// has `None` — single-device refreshes should not clear the indicator.
+    pub fn upsert_device(&mut self, mut device: BluetoothDevice) {
         if let Some(existing) = self
             .devices
             .iter_mut()
             .find(|d| d.address == device.address)
         {
+            // Preserve existing pairing status; prefer the incoming one if set.
+            let new_status = device
+                .pairing_status
+                .take()
+                .or(existing.pairing_status.take());
             *existing = device;
+            existing.pairing_status = new_status;
         } else {
             self.devices.push(device);
         }

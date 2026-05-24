@@ -13,7 +13,7 @@ use gpui::{
 };
 
 use super::BluetoothPageCommand;
-use crate::bluetooth::device::DeviceRowAction;
+use crate::bluetooth::device::{DeviceRowAction, PairingStatus};
 use crate::ui::{h_flex, v_flex};
 
 // ── Row entity ─────────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ pub(crate) struct BluetoothDeviceRow {
     display_name: String,
     paired: bool,
     connected: bool,
+    pairing_status: Option<PairingStatus>,
     cmd_tx: UnboundedSender<BluetoothPageCommand>,
 }
 
@@ -38,6 +39,7 @@ impl BluetoothDeviceRow {
         display_name: String,
         paired: bool,
         connected: bool,
+        pairing_status: Option<PairingStatus>,
         cmd_tx: UnboundedSender<BluetoothPageCommand>,
         _cx: &mut Context<Self>,
     ) -> Self {
@@ -46,6 +48,7 @@ impl BluetoothDeviceRow {
             display_name,
             paired,
             connected,
+            pairing_status,
             cmd_tx,
         }
     }
@@ -58,6 +61,7 @@ impl BluetoothDeviceRow {
         self.display_name = device.display_name.clone();
         self.paired = device.paired;
         self.connected = device.connected;
+        self.pairing_status = device.pairing_status.clone();
     }
 }
 
@@ -78,7 +82,10 @@ impl Render for BluetoothDeviceRow {
         let accent_hover = hsla(210.0 / 360.0, 0.7, 0.45, 1.0);
         let danger = hsla(0.0, 0.7, 0.55, 1.0);
         let danger_hover = hsla(0.0, 0.7, 0.45, 1.0);
+        let amber = hsla(45.0 / 360.0, 0.8, 0.55, 1.0);
         let success = hsla(140.0 / 360.0, 0.6, 0.5, 1.0);
+
+        let pairing_status = self.pairing_status.as_ref();
 
         let cmd_tx = self.cmd_tx.clone();
 
@@ -104,13 +111,23 @@ impl Render for BluetoothDeviceRow {
                             .text_color(text_secondary)
                             .child(SharedString::from(addr_str)),
                     )
-                    .child(div().text_xs().mt_0p5().child(if connected {
-                        div().text_color(success).child("● connected")
-                    } else if paired {
-                        div().text_color(text_secondary).child("paired")
-                    } else {
-                        div().text_color(text_secondary).child("discovered")
-                    })),
+                    .child(div().text_xs().mt_0p5().child(
+                        if let Some(ref status) = pairing_status {
+                            let (dot_color, label): (gpui::Hsla, String) = match status {
+                                PairingStatus::Connecting => (accent, status.to_string()),
+                                PairingStatus::Pairing => (amber, status.to_string()),
+                                PairingStatus::Trusting => (success, status.to_string()),
+                                PairingStatus::Failed(_) => (danger, status.to_string()),
+                            };
+                            div().text_color(dot_color).child(format!("● {label}"))
+                        } else if connected {
+                            div().text_color(success).child("● connected")
+                        } else if paired {
+                            div().text_color(text_secondary).child("paired")
+                        } else {
+                            div().text_color(text_secondary).child("discovered")
+                        },
+                    )),
             )
             .child(
                 // ── Action buttons ──
@@ -145,7 +162,7 @@ impl Render for BluetoothDeviceRow {
                             &cmd_tx,
                         ));
                     }
-                    if !paired {
+                    if !paired && pairing_status.is_none() {
                         btn_row = btn_row.child(action_btn(
                             "Pair & Trust",
                             accent,
@@ -174,7 +191,6 @@ fn action_btn(
     cmd_tx: &UnboundedSender<BluetoothPageCommand>,
 ) -> gpui::Stateful<gpui::Div> {
     let cmd_tx = cmd_tx.clone();
-    let action_clone = action;
     div()
         .id(SharedString::from(format!("btn-{addr}-{action:?}")))
         .px_2()
@@ -187,9 +203,6 @@ fn action_btn(
         .hover(move |el| el.bg(hover_bg))
         .child(SharedString::from(label.to_string()))
         .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, _window, _app| {
-            let _ = cmd_tx.unbounded_send(BluetoothPageCommand::DeviceAction {
-                addr,
-                action: action_clone,
-            });
+            let _ = cmd_tx.unbounded_send(BluetoothPageCommand::DeviceAction { addr, action });
         })
 }

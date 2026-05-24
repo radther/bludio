@@ -1,4 +1,31 @@
 use bluer::Address;
+use std::fmt;
+
+// ── Pairing status ────────────────────────────────────────────────────────
+
+/// Status of an active pairing/connection operation shown on the device row.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PairingStatus {
+    /// Establishing the ACL connection.
+    Connecting,
+    /// Performing the pairing handshake (authentication via agent).
+    Pairing,
+    /// Setting the device as trusted.
+    Trusting,
+    /// The operation failed with the given reason.
+    Failed(String),
+}
+
+impl fmt::Display for PairingStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PairingStatus::Connecting => write!(f, "connecting…"),
+            PairingStatus::Pairing => write!(f, "pairing…"),
+            PairingStatus::Trusting => write!(f, "trusting…"),
+            PairingStatus::Failed(_) => write!(f, "failed to pair"),
+        }
+    }
+}
 
 // ── Action types ────────────────────────────────────────────────────────────
 
@@ -27,6 +54,8 @@ pub struct BluetoothDevice {
     /// Whether the device is trusted (auto-connect allowed).
     #[allow(dead_code)]
     pub trusted: bool,
+    /// Active pairing operation status — `None` when idle.
+    pub pairing_status: Option<PairingStatus>,
 }
 
 /// Sort devices for display: paired first, then connected, then
@@ -62,6 +91,8 @@ pub(crate) async fn quick_device_status(
 
 /// Compare two device lists — returns `true` if display-relevant fields
 /// (count, address, paired, connected) differ.
+/// `pairing_status` is ignored — it's a transient display field that
+/// shouldn't block UI updates.
 pub(crate) fn devices_changed(old: &[BluetoothDevice], new: &[BluetoothDevice]) -> bool {
     if old.len() != new.len() {
         return true;
@@ -95,12 +126,11 @@ pub(crate) async fn execute_device_action(
         DeviceRowAction::Forget => {
             let _ = adapter.remove_device(addr).await;
         }
+        // PairAndTrust is handled stepwise in the command handler
+        // (app.rs) with per-step UI status updates.
         DeviceRowAction::PairAndTrust => {
-            if let Ok(device) = adapter.device(addr) {
-                let _ = device.pair().await;
-                let _ = device.set_trusted(true).await;
-                let _ = device.connect().await;
-            }
+            // Unreachable — see command handler in app.rs.
+            // Kept to satisfy exhaustive match.
         }
     }
 }
