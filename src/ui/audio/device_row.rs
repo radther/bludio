@@ -136,7 +136,7 @@ impl AudioDeviceRow {
             TextField::new(cx)
                 .filter_char(|c| c.is_ascii_digit())
                 .placeholder("vol")
-                .align(gpui::TextAlign::Left)
+                .align(gpui::TextAlign::Center)
         });
         text_field.update(cx, |f, cx| {
             f.set_text(&format!("{}", (params.volume * 100.0).round()), cx);

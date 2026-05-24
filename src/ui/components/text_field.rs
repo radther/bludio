@@ -587,6 +587,7 @@ impl RenderOnce for TextFieldComponent {
             .track_focus(&focus_handle)
             .cursor(CursorStyle::IBeam)
             .flex()
+            .justify_center()
             .flex_grow()
             .px_1()
             .min_h(px(20.))
