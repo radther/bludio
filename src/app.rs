@@ -6,12 +6,14 @@
 use crate::audio::AudioState;
 use crate::audio::DeviceKind;
 use crate::bluetooth::BluetoothState;
-use crate::ui;
 use crate::ui::audio::audio_page::AudioPage;
+use crate::ui::bluetooth::bluetooth_page::BluetoothPage;
+use crate::ui::bluetooth::{BluetoothPageCommand, DeviceRowAction};
 use crate::ui::icons;
 use crate::ui::tab_bar;
-use crate::ui::text_field_test::TextFieldTestPage;
+use crate::ui::dev_test_page::DevTestPage;
 use crate::ui::{h_flex, v_flex};
+use futures::StreamExt;
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, IntoElement, Render, Window, hsla, prelude::*,
 };
@@ -24,7 +26,7 @@ pub(crate) enum Page {
     BluetoothDevices,
     AudioOutputs,
     AudioInputs,
-    TextFieldTest,
+    DevTest,
 }
 
 // ── App state ──────────────────────────────────────────────────────────────
@@ -37,8 +39,10 @@ pub(crate) struct BludioApp {
     /// Self-contained page entities.
     audio_output_page: Entity<AudioPage>,
     audio_input_page: Entity<AudioPage>,
-    /// Test page: self-contained entity.
-    text_field_test_page: Entity<TextFieldTestPage>,
+    /// Developer test page: self-contained entity.
+    dev_test_page: Entity<DevTestPage>,
+    /// Bluetooth device page: self-contained entity.
+    bluetooth_page: Entity<BluetoothPage>,
     active_page: Page,
     _focus_handle: FocusHandle,
 }
@@ -82,7 +86,7 @@ impl BludioApp {
         .detach();
 
         // ── Bluetooth init ──
-        cx.spawn(async move |this, cx| {
+        cx.spawn_in(window, async move |this, cx| {
             // ── Init ──
             let rx = crate::tokio_task(async {
                 let state = BluetoothState::new().await?;
@@ -93,26 +97,33 @@ impl BludioApp {
             let adapter = match rx.await {
                 Ok(Ok((state, agent))) => {
                     let adapter = state.adapter.clone().unwrap();
-                    this.update(cx, |this, cx| {
+                    this.update_in(cx, |this, window, cx| {
                         this.bt_state = state;
                         this.initialized = true;
                         this.bt_agent = agent.ok();
+                        this.bluetooth_page
+                            .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
                         cx.notify();
                     })
                     .ok();
                     adapter
                 }
                 Ok(Err(e)) => {
-                    this.update(cx, |this, cx| {
+                    this.update_in(cx, |this, window, cx| {
                         this.bt_state.error = Some(e);
+                        this.bluetooth_page
+                            .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
                         cx.notify();
                     })
                     .ok();
                     return;
                 }
                 Err(_) => {
-                    this.update(cx, |this, cx| {
-                        this.bt_state.error = Some("Bluetooth initialization cancelled".into());
+                    this.update_in(cx, |this, window, cx| {
+                        this.bt_state.error =
+                            Some("Bluetooth initialization cancelled".into());
+                        this.bluetooth_page
+                            .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
                         cx.notify();
                     })
                     .ok();
@@ -152,12 +163,15 @@ impl BludioApp {
                 if let Some(addr) = signal_addr {
                     // Single-device quick refresh from D-Bus signal.
                     if let Ok(Some(device)) = crate::tokio_task(async move {
-                        crate::actions::quick_device_status(&a, addr).await
+                        quick_device_status(&a, addr).await
                     })
                     .await
                     {
-                        let _ = this.update(cx, |this, cx| {
+                        let _ = this.update_in(cx, |this, window, cx| {
                             this.bt_state.upsert_device(device);
+                            this.bluetooth_page.update(cx, |page, cx| {
+                                page.sync_state(&this.bt_state, window, cx);
+                            });
                             cx.notify();
                         });
                     }
@@ -172,8 +186,78 @@ impl BludioApp {
                             .read_with(cx, |app, _| devices_changed(&app.bt_state.devices, &fresh))
                             .unwrap_or(true);
                         if changed {
-                            let _ = this.update(cx, |this, cx| {
+                            let _ = this.update_in(cx, |this, window, cx| {
                                 this.bt_state.replace_devices(fresh);
+                                this.bluetooth_page.update(cx, |page, cx| {
+                                    page.sync_state(&this.bt_state, window, cx);
+                                });
+                                cx.notify();
+                            });
+                        }
+                    }
+                }
+            }
+        })
+        .detach();
+
+        // ── Bluetooth command channel ──
+        let (bt_cmd_tx, mut bt_cmd_rx) =
+            futures::channel::mpsc::unbounded::<BluetoothPageCommand>();
+
+        cx.spawn_in(window, async move |this, cx| {
+            // NOTE: No crate::TOKIO.enter() here — we use futures::channel::mpsc
+            // which does not require a Tokio context. This avoids EnterGuard
+            // nesting panics with the monitor loop.
+            while let Some(cmd) = bt_cmd_rx.next().await {
+                let adapter = match this
+                    .read_with(cx, |app, _| app.bt_state.adapter.clone())
+                    .unwrap_or(None)
+                {
+                    Some(a) => a,
+                    None => continue,
+                };
+                match cmd {
+                    BluetoothPageCommand::ToggleScan => {
+                        let _ = this.update_in(cx, |this, window, cx| {
+                            if this.bt_state.discovering {
+                                this.bt_state.discovering = false;
+                            } else {
+                                this.bt_state.discovering = true;
+                                cx.spawn_in(window, async move |this, cx| {
+                                    run_discovery(this, cx).await;
+                                })
+                                .detach();
+                            }
+                            this.bluetooth_page
+                                .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
+                            cx.notify();
+                        });
+                    }
+                    BluetoothPageCommand::DeviceAction { addr, action } => {
+                        execute_device_action(&adapter, addr, action).await;
+                        // Quick status update
+                        if let Some(device) = quick_device_status(&adapter, addr).await {
+                            let _ = this.update_in(cx, |this, window, cx| {
+                                this.bt_state.upsert_device(device);
+                                this.bluetooth_page.update(cx, |page, cx| {
+                                    page.sync_state(&this.bt_state, window, cx);
+                                });
+                                cx.notify();
+                            });
+                        }
+                        // Full list refresh (delayed)
+                        let a = adapter.clone();
+                        if let Ok(Some(devices)) = crate::tokio_task(async move {
+                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                            crate::bluetooth::discovery::refresh_device_list(&a).await
+                        })
+                        .await
+                        {
+                            let _ = this.update_in(cx, |this, window, cx| {
+                                this.bt_state.replace_devices(devices);
+                                this.bluetooth_page.update(cx, |page, cx| {
+                                    page.sync_state(&this.bt_state, window, cx);
+                                });
                                 cx.notify();
                             });
                         }
@@ -184,11 +268,12 @@ impl BludioApp {
         .detach();
 
         // ── Create page entities ──
+        let bluetooth_page = cx.new(|cx| BluetoothPage::new(bt_cmd_tx, cx));
         let audio_output_page =
             cx.new(|cx| AudioPage::new(DeviceKind::Output, audio_cmd_tx.clone(), pa_wakeup, cx));
         let audio_input_page =
             cx.new(|cx| AudioPage::new(DeviceKind::Input, audio_cmd_tx.clone(), pa_wakeup, cx));
-        let text_field_test_page = cx.new(TextFieldTestPage::new);
+        let dev_test_page = cx.new(DevTestPage::new);
 
         let mut audio_state = AudioState::default();
         if let Some(err) = pa_init_error {
@@ -202,7 +287,8 @@ impl BludioApp {
             audio_state,
             audio_output_page,
             audio_input_page,
-            text_field_test_page,
+            dev_test_page,
+            bluetooth_page,
             active_page: Page::BluetoothDevices,
             _focus_handle: cx.focus_handle(),
         }
@@ -247,7 +333,7 @@ impl Render for BludioApp {
             Page::BluetoothDevices => 0,
             Page::AudioOutputs => 1,
             Page::AudioInputs => 2,
-            Page::TextFieldTest => 3,
+            Page::DevTest => 3,
         };
 
         h_flex()
@@ -264,8 +350,8 @@ impl Render for BludioApp {
                             0 => Page::BluetoothDevices,
                             1 => Page::AudioOutputs,
                             2 => Page::AudioInputs,
-                            3 => Page::TextFieldTest,
-                            _ => Page::BluetoothDevices,
+                            3 => Page::DevTest,
+                            _ => Page::DevTest,
                         };
                         this.update(app, |this, cx| {
                             if this.active_page != new_page {
@@ -281,13 +367,10 @@ impl Render for BludioApp {
                 v_flex()
                     .flex_1()
                     .child(match active_page {
-                        Page::BluetoothDevices => {
-                            ui::bluetooth_page::bluetooth_page_view(&self.bt_state, cx)
-                                .into_any_element()
-                        }
+                        Page::BluetoothDevices => self.bluetooth_page.clone().into_any_element(),
                         Page::AudioOutputs => self.audio_output_page.clone().into_any_element(),
                         Page::AudioInputs => self.audio_input_page.clone().into_any_element(),
-                        Page::TextFieldTest => self.text_field_test_page.clone().into_any_element(),
+                        Page::DevTest => self.dev_test_page.clone().into_any_element(),
                     })
                     .into_any_element(),
             )
@@ -296,7 +379,14 @@ impl Render for BludioApp {
 
 // ── Discovery orchestration ────────────────────────────────────────────────
 
-pub(crate) async fn run_discovery(this: gpui::WeakEntity<BludioApp>, cx: &mut gpui::AsyncApp) {
+pub(crate) async fn run_discovery(
+    this: gpui::WeakEntity<BludioApp>,
+    cx: &mut gpui::AsyncWindowContext,
+) {
+    // NOTE: run_discovery owns its own EnterGuard. The command channel handler
+    // uses futures::channel::mpsc (no Tokio context needed), so the only other
+    // persistent guard is the monitor loop's. Two-level nesting (monitor +
+    // run_discovery) is safe — the old code had the same topology and worked.
     let _tokio_guard = crate::TOKIO.enter();
 
     let adapter = match this.read_with(cx, |app, _| app.bt_state.adapter.clone()) {
@@ -309,8 +399,10 @@ pub(crate) async fn run_discovery(this: gpui::WeakEntity<BludioApp>, cx: &mut gp
     while let Some(event) = rx.recv().await {
         match event {
             crate::bluetooth::discovery::DiscoveryEvent::DeviceAdded(device) => {
-                let _ = this.update(cx, |this, cx| {
+                let _ = this.update_in(cx, |this, window, cx| {
                     this.bt_state.upsert_device(device);
+                    this.bluetooth_page
+                        .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
                     cx.notify();
                 });
                 if !this
@@ -329,21 +421,70 @@ pub(crate) async fn run_discovery(this: gpui::WeakEntity<BludioApp>, cx: &mut gp
         crate::tokio_task(async move { crate::bluetooth::discovery::refresh_device_list(&a).await })
             .await
     {
-        let _ = this.update(cx, |this, cx| {
+        let _ = this.update_in(cx, |this, window, cx| {
             this.bt_state.replace_devices(devices);
             this.bt_state.discovering = false;
+            this.bluetooth_page
+                .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
             cx.notify();
         });
         return;
     }
 
-    let _ = this.update(cx, |this, cx| {
+    let _ = this.update_in(cx, |this, window, cx| {
         this.bt_state.discovering = false;
+        this.bluetooth_page
+            .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
         cx.notify();
     });
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────
+
+/// Execute a device action (connect / disconnect / forget / pair+trust)
+/// on the Tokio runtime.
+async fn execute_device_action(
+    adapter: &bluer::Adapter,
+    addr: bluer::Address,
+    action: DeviceRowAction,
+) {
+    match action {
+        DeviceRowAction::Connect => {
+            if let Ok(device) = adapter.device(addr) {
+                let _ = device.connect().await;
+            }
+        }
+        DeviceRowAction::Disconnect => {
+            if let Ok(device) = adapter.device(addr) {
+                let _ = device.disconnect().await;
+            }
+        }
+        DeviceRowAction::Forget => {
+            let _ = adapter.remove_device(addr).await;
+        }
+        DeviceRowAction::PairAndTrust => {
+            if let Ok(device) = adapter.device(addr) {
+                let _ = device.pair().await;
+                let _ = device.set_trusted(true).await;
+                let _ = device.connect().await;
+            }
+        }
+    }
+}
+
+/// Minimal status fetch for immediate UI updates — no filtering.
+async fn quick_device_status(
+    adapter: &bluer::Adapter,
+    addr: bluer::Address,
+) -> Option<crate::bluetooth::device::BluetoothDevice> {
+    let device = adapter.device(addr).ok()?;
+    let props = crate::bluetooth::properties::fetch_properties(
+        &device,
+        crate::bluetooth::properties::PropertyTimeouts::default(),
+    )
+    .await;
+    crate::bluetooth::properties::build_device(addr, &props, false, false)
+}
 
 fn devices_changed(
     old: &[crate::bluetooth::device::BluetoothDevice],

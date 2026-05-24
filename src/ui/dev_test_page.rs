@@ -1,7 +1,8 @@
-//! Text Field test page: demonstrates the TextField component.
+//! Developer test page: sandbox for testing components.
 //!
-//! A self-contained entity that owns its TextField and confirmed entries list.
-//! Renders an input field + scrollable list of confirmed entries.
+//! A self-contained entity that owns interactive components and a log of
+//! confirmed entries. Renders an input field + scrollable list of confirmed
+//! entries. Originally built for TextField testing, now a general dev sandbox.
 
 use gpui::{
     App, Context, CursorStyle, Entity, FocusHandle, Focusable, FontWeight, MouseButton,
@@ -13,14 +14,14 @@ use crate::ui::{h_flex, v_flex};
 
 // ── Test page entity ───────────────────────────────────────────────────────
 
-pub(crate) struct TextFieldTestPage {
+pub(crate) struct DevTestPage {
     text_field: Entity<TextField>,
     confirmed_texts: Vec<String>,
     focus_handle: FocusHandle,
     _text_field_sub: Subscription,
 }
 
-impl TextFieldTestPage {
+impl DevTestPage {
     pub(crate) fn new(cx: &mut Context<Self>) -> Self {
         let text_field = cx.new(|cx| TextField::new(cx).placeholder("Type something..."));
         let _text_field_sub =
@@ -43,13 +44,13 @@ impl TextFieldTestPage {
     }
 }
 
-impl Focusable for TextFieldTestPage {
+impl Focusable for DevTestPage {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-impl Render for TextFieldTestPage {
+impl Render for DevTestPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let accent = hsla(210.0 / 360.0, 0.7, 0.55, 1.0);
         let surface = hsla(0.0, 0.0, 0.14, 1.0);

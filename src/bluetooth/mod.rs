@@ -102,6 +102,7 @@ impl BluetoothState {
     }
 
     /// Remove a device by address (no re-sort needed).
+    #[allow(dead_code)]
     pub fn remove_device(&mut self, addr: bluer::Address) {
         self.devices.retain(|d| d.address != addr);
     }
