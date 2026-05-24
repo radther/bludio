@@ -7,8 +7,8 @@
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, DeviceKind};
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
+use crate::ui::components::slider::{Slider, SliderEvent};
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
-use crate::ui::components::volume_slider::volume_bar;
 use crate::ui::{h_flex, v_flex};
 use gpui::{
     App, Context, CursorStyle, Div, Entity, FocusHandle, Focusable, FontWeight, MouseButton,
@@ -34,9 +34,11 @@ pub(crate) struct AudioDeviceRow {
     kind: DeviceKind,
     text_field: Entity<TextField>,
     profile_dropdown: Entity<crate::ui::components::dropdown::Dropdown>,
+    slider: Entity<Slider>,
     cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
     wakeup: PaWakeup,
     focus_handle: FocusHandle,
+    _slider_sub: Subscription,
     _text_field_sub: Subscription,
     _dropdown_sub: Subscription,
 }
@@ -131,6 +133,7 @@ impl AudioDeviceRow {
             TextField::new(cx)
                 .filter_char(|c| c.is_ascii_digit())
                 .placeholder("vol")
+                .align(gpui::TextAlign::Center)
         });
         text_field.update(cx, |f, cx| {
             f.set_text(&format!("{}", (params.volume * 100.0).round()), cx);
@@ -147,7 +150,33 @@ impl AudioDeviceRow {
                 .menu_border(hsla(0.0, 0.0, 0.3, 1.0))
         });
 
+        // ── Slider ──
+        let slider = cx.new(|cx| {
+            let mut s = Slider::new(cx);
+            s.set_value(params.volume, cx);
+            s
+        });
+
         // ── Subscriptions ──
+        let _slider_sub = cx.subscribe_in(&slider, window, {
+            let cmd_tx = cmd_tx.clone();
+            move |this, _sl, event: &SliderEvent, _window, _cx| {
+                let kind = this.kind;
+                let idx = this.index;
+                match event {
+                    SliderEvent::Change(v) => {
+                        let _ = match kind {
+                            DeviceKind::Output => cmd_tx.send(AudioCommand::SetSinkVolume(idx, *v)),
+                            DeviceKind::Input => {
+                                cmd_tx.send(AudioCommand::SetSourceVolume(idx, *v))
+                            }
+                        };
+                        this.wakeup.wake();
+                    }
+                    SliderEvent::Release(_) => {}
+                }
+            }
+        });
         let _text_field_sub = cx.subscribe_in(&text_field, window, {
             move |this, _tf, event: &TextFieldEvent, window, cx| match event {
                 TextFieldEvent::Confirmed(text) => {
@@ -204,9 +233,11 @@ impl AudioDeviceRow {
             kind: params.kind,
             text_field,
             profile_dropdown,
+            slider,
             cmd_tx,
             wakeup,
             focus_handle: cx.focus_handle(),
+            _slider_sub,
             _text_field_sub,
             _dropdown_sub,
         }
@@ -222,8 +253,6 @@ impl AudioDeviceRow {
         self.display_name = sink.description.clone();
         self.pa_name = sink.name.clone();
         self.volume = sink.volume;
-        self.muted = sink.muted;
-        self.is_default = sink.is_default;
 
         let profiles: Vec<String> = sink
             .available_profiles
@@ -237,6 +266,7 @@ impl AudioDeviceRow {
             .unwrap_or(0);
         self.profile_dropdown
             .update(cx, |d, cx| d.set_items(profiles, selected_idx, cx));
+        self.slider.update(cx, |s, cx| s.set_value(sink.volume, cx));
         cx.notify();
     }
 
@@ -251,6 +281,8 @@ impl AudioDeviceRow {
         self.volume = source.volume;
         self.muted = source.muted;
         self.is_default = source.is_default;
+        self.slider
+            .update(cx, |s, cx| s.set_value(source.volume, cx));
         cx.notify();
     }
 }
@@ -286,6 +318,7 @@ impl Render for AudioDeviceRow {
             .hover(|el| el.bg(hsla(0.0, 0.0, 1.0, 0.04)))
             .child(
                 v_flex()
+                    .w_full()
                     .child(self.render_device_name(accent))
                     .child(self.render_controls_row(accent, accent_hover, cx)),
             )
@@ -331,19 +364,11 @@ impl AudioDeviceRow {
         // A fresh closure is created each frame via cx.notify(), so the
         // captured values always match the current row state.
         h_flex()
+            .w_full()
             .gap_2()
             .items_center()
-            // ── Volume bar ──
-            .child(volume_bar(self.volume, self.muted, {
-                let cmd = cmd_tx.clone();
-                move |v| {
-                    let _ = match kind {
-                        DeviceKind::Output => cmd.send(AudioCommand::SetSinkVolume(idx, v)),
-                        DeviceKind::Input => cmd.send(AudioCommand::SetSourceVolume(idx, v)),
-                    };
-                    wk.wake();
-                }
-            }))
+            // ── Volume slider ──
+            .child(self.slider.clone())
             // ── Inline text field for numeric volume ──
             .child(
                 h_flex()

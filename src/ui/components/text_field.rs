@@ -6,11 +6,10 @@
 //! Based on gpui's `input.rs` example and Zed's `ui_input`/`editor` crates.
 
 use gpui::{
-    App, Bounds, ClipboardItem, Context, CursorStyle, Element, Entity, EntityInputHandler,
-    EventEmitter, FocusHandle, Focusable, GlobalElementId, InspectorElementId, IntoElement,
-    KeyDownEvent, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent, PaintQuad, Pixels, Point,
-    Render, ShapedLine, SharedString, Style, TextAlign, TextRun, Window, div, hsla, point,
-    prelude::*, px, relative, size,
+    App, Bounds, ClipboardItem, Context, CursorStyle, Entity, EntityInputHandler, EventEmitter,
+    FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
+    Pixels, Point, Render, RenderOnce, ShapedLine, SharedString, TextAlign, TextRun, Window,
+    canvas, div, hsla, point, prelude::*, px, size,
 };
 use std::ops::Range;
 use std::time::Duration;
@@ -57,6 +56,8 @@ pub(crate) struct TextField {
     blink_epoch: usize,
     /// Whether the text field was focused in the previous frame (for edge detection).
     was_focused: bool,
+    /// Text alignment within the field.
+    align: TextAlign,
 }
 
 impl TextField {
@@ -75,6 +76,7 @@ impl TextField {
             blink_visible: true,
             blink_epoch: 0,
             was_focused: false,
+            align: TextAlign::Left,
         }
     }
 
@@ -88,6 +90,12 @@ impl TextField {
     /// Use this to restrict input to digits, alphanumeric, etc.
     pub fn filter_char(mut self, filter: impl Fn(char) -> bool + 'static) -> Self {
         self.filter_char = Some(Box::new(filter));
+        self
+    }
+
+    /// Set the text alignment within the field. Default: Left.
+    pub fn align(mut self, align: TextAlign) -> Self {
+        self.align = align;
         self
     }
 
@@ -550,12 +558,32 @@ impl Focusable for TextField {
     }
 }
 
-// ── Render ─────────────────────────────────────────────────────────────────
+// ── TextFieldComponent (RenderOnce element) ───────────────────────────────
 
-impl Render for TextField {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let this = cx.weak_entity();
-        let focus_handle = self.focus_handle(cx);
+/// The visual representation of a TextField.
+///
+/// Handles text layout, selection/cursor painting, IME input, and keyboard/mouse
+/// event dispatch via `window.listener_for`. Text is rendered via `ShapedLine`
+/// through a canvas, with selection and cursor as paint quads.
+#[derive(IntoElement)]
+struct TextFieldComponent {
+    entity: Entity<TextField>,
+}
+
+impl TextFieldComponent {
+    fn new(entity: Entity<TextField>) -> Self {
+        Self { entity }
+    }
+}
+
+impl RenderOnce for TextFieldComponent {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let entity = self.entity.clone();
+        let focus_handle = entity.read(cx).focus_handle.clone();
+
+        let entity_for_key = entity.clone();
+        let entity_for_mouse = entity.clone();
+        let entity_for_paint = entity.clone();
 
         div()
             .track_focus(&focus_handle)
@@ -564,16 +592,12 @@ impl Render for TextField {
             .flex_grow()
             .px_1()
             .min_h(px(20.))
-            .on_key_down(move |event: &KeyDownEvent, _window, app| {
-                let Some(this) = this.upgrade() else {
-                    return;
-                };
-                let key = event.keystroke.key.clone();
-                let modifiers = event.keystroke.modifiers;
-
-                this.update(app, |this, cx| {
-                    // Determine platform-appropriate modifier for shortcuts:
-                    // Ctrl on Linux/Windows, Cmd on macOS.
+            .relative()
+            .on_key_down(window.listener_for(
+                &entity_for_key,
+                move |this, event: &KeyDownEvent, _window, cx| {
+                    let key = event.keystroke.key.clone();
+                    let modifiers = event.keystroke.modifiers;
                     let shortcut_mod = modifiers.control || modifiers.platform;
 
                     match key.as_str() {
@@ -636,227 +660,217 @@ impl Render for TextField {
                         "x" if shortcut_mod => {
                             this.handle_cut(cx);
                         }
-                        // All other character keys are handled by EntityInputHandler
-                        // (IME / platform text input routed via window.handle_input())
                         _ => {}
                     }
-                });
-            })
+                },
+            ))
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|this, event: &MouseDownEvent, _window, cx| {
-                    this.on_mouse_down(event, cx);
-                }),
+                window.listener_for(
+                    &entity_for_mouse,
+                    |this, event: &MouseDownEvent, _window, cx| {
+                        this.on_mouse_down(event, cx);
+                    },
+                ),
             )
             .on_mouse_up(
                 MouseButton::Left,
-                cx.listener(|this, _event, _window, cx| {
+                window.listener_for(&entity_for_mouse, |this, _event, _window, cx| {
                     this.on_mouse_up(cx);
                 }),
             )
             .on_mouse_up_out(
                 MouseButton::Left,
-                cx.listener(|this, _event, _window, cx| {
+                window.listener_for(&entity_for_mouse, |this, _event, _window, cx| {
                     this.on_mouse_up(cx);
                 }),
             )
-            .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _window, cx| {
-                this.on_mouse_move(event, cx);
-            }))
-            .child(TextFieldElement {
-                entity: cx.entity(),
-            })
-    }
-}
-
-// ── Custom Element (paints text, selection, cursor, and calls handle_input) ─
-
-struct TextFieldElement {
-    entity: Entity<TextField>,
-}
-
-struct TextFieldPrepaint {
-    line: Option<ShapedLine>,
-    selection: Option<PaintQuad>,
-    cursor: Option<PaintQuad>,
-}
-
-impl IntoElement for TextFieldElement {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
-    }
-}
-
-impl Element for TextFieldElement {
-    type RequestLayoutState = ();
-    type PrepaintState = TextFieldPrepaint;
-
-    fn id(&self) -> Option<gpui::ElementId> {
-        None
-    }
-
-    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
-        None
-    }
-
-    fn request_layout(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> (LayoutId, Self::RequestLayoutState) {
-        let mut style = Style::default();
-        style.size.width = relative(1.).into();
-        style.size.height = window.line_height().into();
-        (window.request_layout(style, [], cx), ())
-    }
-
-    fn prepaint(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        _request_layout: &mut Self::RequestLayoutState,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> Self::PrepaintState {
-        let input = self.entity.read(cx);
-        let content = input.content.clone();
-        let selected_range = input.selected_range.clone();
-        let cursor = input.cursor_offset();
-        let style = window.text_style();
-
-        let (display_text, text_color) = if content.is_empty() {
-            (input.placeholder.clone(), hsla(0., 0., 0.6, 1.))
-        } else {
-            (content, style.color)
-        };
-
-        let run = TextRun {
-            len: display_text.len(),
-            font: style.font(),
-            color: text_color,
-            background_color: None,
-            underline: None,
-            strikethrough: None,
-        };
-        let runs = vec![run];
-
-        let font_size = style.font_size.to_pixels(window.rem_size());
-        let line = window
-            .text_system()
-            .shape_line(display_text, font_size, &runs, None);
-
-        let cursor_pos = line.x_for_index(cursor);
-        let focused = input.focus_handle.is_focused(window);
-
-        // Selection highlight or cursor
-        let (selection, cursor_quad) = if selected_range.is_empty() {
-            // No selection — paint blinking cursor if focused
-            let cursor_visible = focused && input.blink_visible;
-            (
-                None,
-                if cursor_visible {
-                    Some(gpui::fill(
-                        Bounds::new(
-                            point(bounds.left() + cursor_pos, bounds.top()),
-                            size(px(2.), bounds.bottom() - bounds.top()),
-                        ),
-                        hsla(210. / 360., 0.7, 0.55, 1.),
-                    ))
-                } else {
-                    None
+            .on_mouse_move(window.listener_for(
+                &entity_for_mouse,
+                |this, event: &MouseMoveEvent, _window, cx| {
+                    this.on_mouse_move(event, cx);
                 },
-            )
-        } else {
-            // Has selection — always highlight it, plus optionally show cursor
-            let sel_start = line.x_for_index(selected_range.start);
-            let sel_end = line.x_for_index(selected_range.end);
-            (
-                Some(gpui::fill(
-                    Bounds::from_corners(
-                        point(bounds.left() + sel_start, bounds.top()),
-                        point(bounds.left() + sel_end, bounds.bottom()),
-                    ),
-                    hsla(210. / 360., 0.6, 0.5, 0.3),
-                )),
-                // Also show a cursor at the active end if focused
-                if focused && input.blink_visible {
-                    Some(gpui::fill(
-                        Bounds::new(
-                            point(bounds.left() + cursor_pos, bounds.top()),
-                            size(px(2.), bounds.bottom() - bounds.top()),
-                        ),
-                        hsla(210. / 360., 0.7, 0.55, 1.),
-                    ))
-                } else {
-                    None
-                },
-            )
-        };
+            ))
+            .child(
+                // Canvas handles: text painting, selection/cursor overlays, IME input
+                canvas(
+                    {
+                        let entity = entity_for_paint.clone();
+                        move |bounds, window, cx| {
+                            let input = entity.read(cx);
+                            let content = input.content.clone();
+                            let is_empty = content.is_empty();
+                            let selected_range = input.selected_range.clone();
+                            let cursor = input.cursor_offset();
+                            let align = input.align;
+                            let style = window.text_style();
 
-        TextFieldPrepaint {
-            line: Some(line),
-            selection,
-            cursor: cursor_quad,
-        }
+                            let (display_text, text_color) = if content.is_empty() {
+                                (input.placeholder.clone(), hsla(0., 0., 0.6, 1.))
+                            } else {
+                                (content, style.color)
+                            };
+
+                            let run = TextRun {
+                                len: display_text.len(),
+                                font: style.font(),
+                                color: text_color,
+                                background_color: None,
+                                underline: None,
+                                strikethrough: None,
+                            };
+                            let runs = vec![run];
+
+                            let font_size = style.font_size.to_pixels(window.rem_size());
+                            let line = window.text_system().shape_line(
+                                display_text,
+                                font_size,
+                                &runs,
+                                None,
+                            );
+
+                            let cursor_pos = line.x_for_index(cursor);
+                            let focused = input.focus_handle.is_focused(window);
+
+                            // Horizontal offset for text alignment.
+                            // When the field is empty, center the cursor in the field
+                            // (placeholder text is centered separately by line.paint).
+                            let line_width = if !is_empty && line.len() > 0 {
+                                line.x_for_index(line.len())
+                            } else {
+                                px(0.0)
+                            };
+                            let align_offset_x = match align {
+                                TextAlign::Left => px(0.0),
+                                TextAlign::Center => (bounds.size.width - line_width) / 2.0,
+                                TextAlign::Right => bounds.size.width - line_width,
+                            };
+
+                            let (selection, cursor_quad) = if selected_range.is_empty() {
+                                let cursor_visible = focused && input.blink_visible;
+                                (
+                                    None,
+                                    if cursor_visible {
+                                        Some(gpui::fill(
+                                            Bounds::new(
+                                                point(
+                                                    bounds.left() + align_offset_x + cursor_pos,
+                                                    bounds.top(),
+                                                ),
+                                                size(px(2.), bounds.bottom() - bounds.top()),
+                                            ),
+                                            hsla(210. / 360., 0.7, 0.55, 1.),
+                                        ))
+                                    } else {
+                                        None
+                                    },
+                                )
+                            } else {
+                                let sel_start = line.x_for_index(selected_range.start);
+                                let sel_end = line.x_for_index(selected_range.end);
+                                (
+                                    Some(gpui::fill(
+                                        Bounds::from_corners(
+                                            point(
+                                                bounds.left() + align_offset_x + sel_start,
+                                                bounds.top(),
+                                            ),
+                                            point(
+                                                bounds.left() + align_offset_x + sel_end,
+                                                bounds.bottom(),
+                                            ),
+                                        ),
+                                        hsla(210. / 360., 0.6, 0.5, 0.3),
+                                    )),
+                                    if focused && input.blink_visible {
+                                        Some(gpui::fill(
+                                            Bounds::new(
+                                                point(
+                                                    bounds.left() + align_offset_x + cursor_pos,
+                                                    bounds.top(),
+                                                ),
+                                                size(px(2.), bounds.bottom() - bounds.top()),
+                                            ),
+                                            hsla(210. / 360., 0.7, 0.55, 1.),
+                                        ))
+                                    } else {
+                                        None
+                                    },
+                                )
+                            };
+
+                            // Return state for paint phase
+                            (line, selection, cursor_quad, bounds, align, align_offset_x)
+                        }
+                    },
+                    {
+                        let entity = entity_for_paint;
+                        move |_paint_bounds, state, window, cx| {
+                            let (line, selection, cursor_quad, bounds, align, _align_offset_x) =
+                                state;
+
+                            // Handle IME and text input
+                            let focus_handle = entity.read(cx).focus_handle.clone();
+                            window.handle_input(
+                                &focus_handle,
+                                gpui::ElementInputHandler::new(bounds, entity.clone()),
+                                cx,
+                            );
+
+                            // Paint selection background (behind text)
+                            if let Some(selection_quad) = selection {
+                                window.paint_quad(selection_quad);
+                            }
+
+                            // Paint text, vertically centered within the bounds.
+                            // ShapedLine::paint uses align_width to position text for
+                            // center/right alignment.
+                            let line_height = window.line_height();
+                            let text_origin = point(
+                                bounds.origin.x,
+                                bounds.origin.y + (bounds.size.height - line_height) / 2.0,
+                            );
+                            line.paint(
+                                text_origin,
+                                line_height,
+                                align,
+                                Some(bounds.size.width),
+                                window,
+                                cx,
+                            )
+                            .ok();
+
+                            // Paint cursor on top
+                            if let Some(cursor_quad) = cursor_quad {
+                                window.paint_quad(cursor_quad);
+                            }
+
+                            // Update entity state for mouse hit-testing and focus transitions
+                            let focused = entity.read(cx).focus_handle.is_focused(window);
+                            entity.update(cx, |input, cx| {
+                                input.last_layout = Some(line);
+                                input.last_bounds = Some(bounds);
+                                if focused && !input.was_focused {
+                                    input.start_blinking(cx);
+                                } else if !focused && input.was_focused {
+                                    input.blink_visible = false;
+                                    cx.notify();
+                                }
+                                input.was_focused = focused;
+                            });
+                        }
+                    },
+                )
+                .absolute()
+                .size_full(),
+            )
     }
+}
 
-    fn paint(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        _request_layout: &mut Self::RequestLayoutState,
-        prepaint: &mut Self::PrepaintState,
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        let focus_handle = self.entity.read(cx).focus_handle.clone();
-        window.handle_input(
-            &focus_handle,
-            gpui::ElementInputHandler::new(bounds, self.entity.clone()),
-            cx,
-        );
+// ── Render (Entity → RenderOnce) ──────────────────────────────────────────
 
-        // Paint selection background first (so it's behind text)
-        if let Some(selection_quad) = prepaint.selection.take() {
-            window.paint_quad(selection_quad);
-        }
-
-        // Paint text
-        let line = prepaint.line.take().unwrap();
-        line.paint(
-            bounds.origin,
-            window.line_height(),
-            TextAlign::Left,
-            None,
-            window,
-            cx,
-        )
-        .ok();
-
-        // Paint cursor on top
-        if let Some(cursor_quad) = prepaint.cursor.take() {
-            window.paint_quad(cursor_quad);
-        }
-
-        // Update layout/bounds for mouse interaction, and handle focus transitions
-        let focused = self.entity.read(cx).focus_handle.is_focused(window);
-        self.entity.update(cx, |input, cx| {
-            input.last_layout = Some(line);
-            input.last_bounds = Some(bounds);
-            // Edge-detect focus changes for blink lifecycle
-            if focused && !input.was_focused {
-                input.start_blinking(cx);
-            } else if !focused && input.was_focused {
-                input.blink_visible = false;
-                cx.notify();
-            }
-            input.was_focused = focused;
-        });
+impl Render for TextField {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        TextFieldComponent::new(cx.entity())
     }
 }

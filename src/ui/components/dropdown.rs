@@ -8,13 +8,10 @@
 //! (EventEmitter pattern).
 
 use gpui::{
-    Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Element, Entity, EventEmitter,
-    FocusHandle, Focusable, GlobalElementId, Hsla, InspectorElementId, IntoElement, KeyDownEvent,
-    LayoutId, MouseButton, MouseUpEvent, Pixels, Render, SharedString, Window, anchored, deferred,
-    div, hsla, prelude::*, px,
+    Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity, EventEmitter, FocusHandle,
+    Focusable, Hsla, IntoElement, KeyDownEvent, MouseButton, MouseUpEvent, Pixels, Render,
+    RenderOnce, SharedString, Window, anchored, canvas, deferred, div, hsla, prelude::*, px,
 };
-use std::cell::Cell;
-use std::rc::Rc;
 
 use crate::ui::v_flex;
 
@@ -48,7 +45,7 @@ pub(crate) struct Dropdown {
     menu_bg: Hsla,
     menu_border: Hsla,
     /// Bounds of the trigger element, captured during prepaint for positioning.
-    trigger_bounds: Rc<Cell<Option<Bounds<Pixels>>>>,
+    trigger_bounds: Option<Bounds<Pixels>>,
 }
 
 impl Dropdown {
@@ -65,7 +62,7 @@ impl Dropdown {
             hover_bg: hsla(0.0, 0.0, 0.3, 1.0),
             menu_bg: hsla(0.0, 0.0, 0.16, 1.0),
             menu_border: hsla(0.0, 0.0, 0.3, 1.0),
-            trigger_bounds: Rc::new(Cell::new(None)),
+            trigger_bounds: None,
         }
     }
 
@@ -140,92 +137,28 @@ impl Focusable for Dropdown {
     }
 }
 
-// ── Render ─────────────────────────────────────────────────────────────────
+// ── DropdownComponent (RenderOnce element) ──────────────────────────────
 
-impl Render for Dropdown {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .track_focus(&self.focus_handle(cx))
-            .on_key_down({
-                let entity = cx.weak_entity();
-                move |event: &KeyDownEvent, _window, app| {
-                    if let Some(this) = entity.upgrade() {
-                        let key = event.keystroke.key.clone();
-                        this.update(app, |this, cx| match key.as_str() {
-                            "escape" => {
-                                this.is_open = false;
-                                cx.emit(DropdownEvent::Cancelled);
-                                cx.notify();
-                            }
-                            "enter" if this.is_open => {
-                                let idx = this.selected_index;
-                                if let Some(text) = this.items.get(idx).cloned() {
-                                    this.is_open = false;
-                                    cx.emit(DropdownEvent::Selected(idx, text));
-                                    cx.notify();
-                                }
-                            }
-                            "up" | "down" if this.is_open => {
-                                let len = this.items.len();
-                                if len > 0 {
-                                    this.selected_index = if key == "up" {
-                                        this.selected_index.wrapping_sub(1) % len
-                                    } else {
-                                        (this.selected_index + 1) % len
-                                    };
-                                    cx.notify();
-                                }
-                            }
-                            _ => {}
-                        });
-                    }
-                }
-            })
-            .child(DropdownElement {
-                entity: cx.entity(),
-            })
-    }
-}
-
-// ── Custom Element (captures bounds, renders deferred anchored menu) ───────
-
-struct DropdownElement {
+/// The visual representation of a Dropdown.
+///
+/// Renders a trigger button inline and, when open, a floating options list
+/// via `deferred(anchored(...))`. Trigger bounds are captured via canvas.
+#[derive(IntoElement)]
+struct DropdownComponent {
     entity: Entity<Dropdown>,
 }
 
-struct DropdownLayoutState {
-    trigger: Option<gpui::AnyElement>,
-    menu: Option<gpui::AnyElement>,
-}
-
-impl IntoElement for DropdownElement {
-    type Element = Self;
-
-    fn into_element(self) -> Self::Element {
-        self
+impl DropdownComponent {
+    fn new(entity: Entity<Dropdown>) -> Self {
+        Self { entity }
     }
 }
 
-impl Element for DropdownElement {
-    type RequestLayoutState = DropdownLayoutState;
-    type PrepaintState = ();
+impl RenderOnce for DropdownComponent {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let entity = self.entity;
 
-    fn id(&self) -> Option<gpui::ElementId> {
-        None
-    }
-
-    fn source_location(&self) -> Option<&'static std::panic::Location<'static>> {
-        None
-    }
-
-    fn request_layout(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        window: &mut Window,
-        cx: &mut App,
-    ) -> (LayoutId, Self::RequestLayoutState) {
-        // Read all state up front, then drop borrows before building elements.
+        // Read all state up front.
         let (
             is_open,
             selected,
@@ -238,13 +171,13 @@ impl Element for DropdownElement {
             menu_bg,
             menu_border,
         ) = {
-            let d = self.entity.read(cx);
+            let d = entity.read(cx);
             (
                 d.is_open,
                 d.selected_text(),
                 d.items.clone(),
                 d.selected_index,
-                d.trigger_bounds.get().map(|b| b.origin),
+                d.trigger_bounds.map(|b| b.origin),
                 d.accent,
                 d.bg,
                 d.hover_bg,
@@ -253,160 +186,171 @@ impl Element for DropdownElement {
             )
         };
 
-        // ── Build trigger element ──
-        let entity = self.entity.clone();
-        let entity2 = self.entity.clone();
-        let mut trigger = div()
-            .id("dropdown-trigger")
-            .px_2()
-            .py_1()
-            .rounded_sm()
-            .text_xs()
-            .bg(bg)
-            .cursor(CursorStyle::PointingHand)
-            .hover(move |el| el.bg(hover_bg))
-            .child(selected.clone())
-            .on_mouse_up(MouseButton::Left, {
-                let entity = entity.clone();
-                move |_: &MouseUpEvent, _window, app| {
-                    entity.update(app, |this, cx| {
-                        this.is_open = !this.is_open;
-                        cx.notify();
-                    });
-                }
-            })
-            .into_any_element();
-        let _trigger_layout_id = trigger.request_layout(window, cx);
-
-        // ── Build floating menu if open ──
-        let mut menu_deferred: Option<gpui::AnyElement> = None;
-        let mut menu_deferred_layout_id = None;
-        if is_open && !items.is_empty() {
-            let menu_element = v_flex()
-                .bg(menu_bg)
-                .border_1()
-                .border_color(menu_border)
-                .rounded_md()
-                .children(items.iter().enumerate().map(|(i, item)| {
-                    let item = item.clone();
-                    let is_active = i == selected_idx;
-                    let entity = entity2.clone();
-                    div()
-                        .id(SharedString::from(format!("dropdown-item-{i}")))
-                        .px_2()
-                        .py_1()
-                        .text_xs()
-                        .cursor(CursorStyle::PointingHand)
-                        .when(is_active, move |el| el.text_color(accent))
-                        .hover(|el| el.bg(hsla(0.0, 0.0, 1.0, 0.06)))
-                        .child(SharedString::from(item.clone()))
-                        .on_mouse_up(MouseButton::Left, {
-                            let item = item.clone();
-                            let entity = entity.clone();
-                            move |_: &MouseUpEvent, _window, app| {
-                                entity.update(app, |this, cx| {
-                                    this.is_open = false;
-                                    this.selected_index = i;
-                                    cx.emit(DropdownEvent::Selected(i, item.clone()));
-                                    cx.notify();
-                                });
+        // Register click-outside-to-close when open (must happen during paint, not render).
+        let click_outside = if is_open {
+            let e = entity.clone();
+            Some(
+                canvas(
+                    |_, _, _| {},
+                    move |_, _, window, _cx| {
+                        window.on_mouse_event({
+                            let e = e.clone();
+                            move |_: &MouseUpEvent, phase, _window, cx| {
+                                if phase == DispatchPhase::Bubble {
+                                    e.update(cx, |this, cx| {
+                                        if this.is_open {
+                                            this.is_open = false;
+                                            cx.emit(DropdownEvent::Cancelled);
+                                            cx.notify();
+                                        }
+                                    });
+                                }
                             }
-                        })
-                }))
-                .into_any_element();
+                        });
+                    },
+                )
+                .absolute()
+                .size_full(),
+            )
+        } else {
+            None
+        };
 
-            // Float above content using deferred + anchored.
+        // Build the floating menu if open.
+        let menu = if is_open && !items.is_empty() {
             let mut anchored_menu = anchored()
                 .anchor(Anchor::TopLeft)
                 .snap_to_window_with_margin(px(8.));
             if let Some(pos) = trigger_pos {
                 anchored_menu = anchored_menu.position(pos);
             }
-            let anchored_elem = anchored_menu.child(menu_element).into_any_element();
-            let mut deferred_elem = deferred(anchored_elem).with_priority(1).into_any_element();
-            let lid = deferred_elem.request_layout(window, cx);
-            menu_deferred_layout_id = Some(lid);
-            menu_deferred = Some(deferred_elem);
-        }
-
-        let style = gpui::Style {
-            size: gpui::Size {
-                width: gpui::Length::Auto,
-                height: gpui::Length::Auto,
-            },
-            ..Default::default()
+            Some(
+                deferred(
+                    anchored_menu.child(
+                        v_flex()
+                            .bg(menu_bg)
+                            .border_1()
+                            .border_color(menu_border)
+                            .rounded_md()
+                            .children(items.iter().enumerate().map(|(i, item)| {
+                                let item = item.clone();
+                                let is_active = i == selected_idx;
+                                let entity = entity.clone();
+                                div()
+                                    .id(SharedString::from(format!("dropdown-item-{i}")))
+                                    .px_2()
+                                    .py_1()
+                                    .text_xs()
+                                    .cursor(CursorStyle::PointingHand)
+                                    .when(is_active, move |el| el.text_color(accent))
+                                    .hover(|el| el.bg(hsla(0.0, 0.0, 1.0, 0.06)))
+                                    .child(SharedString::from(item.clone()))
+                                    .on_mouse_up(MouseButton::Left, {
+                                        let item = item.clone();
+                                        let entity = entity.clone();
+                                        window.listener_for(
+                                            &entity,
+                                            move |this: &mut Dropdown, _, _, cx| {
+                                                this.is_open = false;
+                                                this.selected_index = i;
+                                                cx.emit(DropdownEvent::Selected(i, item.clone()));
+                                                cx.notify();
+                                            },
+                                        )
+                                    })
+                            })),
+                    ),
+                )
+                .with_priority(1),
+            )
+        } else {
+            None
         };
-        let layout_ids: Vec<LayoutId> = [_trigger_layout_id]
-            .into_iter()
-            .chain(menu_deferred_layout_id)
-            .collect();
-        let layout_id = window.request_layout(style, layout_ids, cx);
 
-        (
-            layout_id,
-            DropdownLayoutState {
-                trigger: Some(trigger),
-                menu: menu_deferred,
-            },
-        )
-    }
+        let entity_for_key = entity.clone();
+        let entity_for_trigger = entity.clone();
+        let entity_for_bounds = entity.clone();
 
-    fn prepaint(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        bounds: Bounds<Pixels>,
-        request_layout: &mut Self::RequestLayoutState,
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        // Capture trigger bounds for anchoring the menu.
-        let dropdown = self.entity.read(cx);
-        dropdown.trigger_bounds.set(Some(bounds));
-
-        if let Some(trigger) = request_layout.trigger.as_mut() {
-            trigger.prepaint(window, cx);
-        }
-        if let Some(menu) = request_layout.menu.as_mut() {
-            menu.prepaint(window, cx);
-        }
-    }
-
-    fn paint(
-        &mut self,
-        _id: Option<&GlobalElementId>,
-        _inspector_id: Option<&InspectorElementId>,
-        _bounds: Bounds<Pixels>,
-        request_layout: &mut Self::RequestLayoutState,
-        _prepaint: &mut Self::PrepaintState,
-        window: &mut Window,
-        cx: &mut App,
-    ) {
-        // Close dropdown on click outside.
-        let entity = self.entity.clone();
-        let is_open = self.entity.read(cx).is_open;
-        if is_open {
-            window.on_mouse_event({
-                let entity = entity.clone();
-                move |_: &MouseUpEvent, phase, _window, cx| {
-                    if phase == DispatchPhase::Bubble {
-                        entity.update(cx, |this, cx| {
-                            if this.is_open {
+        div()
+            .track_focus(&entity.read(cx).focus_handle(cx))
+            .on_key_down(window.listener_for(
+                &entity_for_key,
+                move |this: &mut Dropdown, event: &KeyDownEvent, _window, cx| {
+                    let key = event.keystroke.key.clone();
+                    match key.as_str() {
+                        "escape" => {
+                            this.is_open = false;
+                            cx.emit(DropdownEvent::Cancelled);
+                            cx.notify();
+                        }
+                        "enter" if this.is_open => {
+                            let idx = this.selected_index;
+                            if let Some(text) = this.items.get(idx).cloned() {
                                 this.is_open = false;
-                                cx.emit(DropdownEvent::Cancelled);
+                                cx.emit(DropdownEvent::Selected(idx, text));
                                 cx.notify();
                             }
-                        });
+                        }
+                        "up" | "down" if this.is_open => {
+                            let len = this.items.len();
+                            if len > 0 {
+                                this.selected_index = if key == "up" {
+                                    this.selected_index.wrapping_sub(1) % len
+                                } else {
+                                    (this.selected_index + 1) % len
+                                };
+                                cx.notify();
+                            }
+                        }
+                        _ => {}
                     }
-                }
-            });
-        }
+                },
+            ))
+            .child(
+                // ── Trigger button ──
+                div()
+                    .id("dropdown-trigger")
+                    .px_2()
+                    .py_1()
+                    .rounded_sm()
+                    .text_xs()
+                    .bg(bg)
+                    .cursor(CursorStyle::PointingHand)
+                    .hover(move |el| el.bg(hover_bg))
+                    .child(selected.clone())
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        window.listener_for(
+                            &entity_for_trigger,
+                            |this: &mut Dropdown, _, _, cx| {
+                                this.is_open = !this.is_open;
+                                cx.notify();
+                            },
+                        ),
+                    ),
+            )
+            .when_some(menu, |this, menu| this.child(menu))
+            .when_some(click_outside, |this, co| this.child(co))
+            .child(
+                // ── Canvas for trigger bounds capture ──
+                canvas(
+                    move |bounds, _window, cx| {
+                        entity_for_bounds.update(cx, |d, _| {
+                            d.trigger_bounds = Some(bounds);
+                        });
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .size_full(),
+            )
+    }
+}
 
-        if let Some(mut trigger) = request_layout.trigger.take() {
-            trigger.paint(window, cx);
-        }
-        if let Some(mut menu) = request_layout.menu.take() {
-            menu.paint(window, cx);
-        }
+// ── Render (Entity → RenderOnce) ──────────────────────────────────────────
+
+impl Render for Dropdown {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        DropdownComponent::new(cx.entity())
     }
 }

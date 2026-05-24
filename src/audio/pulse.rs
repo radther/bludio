@@ -15,6 +15,7 @@ use pulse::mainloop::standard::Mainloop;
 use pulse::proplist::Proplist;
 use pulse::volume::Volume;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::mpsc;
 use tokio::sync::mpsc as tmpsc;
@@ -134,10 +135,36 @@ fn run_pa_loop(
 
     loop {
         // ── Process pending commands (non-blocking) ──
-        // Commands arrive when the GPUI thread sends them; wakeup() was
-        // already called, so iterate(true) will return immediately.
+        // Drain the channel: for volume commands, keep only the last one per device
+        // to avoid building a backlog during rapid drag updates.
+        let mut vol_cmds: HashMap<u32, AudioCommand> = HashMap::new();
+        let mut other_cmds: Vec<AudioCommand> = Vec::new();
+
         if let Ok(cmd) = cmd_rx.try_recv() {
+            match &cmd {
+                AudioCommand::SetSinkVolume(idx, _) | AudioCommand::SetSourceVolume(idx, _) => {
+                    vol_cmds.insert(*idx, cmd);
+                }
+                _ => other_cmds.push(cmd),
+            }
+        }
+        while let Ok(cmd) = cmd_rx.try_recv() {
+            match &cmd {
+                AudioCommand::SetSinkVolume(idx, _) | AudioCommand::SetSourceVolume(idx, _) => {
+                    vol_cmds.insert(*idx, cmd);
+                }
+                _ => other_cmds.push(cmd),
+            }
+        }
+
+        let had_cmds = !other_cmds.is_empty() || !vol_cmds.is_empty();
+        for cmd in other_cmds {
             execute_command(&pa_ctx, &ml, &cmd, &done);
+        }
+        for (_, cmd) in vol_cmds {
+            execute_command(&pa_ctx, &ml, &cmd, &done);
+        }
+        if had_cmds {
             *needs_rebuild.borrow_mut() = true;
         }
 
