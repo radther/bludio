@@ -1,0 +1,477 @@
+# Codebase Audit Report — Finalised
+
+**Date:** 2026-05-25
+**Consolidated from:** `audit.md` and `.pi/audit-2026-05-25.md`
+**Files reviewed:** 30
+**Tooling:** `cargo clippy -- -D warnings` (clean), `cargo fmt --check` (clean)
+
+---
+
+## Summary
+
+7 warnings, 10 suggestions, 8 notes, 12 positive findings. **No critical issues.** The codebase is clean, well-organised, and follows GPUI conventions consistently. Clippy and rustfmt are both clean. The main areas for improvement are: subscription fields using `#[allow(dead_code)]` instead of the `_` prefix convention, missing justification comments on `#[allow(dead_code)]` and `unsafe` attributes, an unused field in `CardRow`, and a very long command handler method in `app.rs` that would benefit from decomposition.
+
+---
+
+## Warnings
+
+### [WARNING-1] Subscription fields use `#[allow(dead_code)]` instead of `_` prefix
+
+**Files:** `src/ui/audio/device_row.rs:42–46`, `src/ui/audio/card_row.rs:32–33`, `src/ui/dev_test_page.rs:22–23`
+
+**What:** Three files store `Subscription` fields with `#[allow(dead_code)]` instead of using the Rust `_` prefix convention:
+
+- `device_row.rs` — `slider_sub`, `text_field_sub`, `dropdown_sub`
+- `card_row.rs` — `dropdown_sub`
+- `dev_test_page.rs` — `text_field_sub`
+
+Meanwhile, `app.rs:54` already uses the `_` prefix correctly (`_tab_bar_sub`). The AGENTS.md explicitly documents this pattern:
+
+> "The preferred convention is to name the field with a `_` prefix (e.g., `_tab_bar_sub`), which suppresses Rust's unused-field warning *without* needing `#[allow(dead_code)]`."
+
+**Why:** Inconsistent. Rust's `_` prefix is the idiomatic way to suppress unused warnings. Using `#[allow(dead_code)]` on subscription fields adds visual noise and is less clear about intent — a `_` prefix immediately tells the reader "this is held to keep the subscription alive."
+
+**Fix:** Rename the fields to `_slider_sub`, `_text_field_sub`, `_dropdown_sub` and remove the `#[allow(dead_code)]` attributes. For `card_row.rs`, also rename `cmd_tx` to `_cmd_tx` (see WARNING-2).
+
+---
+
+### [WARNING-2] `#[allow(clippy::cast_possible_truncation)]` without explanatory comment
+
+**File:** `src/ui/components/slider.rs`
+**Line:** 219
+
+```rust
+#[allow(clippy::cast_possible_truncation)]
+let fill_w = relative(fill as f32);
+```
+
+**What:** The attribute lacks a comment explaining why the truncation is safe.
+
+**Why:** The project convention (documented in AGENTS.md, applied in `pulse.rs:323` and `audio/mod.rs:91`) is that every clippy allow attribute must have an explanatory comment. The `fill` value is in [0, 1] so the cast to `f32` is lossless — but that's not obvious without a comment.
+
+**Fix:** Add a comment:
+
+```rust
+// fill is in [0.0, 1.0] — lossless cast to f32
+#[allow(clippy::cast_possible_truncation)]
+let fill_w = relative(fill as f32);
+```
+
+---
+
+### [WARNING-3] `expect()` on adapter in public method `list_devices()`
+
+**File:** `src/bluetooth/mod.rs`
+**Line:** 65
+
+```rust
+let adapter = self
+    .adapter
+    .as_ref()
+    .expect("BluetoothState not initialized");
+```
+
+**What:** `BluetoothState::list_devices()` calls `.expect()` on `self.adapter`. If called before `BluetoothState::new()` completes, this panics. The method is currently only called from `new()` itself (line 55), so it can't fail in practice — but the method is `pub` and nothing prevents future misuse.
+
+**Why:** A `pub` method that panics on uninitialized state is fragile. The current call path is safe, but the method signature (`Result<(), String>`) already accommodates error returns.
+
+**Fix:** Return an error instead of panicking:
+
+```rust
+let adapter = self
+    .adapter
+    .as_ref()
+    .ok_or_else(|| "BluetoothState not initialized".to_string())?;
+```
+
+---
+
+### [WARNING-4] "For future use" field `cmd_tx` in `CardRow` is unused
+
+**File:** `src/ui/audio/card_row.rs`
+**Lines:** 28–29
+
+```rust
+/// Stored for potential direct command dispatch from the row.
+#[allow(dead_code)]
+cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
+```
+
+**What:** The `cmd_tx` field is cloned into the dropdown subscription closure at construction time but the field itself is never read after construction.
+
+**Why:** AGENTS.md advises: "Add them when they're needed, not before. Carrying unnecessary state bloats the struct and confuses readers." The dropdown subscription callback already captures its own `cmd_tx` clone at creation time (lines 60–65). If direct command dispatch is needed later, adding the field then will be a minimal diff.
+
+**Fix:** Remove the `cmd_tx` field. No functionality is lost — the sender is already captured in the `dropdown_sub` closure.
+
+---
+
+### [WARNING-5] `unsafe impl Send for PaWakeup` lacks a soundness justification comment
+
+**File:** `src/audio/pulse.rs`
+**Lines:** 32–33
+
+```rust
+unsafe impl Send for PaWakeup {}
+```
+
+**What:** The `unsafe impl Send` for `PaWakeup` (a wrapper around `*mut c_void`) has no doc comment explaining why it's sound. The `wake()` method has `/// Wake up the PA mainloop. Safe to call from any thread.` but this doesn't explain the *Send* impl specifically.
+
+**Why:** AGENTS.md explicitly states: "every `unsafe` block must have a doc comment explaining why it's sound." The `Send` impl is sound because:
+- `pa_mainloop_wakeup()` is documented by PulseAudio as thread-safe
+- The raw pointer is only used to call that one function
+- The PA thread owns the `Mainloop` and outlives all `PaWakeup` copies (the thread joins on drop)
+
+But this reasoning must be written down.
+
+**Fix:** Add a doc comment:
+
+```rust
+/// # Safety
+///
+/// Safe to send across threads because:
+/// - The raw pointer is only used to call `pa_mainloop_wakeup()`, which
+///   PulseAudio documents as thread-safe.
+/// - The PA thread owns the `Mainloop` and outlives all `PaWakeup` copies
+///   (the thread joins on drop).
+unsafe impl Send for PaWakeup {}
+```
+
+---
+
+### [WARNING-6] `unsafe` block in `wake()` is undocumented
+
+**File:** `src/audio/pulse.rs`
+**Lines:** 37–39
+
+```rust
+pub(crate) fn wake(&self) {
+    unsafe {
+        libpulse_sys::mainloop::pa_mainloop_wakeup(self.ptr.cast());
+    }
+}
+```
+
+**What:** The `unsafe` block inside `wake()` lacks an inline `// SAFETY:` comment. The method-level doc comment mentions "Safe to call from any thread" but doesn't explain *why* the raw pointer dereference through FFI is sound.
+
+**Why:** Per Rust convention and AGENTS.md, every `unsafe` block should have a `// SAFETY:` comment explaining the invariants that make it sound. The call is sound because the pointer comes from a live `Mainloop` and `pa_mainloop_wakeup` is thread-safe, but this should be stated inline.
+
+**Fix:** Add a `// SAFETY:` comment:
+
+```rust
+unsafe {
+    // SAFETY: ptr was extracted from a live PA Mainloop; pa_mainloop_wakeup
+    // is documented as thread-safe by PulseAudio. The mainloop outlives all
+    // PaWakeup copies.
+    libpulse_sys::mainloop::pa_mainloop_wakeup(self.ptr.cast());
+}
+```
+
+---
+
+### [WARNING-7] Duplicate device refresh logic in `app.rs`
+
+**File:** `src/app.rs`
+**Lines:** ~400–550 (inside the `BluetoothPageCommand::DeviceAction` handler)
+
+**What:** The post-action device refresh logic (quick device status → sleep 500ms → full list refresh) appears nearly identically in two code paths: the `PairAndTrust` path and the non-`PairAndTrust` path. The `PairAndTrust` path additionally has the step-by-step pairing chain, but the trailing refresh is the same pattern repeated.
+
+**Why:** DRY violation — if the refresh logic ever changes (different delay, additional fields), both copies must be updated. Both paths do:
+1. `quick_device_status` → `upsert_device` → `sync_state` → `cx.notify()`
+2. `sleep(500ms)` → `refresh_device_list` → `replace_devices` → `sync_state` → `cx.notify()`
+
+**Fix:** Extract a helper method:
+
+```rust
+async fn refresh_device_after_action(
+    adapter: &bluer::Adapter,
+    addr: bluer::Address,
+    this: &WeakEntity<BludioApp>,
+    cx: &mut AsyncWindowContext,
+) {
+    // quick refresh → upsert
+    // sleep 500ms → full list refresh → replace
+}
+```
+
+---
+
+## Suggestions
+
+### [SUGGESTION-1] Missing justification comments on multiple `#[allow(dead_code)]` attributes
+
+**Files:** `src/ui/components/slider.rs:90,96,193,200,207`, `src/ui/icons.rs:25`, `src/bluetooth/mod.rs:118`
+
+**What:** Several `#[allow(dead_code)]` attributes lack explanatory comments, violating the convention documented in AGENTS.md:
+
+- `slider.rs` — `value()`, `is_dragging()` accessors (lines 90, 96)
+- `slider.rs` — `SliderBar::track_color()`, `fill_color()`, `border_color()` builder methods (lines 193, 200, 207)
+- `icons.rs` — `page_placeholder()` function (line 25)
+- `mod.rs` — `BluetoothState::remove_device()` method (line 118)
+
+**Why:** Without comments, a reader can't tell whether these are intentionally kept for future use or accidentally left behind. All of these are legitimate API surface kept for future consumers — they just need a brief explanatory comment.
+
+**Fix:** Add brief justification comments to each:
+
+- `value()` / `is_dragging()`: `// Public getter — part of the Slider API.`
+- `track_color` / `fill_color` / `border_color`: `// Public API — available for callers who want custom slider colors.`
+- `page_placeholder()`: `// Placeholder icon for future page types.`
+- `remove_device()`: `// Part of the public BluetoothState API — used when devices are explicitly removed.`
+
+---
+
+### [SUGGESTION-2] `let _ =` swallowing D-Bus errors silently in device actions
+
+**File:** `src/bluetooth/device.rs`
+**Lines:** 118, 123, 127
+
+```rust
+let _ = device.connect().await;
+let _ = device.disconnect().await;
+let _ = adapter.remove_device(addr).await;
+```
+
+**What:** These fire-and-forget D-Bus calls silently discard errors. If a connect, disconnect, or forget operation fails, the user gets no visual feedback. The `execute_device_action` function is called from the command handler which does post-action device status refreshing, but the error itself is invisible.
+
+**Why:** Silent failure is a poor UX — the user should at least get a console diagnostic when a Bluetooth action fails unexpectedly.
+
+**Fix:** Add `eprintln!` on failure:
+
+```rust
+if let Err(e) = device.connect().await {
+    eprintln!("[bluetooth] Connect failed for {addr}: {e}");
+}
+```
+
+---
+
+### [SUGGESTION-3] Missing module doc comments on `icons.rs` and `tooltip.rs`
+
+**Files:** `src/ui/icons.rs`, `src/ui/tooltip.rs`
+
+**What:** Both files lack a file-level `//!` module doc comment, unlike every other module in the project.
+
+**Why:** Inconsistent. Every other source file (including `ext.rs`, `stack.rs`, all component and page files) opens with a `//!` doc comment describing the module's purpose.
+
+**Fix:** Add module doc comments:
+- `icons.rs`: `//! Lucide icon helpers for GPUI. Loaded from the icons/ directory.`
+- `tooltip.rs`: `//! Lightweight tooltip component rendering a styled label.`
+
+---
+
+### [SUGGESTION-4] `spawn_bluetooth_command_handler` is very long and deeply nested
+
+**File:** `src/app.rs`
+**Lines:** 304–618 (~315 lines)
+
+**What:** A single method containing the entire Bluetooth command handler, with `PairAndTrust` logic deeply nested across ~200 lines of step-by-step async state management.
+
+**Why:** This makes the method hard to read, test, and modify. The `PairAndTrust` chain (connect → pair → trust → refresh) is a well-defined sequence that could be extracted into its own function.
+
+**Fix:** Extract the `PairAndTrust` sequence into a standalone async function (e.g., `async fn execute_pair_and_trust(...)`) that takes the adapter, address, and a push-status callback. The command handler would then become a simple dispatch: `PairAndTrust => execute_pair_and_trust(...).await`.
+
+---
+
+### [SUGGESTION-5] `ProfileInfo::available` has `#[allow(dead_code)]` without justification
+
+**File:** `src/audio/mod.rs`
+**Line:** 83
+
+```rust
+/// Whether this profile is available on the hardware.
+#[allow(dead_code)]
+pub(crate) available: bool,
+```
+
+**What:** The `available` field is populated from `p.profile.available` in `pulse.rs` but never read outside of `build_audio_state`. Unlike `description` (which has a comment about "kept for future tooltips"), `available` has no such comment.
+
+**Why:** The future purpose of `available` isn't clear. We already know a profile is available because it was listed by PA — unavailable profiles aren't included. The field may be genuinely dead with no future use case.
+
+**Fix:** Either add a comment explaining the future use case for `available`, or remove the field from `ProfileInfo`. If the intent is to grey out unavailable profiles in the dropdown, add that comment.
+
+---
+
+### [SUGGESTION-6] `AudioCommand` variants could use a shared volume type
+
+**File:** `src/audio/mod.rs`
+**Lines:** 93–100
+
+```rust
+SetSinkVolume(u32, f64),
+SetSourceVolume(u32, f64),
+SetSinkMute(u32, bool),
+SetSourceMute(u32, bool),
+```
+
+**What:** Sink/Source volume/mute variants are structurally identical but split by device kind. The dedup logic in `pulse.rs` (lines ~140–163) manually separates volume commands from other commands via pattern matching on the enum variant. The dedup HashMap uses a `u32` key that could collide between a sink and source with the same index.
+
+**Why:** In practice, PA sink and source indices are in separate namespaces, so this works correctly — but the code doesn't enforce this separation. Adding a discriminator would make the code more robust and simplify pattern matching throughout `pulse.rs` and `device_row.rs`.
+
+**Fix (optional refactor):** Consider adding `DeviceKind` to the volume/mute commands:
+
+```rust
+SetVolume(DeviceKind, u32, f64),
+SetMute(DeviceKind, u32, bool),
+```
+
+This is a refactor, not a bug — the current code works correctly. File under "nice to have."
+
+---
+
+### [SUGGESTION-7] Audio page tab icons are placeholders matching Bluetooth
+
+**File:** `src/ui/icons.rs`
+**Lines:** 31–37
+
+```rust
+pub fn audio_output() -> gpui::Svg {
+    icon("bolt") // TODO: replace with proper speaker icon
+}
+pub fn audio_input() -> gpui::Svg {
+    icon("plus") // TODO: replace with proper mic icon
+}
+```
+
+**What:** The audio output tab uses a bolt icon (same as Bluetooth) and the audio input tab uses a plus icon. TODOs note this should be fixed.
+
+**Why:** Using the same icon for two tabs is confusing — users can't visually distinguish Bluetooth from Audio Output in the tab bar.
+
+**Fix:** Replace with proper SVG icons matching the Lucide icon names bundled in `icons/`: `speaker` or `volume-2` for output, `mic` or `mic-2` for input.
+
+---
+
+### [SUGGESTION-8] `BluetoothDeviceRow` does not implement `Focusable`
+
+**File:** `src/ui/bluetooth/device_row.rs`
+**Lines:** 31–37
+
+**What:** The struct has a doc comment explicitly stating `Focusable` is omitted intentionally because the row currently has no interactive sub-entities (`TextField`, Dropdown, etc.) — only simple action buttons with `on_mouse_up`.
+
+**Why:** This is fine for now. The note is advisory: when interactive children are added to `BluetoothDeviceRow`, `Focusable` must be implemented to ensure proper focus management.
+
+**Fix:** No change needed now. This is a reminder for when interactive children are introduced.
+
+---
+
+### [SUGGESTION-9] AGENTS.md note about `CardInfo::name` is stale
+
+**File:** `src/audio/mod.rs`
+**Lines:** 67 (the `name` field on `CardInfo`)
+
+**What:** AGENTS.md mentions `CardInfo::name` as "kept for future use" with `#[allow(dead_code)]`, but the field doesn't actually have `#[allow(dead_code)]` — it's actively used in `pulse.rs` as a fallback for `description` in `CardRow::new` and `CardRow::update_from_card`.
+
+**Why:** The field IS used (as a description fallback). The AGENTS.md note is slightly misleading.
+
+**Fix:** No code change needed. AGENTS.md could be updated to reflect that `name` is actively used as the description fallback.
+
+---
+
+### [SUGGESTION-10] `TextStyleSet::default()` could be `const` or use a `LazyLock`
+
+**File:** `src/ui/theme.rs`
+**Lines:** 121–129
+
+**What:** `TextStyleSet::default()` is called once at theme construction time but allocates `AbsoluteLength` values each time via `gpui::rems(1.0).into()`. This is negligible in practice.
+
+**Fix:** No action needed now. Minor perf note for the future — if `gpui::rems` and `.into()` ever become `const`, this could be optimised.
+
+---
+
+## Notes
+
+### [NOTE-1] Channel error suppression is correct by design
+
+Throughout the codebase, channel sends use `let _ =` to suppress errors. This is intentional: when the receiver drops (app shutdown), `UnboundedSender::send` returns an error, and panicking on shutdown would be incorrect. The pattern is consistent and well-understood. In `app.rs`, a mix of `let _ = this.update_in(...)` and `.ok()` is noticeable but neither is wrong — `let _ =` is cleaner when the return value isn't needed.
+
+---
+
+### [NOTE-2] `AgentHandle` uses `tokio::sync::Mutex` — correct for the use case
+
+**File:** `src/bluetooth/agent.rs`
+
+The `AgentHandle` type wraps a non-`Send` `bluer::agent::AgentHandle` behind `Arc<tokio::sync::Mutex<Option<T>>>`. This is appropriate because the handle needs to be shared across Tokio tasks and is only ever accessed from async context. No `Rc<RefCell<T>>` concerns apply here since this is Tokio-land, not PA-land.
+
+---
+
+### [NOTE-3] Icons are placeholders — expected for a WIP project
+
+**File:** `src/ui/icons.rs`, `icons/` directory
+
+The current icon set includes: `bolt.svg`, `inbox.svg`, `plus.svg`, `settings.svg`. `audio_output()` maps to `bolt` and `audio_input()` maps to `plus`. Both carry TODO comments. This is expected for a work-in-progress project. See SUGGESTION-7 for the recommended replacements.
+
+---
+
+### [NOTE-4] `trusted` field is properly justified
+
+**File:** `src/bluetooth/device.rs:55`
+
+The `trusted` field has `#[allow(dead_code)]` with a comment and is documented in AGENTS.md. The field is semantically meaningful and likely to be surfaced in the UI soon. This is the correct pattern for "kept for future use" fields.
+
+---
+
+### [NOTE-5] `make_channel_volumes` hardcodes 2 channels
+
+**File:** `src/audio/pulse.rs:334`
+
+A TODO reads: "preserve channel count from the device instead of hardcoding 2." PulseAudio handles channel count mismatch for volume setting gracefully, so this is not a correctness bug — it's a fidelity limitation. Multi-channel devices (5.1, 7.1) will still work but may show slightly different volume readback.
+
+---
+
+### [NOTE-6] Pairing agent auto-accepts all requests
+
+**File:** `src/bluetooth/agent.rs:11`
+
+The agent auto-accepts all passkey and confirmation requests. This is flagged as "only suitable for testing" in AGENTS.md. No security issue in the current context, but a production deployment would need user-facing confirmation dialogs.
+
+---
+
+### [NOTE-7] `BluetoothState::remove_device` is dead code
+
+**File:** `src/bluetooth/mod.rs:118`
+
+`remove_device()` is never called. The `Forget` action is handled by BlueZ directly via `adapter.remove_device()`. The method may be useful for optimistic UI updates (removing the device from local state before BlueZ confirms), but it's currently unused. See SUGGESTION-1 for adding a justification comment.
+
+---
+
+### [NOTE-8] `crate::TOKIO.enter()` usage is correct but nuanced
+
+**Files:** `src/app.rs`, various async blocks
+
+The `let _tokio_guard = crate::TOKIO.enter();` pattern appears in some async blocks (e.g., `spawn_audio_state_loop`) but not others. Some blocks (e.g., `spawn_bluetooth_init`) that call `tokio_task()` don't need `enter()` because `tokio_task()` does `TOKIO.spawn()` which auto-enters. This is correct behavior — `enter()` is only needed when the async block itself does `mpsc::recv()` or similar Tokio operations directly. No change needed.
+
+---
+
+## Positive Findings
+
+1. **RenderOnce pattern consistently applied.** Dropdown, Slider, and TextField all follow Entity → RenderOnce → IntoElement. This is exactly the pattern used in `gpui-component/` and Zed itself. The separation of state from painting is clean and idiomatic.
+
+2. **Layout conventions are uniform.** `h_flex()` and `v_flex()` are used everywhere — not a single raw `div().flex().flex_row()` or `div().flex().flex_col()` in the entire codebase. `h_flex()`'s default `items_center()` is never redundantly re-added. Overrides use `.items_start()` / `.items_stretch()` where appropriate.
+
+3. **GPUI + Tokio bridge is well-abstracted.** All Bluetooth D-Bus work goes through `crate::tokio_task()` → `oneshot::Receiver`. The pattern `cx.spawn_in(window, async { TOKIO.enter(); ... }).detach()` is consistently applied. There's no raw Tokio spawning inside GPUI contexts. The `_in` variants (`cx.spawn_in`, `cx.subscribe_in`, `this.update_in`) are used correctly throughout, with window access threaded properly.
+
+4. **Audio backend correctly uses `Rc<RefCell<T>>`** for mutable state shared with C callbacks. The `DoneFlag` + `spin_until` pattern correctly blocks only the PA thread, never GPUI. The volume command dedup via `HashMap` in `run_pa_loop` (lines 155–168) is a thoughtful optimization that prevents UI drag from building a command backlog.
+
+5. **Module separation is clean.** `audio/`, `bluetooth/`, `ui/` are fully separated with no cross-contamination. Bluetooth code never imports UI types; the UI never reaches into PA internals. The command channel pattern (`AudioCommand`, `BluetoothPageCommand`) provides clean interface boundaries. Every file has a `//!` module-level doc comment (except `icons.rs` and `tooltip.rs` — see SUGGESTION-3).
+
+6. **Entity ownership hierarchy is well-structured:**
+   ```
+   BludioApp → TabBar, AudioPage, BluetoothPage, ConfigurationPage, DevTestPage
+   AudioPage → Vec<AudioDeviceRow> → TextField, Dropdown, Slider
+   ConfigurationPage → Vec<CardRow> → Dropdown
+   ```
+   No parent ever stores a grandchild's entity handle. Each level creates its children and subscribes to their events. Section comments use the `// ──` convention consistently.
+
+7. **EventEmitter pattern applied consistently.** All child→parent communication uses `cx.emit()` + `cx.subscribe_in()` — no custom `drain_events()` polling or callback workarounds. The pattern is applied across `SliderEvent`, `TextFieldEvent`, `DropdownEvent`, and `TabBarEvent`.
+
+8. **Theme system is well-designed.** `Theme` stores all semantic tokens; `GlobalTheme` wraps it in `Arc<Theme>` for cheap cloning; `theme(cx)` provides a one-line accessor. Async tasks never call `theme(cx)` inside the async block — the arc is cloned before spawning. Colors are semantic tokens, not raw HSLA values. Good documentation in `theme.rs` with an ASCII architecture diagram.
+
+9. **Interactive element IDs are comprehensive.** Every interactive element has a `.id()` — slider tracks, buttons, dropdown triggers, device rows, text fields. No missing IDs detected. All 42 `cx.notify()` calls appear in the correct contexts: after state mutations, in async update closures, and after child event handling. No state changes without a corresponding notify.
+
+10. **Shared constructor pattern is well-executed.** `AudioDeviceRow::new_sink` / `new_source` correctly share logic through a private `new_impl` with `RowParams` struct. Clean, DRY, and matches the documented convention exactly.
+
+11. **Channel-based backend communication is the norm.** Every backend interaction goes through typed channels (`AudioCommand`, `BluetoothPageCommand`). The UI never calls `pulse.rs` or `bluer` functions directly. The `HashMap`-based volume dedup in `pulse.rs` is a smart optimization that prevents backlog during rapid drag — well-designed and well-documented.
+
+12. **Tooling compliance.** `cargo clippy -- -D warnings` is clean (zero warnings) and `cargo fmt --check` passes without formatting violations.
+
+---
+
+**Total:** 0 critical, 7 warnings, 10 suggestions, 8 notes, 12 positive findings.
