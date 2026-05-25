@@ -78,7 +78,7 @@ fn new_impl(params: RowParams, ..., window, cx) -> Self { ... }
 ### Audio / FFI backend
 - `Rc<RefCell<T>>` for mutable data shared with C callbacks in a single-threaded context
 - `PaWakeup` is `Clone + Copy`; store as `Option<PaWakeup>` when init may fail
-- `#[allow(dead_code)]` with a doc comment when keeping fields for future use (e.g., `CardInfo::name`)
+- `#[allow(dead_code)]` with a doc comment when keeping fields for future use (e.g., `BluetoothDevice::trusted`)
 - `#[allow(clippy::enum_variant_names)]` with a comment when a prefix is intentional (e.g., `SetSinkVolume`)
 
 ### GPUI + Tokio bridge

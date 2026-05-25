@@ -114,17 +114,23 @@ pub(crate) async fn execute_device_action(
 ) {
     match action {
         DeviceRowAction::Connect => {
-            if let Ok(device) = adapter.device(addr) {
-                let _ = device.connect().await;
+            if let Ok(device) = adapter.device(addr)
+                && let Err(e) = device.connect().await
+            {
+                eprintln!("[bluetooth] Connect failed for {addr}: {e}");
             }
         }
         DeviceRowAction::Disconnect => {
-            if let Ok(device) = adapter.device(addr) {
-                let _ = device.disconnect().await;
+            if let Ok(device) = adapter.device(addr)
+                && let Err(e) = device.disconnect().await
+            {
+                eprintln!("[bluetooth] Disconnect failed for {addr}: {e}");
             }
         }
         DeviceRowAction::Forget => {
-            let _ = adapter.remove_device(addr).await;
+            if let Err(e) = adapter.remove_device(addr).await {
+                eprintln!("[bluetooth] Forget failed for {addr}: {e}");
+            }
         }
         // PairAndTrust is handled stepwise in the command handler
         // (app.rs) with per-step UI status updates.

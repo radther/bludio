@@ -5,7 +5,9 @@
 //! (`tokio::sync::mpsc::UnboundedSender` works from any thread — only the
 //! receiver end needs a Tokio runtime.)
 
-use crate::audio::{AudioCommand, AudioState, CardInfo, ProfileInfo, SinkInfo, SourceInfo};
+use crate::audio::{
+    AudioCommand, AudioState, CardInfo, DeviceKind, ProfileInfo, SinkInfo, SourceInfo,
+};
 use libpulse_binding as pulse;
 use pulse::callbacks::ListResult;
 use pulse::context::{Context, FlagSet as ContextFlags, State as ContextState};
@@ -148,21 +150,21 @@ fn run_pa_loop(
         // ── Process pending commands (non-blocking) ──
         // Drain the channel: for volume commands, keep only the last one per device
         // to avoid building a backlog during rapid drag updates.
-        let mut vol_cmds: HashMap<u32, AudioCommand> = HashMap::new();
+        let mut vol_cmds: HashMap<(DeviceKind, u32), AudioCommand> = HashMap::new();
         let mut other_cmds: Vec<AudioCommand> = Vec::new();
 
         if let Ok(cmd) = cmd_rx.try_recv() {
             match &cmd {
-                AudioCommand::SetSinkVolume(idx, _) | AudioCommand::SetSourceVolume(idx, _) => {
-                    vol_cmds.insert(*idx, cmd);
+                AudioCommand::SetVolume(kind, idx, _) => {
+                    vol_cmds.insert((*kind, *idx), cmd);
                 }
                 _ => other_cmds.push(cmd),
             }
         }
         while let Ok(cmd) = cmd_rx.try_recv() {
             match &cmd {
-                AudioCommand::SetSinkVolume(idx, _) | AudioCommand::SetSourceVolume(idx, _) => {
-                    vol_cmds.insert(*idx, cmd);
+                AudioCommand::SetVolume(kind, idx, _) => {
+                    vol_cmds.insert((*kind, *idx), cmd);
                 }
                 _ => other_cmds.push(cmd),
             }
@@ -227,7 +229,7 @@ fn execute_command(
     done: &DoneFlag,
 ) {
     match cmd {
-        AudioCommand::SetSinkVolume(index, vol) => {
+        AudioCommand::SetVolume(DeviceKind::Output, index, vol) => {
             let index = *index;
             let vol = *vol;
             let v = volume_f64_to_pa(vol);
@@ -243,7 +245,7 @@ fn execute_command(
             );
             spin_until(ml, done);
         }
-        AudioCommand::SetSourceVolume(index, vol) => {
+        AudioCommand::SetVolume(DeviceKind::Input, index, vol) => {
             let index = *index;
             let vol = *vol;
             let v = volume_f64_to_pa(vol);
@@ -259,7 +261,7 @@ fn execute_command(
             );
             spin_until(ml, done);
         }
-        AudioCommand::SetSinkMute(index, mute) => {
+        AudioCommand::SetMute(DeviceKind::Output, index, mute) => {
             let index = *index;
             let mute = *mute;
             let mut intro = pa_ctx.borrow_mut().introspect();
@@ -273,7 +275,7 @@ fn execute_command(
             );
             spin_until(ml, done);
         }
-        AudioCommand::SetSourceMute(index, mute) => {
+        AudioCommand::SetMute(DeviceKind::Input, index, mute) => {
             let index = *index;
             let mute = *mute;
             let mut intro = pa_ctx.borrow_mut().introspect();

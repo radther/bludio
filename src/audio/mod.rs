@@ -5,7 +5,7 @@ pub(crate) mod pulse;
 // ── Device kind ────────────────────────────────────────────────────────────
 
 /// Whether a device is an output (sink/speaker) or input (source/microphone).
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub(crate) enum DeviceKind {
     Output,
     Input,
@@ -80,6 +80,8 @@ pub(crate) struct ProfileInfo {
     #[allow(dead_code)]
     pub(crate) description: String,
     /// Whether this profile is available on the hardware.
+    /// Kept for completeness — having the full PA state available may inform
+    /// future UI decisions (e.g., greying out unavailable profiles).
     #[allow(dead_code)]
     pub(crate) available: bool,
 }
@@ -87,14 +89,12 @@ pub(crate) struct ProfileInfo {
 // ── Commands (UI → PA thread) ──────────────────────────────────────────────
 
 /// Commands sent from the UI to the `PulseAudio` backend thread.
-/// The `Set` prefix is intentional — these map to `PulseAudio` operations.
+/// The `Set` prefix is intentional — these map to `PulseAudio` setter operations.
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug)]
 pub(crate) enum AudioCommand {
-    SetSinkVolume(u32, f64),
-    SetSourceVolume(u32, f64),
-    SetSinkMute(u32, bool),
-    SetSourceMute(u32, bool),
+    SetVolume(DeviceKind, u32, f64),
+    SetMute(DeviceKind, u32, bool),
     SetCardProfile(u32, String),
     SetDefaultSink(String),
     SetDefaultSource(String),

@@ -86,18 +86,6 @@ impl Slider {
         cx.notify();
     }
 
-    /// Get the current value.
-    #[allow(dead_code)]
-    pub fn value(&self) -> f64 {
-        self.value
-    }
-
-    /// Whether the user is currently dragging the slider.
-    #[allow(dead_code)]
-    pub(crate) fn is_dragging(&self) -> bool {
-        self.dragging
-    }
-
     // ── Helpers ─────────────────────────────────────────────────────────
 
     /// Map a value in [min, max] to a percentage [0.0, 1.0].
@@ -187,27 +175,6 @@ impl SliderBar {
             fill_color: colors.accent,
             border_color: colors.accent,
         }
-    }
-
-    /// Background color of the unfilled track.
-    #[allow(dead_code)]
-    pub fn track_color(mut self, color: Hsla) -> Self {
-        self.track_color = color;
-        self
-    }
-
-    /// Color of the filled portion.
-    #[allow(dead_code)]
-    pub fn fill_color(mut self, color: Hsla) -> Self {
-        self.fill_color = color;
-        self
-    }
-
-    /// Border color of the filled portion.
-    #[allow(dead_code)]
-    pub fn border_color(mut self, color: Hsla) -> Self {
-        self.border_color = color;
-        self
     }
 }
 

@@ -341,6 +341,119 @@ impl BludioApp {
         }
     }
 
+    // ── Pair-and-trust sequence ───────────────────────────────────────
+
+    /// Execute the full PairAndTrust flow: Connect → Pair → Trust+Reconnect.
+    ///
+    /// Each step runs on the Tokio runtime via `tokio_task`. Status updates
+    /// are pushed to the UI through `push_status`. Errors are logged and
+    /// surfaced as `PairingStatus::Failed` in the UI.
+    async fn execute_pair_and_trust(
+        adapter: &bluer::Adapter,
+        addr: bluer::Address,
+        this: &gpui::WeakEntity<Self>,
+        cx: &mut gpui::AsyncWindowContext,
+    ) {
+        let mut push_status = |status: Option<PairingStatus>| {
+            let _ = this.update_in(cx, |this, _window, cx| {
+                if let Some(existing) = this.bt_state.devices.iter_mut().find(|d| d.address == addr)
+                {
+                    existing.pairing_status = status;
+                }
+                this.bluetooth_page
+                    .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                cx.notify();
+            });
+        };
+
+        // ── Step-by-step chain with proper double-Result flattening ──
+        // tokio_task wraps in oneshot: Result<Result<T,E>, Canceled>
+        // We must match both layers to catch D-Bus errors.
+        let mut ok = true;
+
+        // 1. Connect
+        if ok {
+            let a2 = adapter.clone();
+            ok = match crate::tokio_task(async move {
+                let device = a2.device(addr)?;
+                device.connect().await
+            })
+            .await
+            {
+                Ok(Ok(())) => true,
+                Ok(Err(e)) => {
+                    eprintln!("[bluetooth] Pairing failed for {addr}: connect error: {e}");
+                    push_status(Some(PairingStatus::Failed("connection failed".into())));
+                    false
+                }
+                Err(_) => {
+                    eprintln!("[bluetooth] Pairing failed for {addr}: connect task cancelled");
+                    push_status(Some(PairingStatus::Failed("internal error".into())));
+                    false
+                }
+            };
+        }
+
+        // 2. Pair
+        if ok {
+            push_status(Some(PairingStatus::Pairing));
+            let a2 = adapter.clone();
+            ok = match crate::tokio_task(async move {
+                let device = a2.device(addr)?;
+                device.pair().await
+            })
+            .await
+            {
+                Ok(Ok(())) => true,
+                Ok(Err(e)) => {
+                    eprintln!("[bluetooth] Pairing failed for {addr}: pair error: {e}");
+                    push_status(Some(PairingStatus::Failed("pairing failed".into())));
+                    false
+                }
+                Err(_) => {
+                    eprintln!("[bluetooth] Pairing failed for {addr}: pair task cancelled");
+                    push_status(Some(PairingStatus::Failed("internal error".into())));
+                    false
+                }
+            };
+        }
+
+        // 3. Trust + reconnect
+        if ok {
+            push_status(Some(PairingStatus::Trusting));
+            let a2 = adapter.clone();
+            ok = match crate::tokio_task(async move {
+                let device = a2.device(addr)?;
+                device.set_trusted(true).await?;
+                device.connect().await
+            })
+            .await
+            {
+                Ok(Ok(())) => true,
+                Ok(Err(e)) => {
+                    eprintln!(
+                        "[bluetooth] Pairing partially succeeded for {addr}: trust/connect error: {e}"
+                    );
+                    push_status(Some(PairingStatus::Failed("trust failed".into())));
+                    false
+                }
+                Err(_) => {
+                    eprintln!("[bluetooth] Pairing failed for {addr}: trust task cancelled");
+                    push_status(Some(PairingStatus::Failed("internal error".into())));
+                    false
+                }
+            };
+        }
+
+        if ok {
+            eprintln!("[bluetooth] PairAndTrust succeeded for {addr}");
+            push_status(None);
+        }
+
+        // Refresh device state (regardless of success/failure).
+        Self::refresh_device_after_action(adapter, addr, this, cx).await;
+    }
+
     // ── Bluetooth command handler ───────────────────────────────────────
 
     fn spawn_bluetooth_command_handler(
@@ -392,143 +505,9 @@ impl BludioApp {
                                 cx.notify();
 
                                 // Spawn the full chain as a background task.
+                                let a = adapter.clone();
                                 cx.spawn_in(window, async move |this, cx| {
-                                    // ── Helper: push a pairing status update ──
-                                    let mut push_status =
-                                        |status: Option<PairingStatus>| {
-                                            let _ =
-                                                this.update_in(cx, |this, _window, cx| {
-                                                    if let Some(existing) = this
-                                                        .bt_state
-                                                        .devices
-                                                        .iter_mut()
-                                                        .find(|d| d.address == addr)
-                                                    {
-                                                        existing.pairing_status = status;
-                                                    }
-                                                    this.bluetooth_page.update(
-                                                        cx,
-                                                        |page, cx| {
-                                                            page.sync_state(
-                                                                &this.bt_state,
-                                                                cx,
-                                                            );
-                                                        },
-                                                    );
-                                                    cx.notify();
-                                                });
-                                        };
-
-                                    // ── Step-by-step chain with proper double-Result flattening ──
-                                    // tokio_task wraps in oneshot: Result<Result<T,E>, Canceled>
-                                    // We must match both layers to catch D-Bus errors.
-                                    let mut ok = true;
-
-                                    // 1. Connecting (status already set in outer update_in)
-                                    if ok {
-                                        let a2 = a.clone();
-                                        ok = match crate::tokio_task(async move {
-                                            let device = a2.device(addr)?;
-                                            device.connect().await
-                                        })
-                                        .await
-                                        {
-                                            Ok(Ok(())) => true,
-                                            Ok(Err(e)) => {
-                                                eprintln!(
-                                                    "[bluetooth] Pairing failed for {addr}: connect error: {e}"
-                                                );
-                                                push_status(Some(PairingStatus::Failed(
-                                                    "connection failed".into(),
-                                                )));
-                                                false
-                                            }
-                                            Err(_) => {
-                                                eprintln!(
-                                                    "[bluetooth] Pairing failed for {addr}: connect task cancelled"
-                                                );
-                                                push_status(Some(PairingStatus::Failed(
-                                                    "internal error".into(),
-                                                )));
-                                                false
-                                            }
-                                        };
-                                    }
-
-                                    // 2. Pairing
-                                    if ok {
-                                        push_status(Some(PairingStatus::Pairing));
-                                        let a2 = a.clone();
-                                        ok = match crate::tokio_task(async move {
-                                            let device = a2.device(addr)?;
-                                            device.pair().await
-                                        })
-                                        .await
-                                        {
-                                            Ok(Ok(())) => true,
-                                            Ok(Err(e)) => {
-                                                eprintln!(
-                                                    "[bluetooth] Pairing failed for {addr}: pair error: {e}"
-                                                );
-                                                push_status(Some(PairingStatus::Failed(
-                                                    "pairing failed".into(),
-                                                )));
-                                                false
-                                            }
-                                            Err(_) => {
-                                                eprintln!(
-                                                    "[bluetooth] Pairing failed for {addr}: pair task cancelled"
-                                                );
-                                                push_status(Some(PairingStatus::Failed(
-                                                    "internal error".into(),
-                                                )));
-                                                false
-                                            }
-                                        };
-                                    }
-
-                                    // 3. Trusting
-                                    if ok {
-                                        push_status(Some(PairingStatus::Trusting));
-                                        let a2 = a.clone();
-                                        ok = match crate::tokio_task(async move {
-                                            let device = a2.device(addr)?;
-                                            device.set_trusted(true).await?;
-                                            device.connect().await
-                                        })
-                                        .await
-                                        {
-                                            Ok(Ok(())) => true,
-                                            Ok(Err(e)) => {
-                                                eprintln!(
-                                                    "[bluetooth] Pairing partially succeeded for {addr}: trust/connect error: {e}"
-                                                );
-                                                push_status(Some(PairingStatus::Failed(
-                                                    "trust failed".into(),
-                                                )));
-                                                false
-                                            }
-                                            Err(_) => {
-                                                eprintln!(
-                                                    "[bluetooth] Pairing failed for {addr}: trust task cancelled"
-                                                );
-                                                push_status(Some(PairingStatus::Failed(
-                                                    "internal error".into(),
-                                                )));
-                                                false
-                                            }
-                                        };
-                                    }
-
-                                    if ok {
-                                        eprintln!(
-                                            "[bluetooth] PairAndTrust succeeded for {addr}"
-                                        );
-                                        push_status(None);
-                                    }
-
-                                    // Refresh device state (regardless of success/failure).
-                                    Self::refresh_device_after_action(&a, addr, &this, cx).await;
+                                    Self::execute_pair_and_trust(&a, addr, &this, cx).await;
                                 })
                                 .detach();
                             } else {

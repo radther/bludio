@@ -160,12 +160,7 @@ impl AudioDeviceRow {
                 let idx = this.index;
                 match event {
                     SliderEvent::Change(v) => {
-                        let _ = match kind {
-                            DeviceKind::Output => cmd_tx.send(AudioCommand::SetSinkVolume(idx, *v)),
-                            DeviceKind::Input => {
-                                cmd_tx.send(AudioCommand::SetSourceVolume(idx, *v))
-                            }
-                        };
+                        let _ = cmd_tx.send(AudioCommand::SetVolume(kind, idx, *v));
                         this.wakeup.wake();
                     }
                     SliderEvent::Release(_) => {}
@@ -177,10 +172,7 @@ impl AudioDeviceRow {
                 TextFieldEvent::Confirmed(text) => {
                     if let Ok(val) = text.parse::<f64>() {
                         let clamped = val.clamp(0.0, 100.0) / 100.0;
-                        let cmd = match this.kind {
-                            DeviceKind::Output => AudioCommand::SetSinkVolume(this.index, clamped),
-                            DeviceKind::Input => AudioCommand::SetSourceVolume(this.index, clamped),
-                        };
+                        let cmd = AudioCommand::SetVolume(this.kind, this.index, clamped);
                         let _ = this.cmd_tx.send(cmd);
                         this.wakeup.wake();
                         this.text_field.update(cx, |f, cx| {
@@ -384,10 +376,7 @@ impl AudioDeviceRow {
                     let muted = self.muted;
                     let cmd = cmd_tx.clone();
                     move || {
-                        let _ = match kind {
-                            DeviceKind::Output => cmd.send(AudioCommand::SetSinkMute(idx, !muted)),
-                            DeviceKind::Input => cmd.send(AudioCommand::SetSourceMute(idx, !muted)),
-                        };
+                        let _ = cmd.send(AudioCommand::SetMute(kind, idx, !muted));
                         wk.wake();
                     }
                 },
