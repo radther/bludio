@@ -121,9 +121,16 @@ impl Render for AudioPage {
         let colors = &theme.colors;
         let text_styles = &theme.text_styles;
 
+        let count = self.rows.len();
         let (title, caption) = match self.kind {
-            DeviceKind::Output => ("Output Devices", "Manage output devices"),
-            DeviceKind::Input => ("Input Devices", "Manage input devices"),
+            DeviceKind::Output => (
+                "Output Devices",
+                format!("{} output device{}", count, if count == 1 { "" } else { "s" }),
+            ),
+            DeviceKind::Input => (
+                "Input Devices",
+                format!("{} input device{}", count, if count == 1 { "" } else { "s" }),
+            ),
         };
 
         v_flex()

@@ -80,7 +80,12 @@ impl Render for ConfigurationPage {
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .child(page_header("Configuration", "Audio hardware cards and profiles", colors, text_styles)),
+                    .child(page_header(
+                        "Configuration",
+                        format!("{} card{}", self.rows.len(), if self.rows.len() == 1 { "" } else { "s" }),
+                        colors,
+                        text_styles,
+                    )),
             )
             .when_some(self.error.clone(), |el, err| {
                 el.child(

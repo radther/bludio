@@ -101,7 +101,12 @@ impl Render for BluetoothPage {
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .child(page_header("Bluetooth", "Discover and manage devices", colors, text_styles))
+                    .child(page_header(
+                        "Bluetooth",
+                        format!("{} device{}", self.rows.len(), if self.rows.len() == 1 { "" } else { "s" }),
+                        colors,
+                        text_styles,
+                    ))
                     .child(
                         // Scan / Stop button
                         div()
