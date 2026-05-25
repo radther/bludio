@@ -56,7 +56,7 @@ fn main() {
         cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
-                app_id: Some("com.bludio.app".to_string()),
+                app_id: Some("dev.toomosin.bludio".to_string()),
                 ..Default::default()
             },
             |window, cx| cx.new(|cx| app::BludioApp::new(window, cx)),
