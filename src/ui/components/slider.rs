@@ -216,6 +216,7 @@ impl RenderOnce for SliderBar {
         let entity = self.entity.clone();
         let entity_id = entity.entity_id();
         let fill = entity.read(cx).fill_fraction();
+        // fill is in [0.0, 1.0] — lossless cast to f32
         #[allow(clippy::cast_possible_truncation)]
         let fill_w = relative(fill as f32);
 

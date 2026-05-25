@@ -24,13 +24,9 @@ pub(crate) struct CardRow {
     pub(crate) card_index: u32,
     display_name: String,
     profile_dropdown: Entity<crate::ui::components::dropdown::Dropdown>,
-    /// Stored for potential direct command dispatch from the row.
-    #[allow(dead_code)]
-    cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
     wakeup: PaWakeup,
     focus_handle: FocusHandle,
-    #[allow(dead_code)]
-    dropdown_sub: Subscription,
+    _dropdown_sub: Subscription,
 }
 
 impl CardRow {
@@ -57,7 +53,7 @@ impl CardRow {
                 .placeholder("unknown")
         });
 
-        let dropdown_sub = cx.subscribe(&profile_dropdown, {
+        let _dropdown_sub = cx.subscribe(&profile_dropdown, {
             let cmd_tx = cmd_tx.clone();
             move |this, _dd, event: &DdEvt, _cx| {
                 if let DdEvt::Selected(_idx, profile) = event {
@@ -74,10 +70,9 @@ impl CardRow {
             card_index: card.index,
             display_name,
             profile_dropdown,
-            cmd_tx,
             wakeup,
             focus_handle: cx.focus_handle(),
-            dropdown_sub,
+            _dropdown_sub,
         }
     }
 

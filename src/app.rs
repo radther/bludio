@@ -298,6 +298,49 @@ impl BludioApp {
         .detach();
     }
 
+    // ── Post-action device refresh ─────────────────────────────────────
+
+    /// Refresh device state after a user action: quick single-device status,
+    /// then a delayed full list refresh to catch anything the D-Bus signal
+    /// path might miss.
+    async fn refresh_device_after_action(
+        adapter: &bluer::Adapter,
+        addr: bluer::Address,
+        this: &gpui::WeakEntity<Self>,
+        cx: &mut gpui::AsyncWindowContext,
+    ) {
+        // Phase 1: quick single-device status refresh
+        let a = adapter.clone();
+        if let Ok(Some(device)) = crate::tokio_task(async move {
+            crate::bluetooth::device::quick_device_status(&a, addr).await
+        })
+        .await
+        {
+            let _ = this.update_in(cx, |this, _window, cx| {
+                this.bt_state.upsert_device(device);
+                this.bluetooth_page
+                    .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                cx.notify();
+            });
+        }
+
+        // Phase 2: full list refresh after a small delay
+        let a = adapter.clone();
+        if let Ok(Some(devices)) = crate::tokio_task(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            crate::bluetooth::discovery::refresh_device_list(&a).await
+        })
+        .await
+        {
+            let _ = this.update_in(cx, |this, _window, cx| {
+                this.bt_state.replace_devices(devices);
+                this.bluetooth_page
+                    .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                cx.notify();
+            });
+        }
+    }
+
     // ── Bluetooth command handler ───────────────────────────────────────
 
     fn spawn_bluetooth_command_handler(
@@ -485,55 +528,7 @@ impl BludioApp {
                                     }
 
                                     // Refresh device state (regardless of success/failure).
-                                    let a2 = a.clone();
-                                    if let Ok(Some(device)) = crate::tokio_task(async move {
-                                        quick_device_status(&a2, addr).await
-                                    })
-                                    .await
-                                    {
-                                        let _ =
-                                            this.update_in(cx, |this, _window, cx| {
-                                                this.bt_state.upsert_device(device);
-                                                this.bluetooth_page.update(
-                                                    cx,
-                                                    |page, cx| {
-                                                        page.sync_state(
-                                                            &this.bt_state,
-                                                            cx,
-                                                        );
-                                                    },
-                                                );
-                                                cx.notify();
-                                            });
-                                    }
-
-                                    // Full list refresh (delayed)
-                                    let a2 = a.clone();
-                                    if let Ok(Some(devices)) = crate::tokio_task(async move {
-                                        tokio::time::sleep(
-                                            std::time::Duration::from_millis(500),
-                                        )
-                                        .await;
-                                        crate::bluetooth::discovery::refresh_device_list(&a2)
-                                            .await
-                                    })
-                                    .await
-                                    {
-                                        let _ =
-                                            this.update_in(cx, |this, _window, cx| {
-                                                this.bt_state.replace_devices(devices);
-                                                this.bluetooth_page.update(
-                                                    cx,
-                                                    |page, cx| {
-                                                        page.sync_state(
-                                                            &this.bt_state,
-                                                            cx,
-                                                        );
-                                                    },
-                                                );
-                                                cx.notify();
-                                            });
-                                    }
+                                    Self::refresh_device_after_action(&a, addr, &this, cx).await;
                                 })
                                 .detach();
                             } else {
@@ -558,55 +553,7 @@ impl BludioApp {
                                         }
                                     }
 
-                                    let a3 = a2.clone();
-                                    if let Ok(Some(device)) = crate::tokio_task(async move {
-                                        quick_device_status(&a3, addr).await
-                                    })
-                                    .await
-                                    {
-                                        let _ =
-                                            this.update_in(cx, |this, _window, cx| {
-                                                this.bt_state.upsert_device(device);
-                                                this.bluetooth_page.update(
-                                                    cx,
-                                                    |page, cx| {
-                                                        page.sync_state(
-                                                            &this.bt_state,
-                                                            cx,
-                                                        );
-                                                    },
-                                                );
-                                                cx.notify();
-                                            });
-                                    }
-
-                                    // Full list refresh (delayed)
-                                    let a3 = a2.clone();
-                                    if let Ok(Some(devices)) = crate::tokio_task(async move {
-                                        tokio::time::sleep(
-                                            std::time::Duration::from_millis(500),
-                                        )
-                                        .await;
-                                        crate::bluetooth::discovery::refresh_device_list(&a3)
-                                            .await
-                                    })
-                                    .await
-                                    {
-                                        let _ =
-                                            this.update_in(cx, |this, _window, cx| {
-                                                this.bt_state.replace_devices(devices);
-                                                this.bluetooth_page.update(
-                                                    cx,
-                                                    |page, cx| {
-                                                        page.sync_state(
-                                                            &this.bt_state,
-                                                            cx,
-                                                        );
-                                                    },
-                                                );
-                                                cx.notify();
-                                            });
-                                    }
+                                    Self::refresh_device_after_action(&a2, addr, &this, cx).await;
                                 })
                                 .detach();
                             }

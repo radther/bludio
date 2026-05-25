@@ -19,14 +19,13 @@ pub(crate) struct DevTestPage {
     text_field: Entity<TextField>,
     confirmed_texts: Vec<String>,
     focus_handle: FocusHandle,
-    #[allow(dead_code)]
-    text_field_sub: Subscription,
+    _text_field_sub: Subscription,
 }
 
 impl DevTestPage {
     pub(crate) fn new(cx: &mut Context<Self>) -> Self {
         let text_field = cx.new(|cx| TextField::new(cx).placeholder("Type something..."));
-        let text_field_sub =
+        let _text_field_sub =
             cx.subscribe(
                 &text_field,
                 |this, _tf, event: &TextFieldEvent, cx| match event {
@@ -41,7 +40,7 @@ impl DevTestPage {
             text_field,
             confirmed_texts: Vec::new(),
             focus_handle: cx.focus_handle(),
-            text_field_sub,
+            _text_field_sub,
         }
     }
 }

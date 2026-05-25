@@ -29,12 +29,22 @@ pub(crate) struct PaWakeup {
     ptr: *mut std::ffi::c_void,
 }
 
+/// # Safety
+///
+/// Safe to send across threads because:
+/// - The raw pointer is only used to call `pa_mainloop_wakeup()`, which
+///   PulseAudio documents as thread-safe.
+/// - The PA thread owns the `Mainloop` and outlives all `PaWakeup` copies
+///   (the thread joins on drop).
 unsafe impl Send for PaWakeup {}
 
 impl PaWakeup {
     /// Wake up the PA mainloop. Safe to call from any thread.
     pub(crate) fn wake(&self) {
         unsafe {
+            // SAFETY: ptr was extracted from a live PA Mainloop; pa_mainloop_wakeup
+            // is documented as thread-safe by PulseAudio. The mainloop outlives all
+            // PaWakeup copies.
             libpulse_sys::mainloop::pa_mainloop_wakeup(self.ptr.cast());
         }
     }

@@ -38,12 +38,9 @@ pub(crate) struct AudioDeviceRow {
     cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
     wakeup: PaWakeup,
     focus_handle: FocusHandle,
-    #[allow(dead_code)]
-    slider_sub: Subscription,
-    #[allow(dead_code)]
-    text_field_sub: Subscription,
-    #[allow(dead_code)]
-    dropdown_sub: Subscription,
+    _slider_sub: Subscription,
+    _text_field_sub: Subscription,
+    _dropdown_sub: Subscription,
 }
 
 /// Bundled parameters for the shared `new_impl` constructor.
@@ -156,7 +153,7 @@ impl AudioDeviceRow {
         });
 
         // ── Subscriptions ──
-        let slider_sub = cx.subscribe(&slider, {
+        let _slider_sub = cx.subscribe(&slider, {
             let cmd_tx = cmd_tx.clone();
             move |this, _sl, event: &SliderEvent, _cx| {
                 let kind = this.kind;
@@ -175,7 +172,7 @@ impl AudioDeviceRow {
                 }
             }
         });
-        let text_field_sub = cx.subscribe_in(&text_field, window, {
+        let _text_field_sub = cx.subscribe_in(&text_field, window, {
             move |this, _tf, event: &TextFieldEvent, window, cx| match event {
                 TextFieldEvent::Confirmed(text) => {
                     if let Ok(val) = text.parse::<f64>() {
@@ -208,7 +205,7 @@ impl AudioDeviceRow {
                 }
             }
         });
-        let dropdown_sub = cx.subscribe(&profile_dropdown, {
+        let _dropdown_sub = cx.subscribe(&profile_dropdown, {
             let cmd_tx = cmd_tx.clone();
             move |this, _dd, event: &DdEvt, _cx| {
                 if let DdEvt::Selected(_idx, profile) = event
@@ -235,9 +232,9 @@ impl AudioDeviceRow {
             cmd_tx,
             wakeup,
             focus_handle: cx.focus_handle(),
-            slider_sub,
-            text_field_sub,
-            dropdown_sub,
+            _slider_sub,
+            _text_field_sub,
+            _dropdown_sub,
         }
     }
 

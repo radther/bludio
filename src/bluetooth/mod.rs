@@ -62,7 +62,7 @@ impl BluetoothState {
         let adapter = self
             .adapter
             .as_ref()
-            .expect("BluetoothState not initialized");
+            .ok_or_else(|| "BluetoothState not initialized".to_string())?;
 
         let addresses = adapter
             .device_addresses()
