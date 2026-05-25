@@ -281,14 +281,23 @@ These patterns exist in the current codebase. New code must follow them. Flag de
 
 ## Report Format
 
-Produce the report as a single markdown document.
+Produce the report as a single markdown document with YAML frontmatter.
 
 ```markdown
+---
+status: reported
+date: YYYY-MM-DD
+mode: full | compare (branch → main)
+files_reviewed: N
+tooling:
+  clippy: clean | (output)
+  fmt: clean | (output)
+---
+
 # Codebase Audit Report
 
-**Date:** YYYY-MM-DD
-**Mode:** full | compare (branch → main)
-**Files reviewed:** N
+(If the report is consolidated from multiple audit runs, add a `consolidated_from` field listing the source file paths.
+If comparing against a specific base rather than main, add a `base` field.)
 
 ## Summary
 
@@ -322,15 +331,7 @@ Observations, tradeoffs, patterns worth knowing about. Not actionable issues.
 
 What's done well — specific modules, functions, or patterns that exemplify good practices.
 
-## Tool Output
 
-### cargo clippy
-
-(raw output or "clean")
-
-### cargo fmt --check
-
-(raw output or "clean")
 ```
 
 ---
