@@ -90,6 +90,7 @@ impl Render for BluetoothPage {
 
         let discovering = self.discovering;
         let initialized = self.initialized;
+        let connected_count = self.rows.iter().filter(|r| r.read(cx).connected).count();
 
         let cmd_tx = self.cmd_tx.clone();
 
@@ -103,7 +104,12 @@ impl Render for BluetoothPage {
                     .py_2()
                     .child(page_header(
                         "Bluetooth",
-                        format!("{} device{}", self.rows.len(), if self.rows.len() == 1 { "" } else { "s" }),
+                        format!(
+                            "{} device{}, {} connected",
+                            self.rows.len(),
+                            if self.rows.len() == 1 { "" } else { "s" },
+                            connected_count,
+                        ),
                         colors,
                         text_styles,
                     ))

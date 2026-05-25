@@ -29,7 +29,7 @@ pub(crate) struct BluetoothDeviceRow {
     pub(crate) address: Address,
     display_name: String,
     paired: bool,
-    connected: bool,
+    pub(crate) connected: bool,
     pairing_status: Option<PairingStatus>,
     cmd_tx: UnboundedSender<BluetoothPageCommand>,
 }
