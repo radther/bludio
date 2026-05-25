@@ -48,6 +48,8 @@ pub(crate) struct ThemeColors {
     pub element_background: Hsla,
     /// Button/element hover state.
     pub element_hover: Hsla,
+    /// Button/element selected state.
+    pub element_selected: Hsla,
     /// Text input field background.
     pub input_background: Hsla,
     /// Dropdown/context menu background.

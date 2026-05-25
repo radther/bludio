@@ -61,6 +61,7 @@ pub(crate) fn rose_pine() -> Theme {
             sidebar: OVERLAY,
             element_background: HIGHLIGHT_MED,
             element_hover: HIGHLIGHT_HIGH,
+            element_selected: HIGHLIGHT_MED,
             input_background: HIGHLIGHT_LOW,
             menu_background: OVERLAY,
 

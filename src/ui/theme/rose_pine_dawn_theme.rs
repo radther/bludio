@@ -60,7 +60,8 @@ pub(crate) fn rose_pine_dawn() -> Theme {
             surface: SURFACE,
             sidebar: OVERLAY,
             element_background: HIGHLIGHT_MED,
-            element_hover: HIGHLIGHT_HIGH,
+            element_hover: HIGHLIGHT_MED,
+            element_selected: HIGHLIGHT_MED,
             input_background: HIGHLIGHT_LOW,
             menu_background: OVERLAY,
 

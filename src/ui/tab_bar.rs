@@ -22,13 +22,13 @@ use std::time::{Duration, Instant};
 // ── Constants ──────────────────────────────────────────────────────────────
 
 /// Width of the tab bar column.
-pub const TAB_BAR_WIDTH: f32 = 48.0;
+pub const TAB_BAR_WIDTH: f32 = 64.0;
 
 /// Height of an individual tab button.
 pub const TAB_HEIGHT: f32 = 48.0;
 
 /// Width of the sliding selection indicator bar.
-const INDICATOR_WIDTH: f32 = 3.0;
+const INDICATOR_WIDTH: f32 = 4.0;
 
 /// Duration of the slide animation.
 const ANIMATION_DURATION: Duration = Duration::from_millis(250);
@@ -78,7 +78,7 @@ impl TabBar {
     /// Create a new tab bar entity.
     pub(crate) fn new(tabs: Vec<Tab>, active_index: usize, cx: &mut Context<Self>) -> Self {
         Self {
-            indicator_offset: active_index as f32 * TAB_HEIGHT,
+            indicator_offset: active_index as f32 * TAB_HEIGHT + 12.0,
             active_index,
             tabs,
             animation_generation: 0,
@@ -99,7 +99,7 @@ impl TabBar {
         let from = self.indicator_offset;
         self.animation_generation = self.animation_generation.wrapping_add(1);
         let generation = self.animation_generation;
-        let target = index as f32 * TAB_HEIGHT;
+        let target = index as f32 * (TAB_HEIGHT) + 12.0;
 
         // ── Spawn animation driver (frame loop) ──
         cx.spawn(async move |this, cx| {
@@ -160,26 +160,18 @@ impl Render for TabBar {
         let tab_buttons = self.tabs.iter().enumerate().map({
             let entity = entity.clone();
             move |(i, tab)| {
-                let is_active = i == active_index;
+                // let is_active = i == active_index;
                 h_flex()
                     .id(SharedString::from(format!("tab-{i}")))
                     .justify_center()
-                    .w(px(TAB_BAR_WIDTH))
+                    .w(px(TAB_BAR_WIDTH - 16.0))
+                    .mx_2()
                     .h(px(TAB_HEIGHT))
+                    .rounded_lg()
                     .cursor(CursorStyle::PointingHand)
                     .tooltip(tooltip::tooltip_text(tab.tooltip))
-                    .hover(move |el| {
-                        if is_active {
-                            el.bg(colors.accent_hover)
-                        } else {
-                            el.bg(colors.hover_overlay)
-                        }
-                    })
-                    .child((tab.icon)().text_color(if is_active {
-                        colors.accent
-                    } else {
-                        colors.icon
-                    }))
+                    .hover(move |el| el.bg(colors.element_hover))
+                    .child((tab.icon)().text_color(colors.text_secondary))
                     .on_mouse_up(MouseButton::Left, {
                         let entity = entity.clone();
                         move |_: &MouseUpEvent, _window, app_cx: &mut App| {
@@ -194,21 +186,22 @@ impl Render for TabBar {
         v_flex()
             .w(px(TAB_BAR_WIDTH))
             .h_full()
+            .pt_2()
             .bg(colors.sidebar)
-            .border_r_1()
-            .border_color(colors.border)
+            // .border_r_1()
+            // .border_color(colors.border)
             .relative()
             // ── Animated selection indicator ──
+            .children(tab_buttons)
             .child(
                 div()
                     .absolute()
-                    .left(px(0.0))
+                    .right(px(2.0))
                     .top(indicator_y)
                     .w(px(INDICATOR_WIDTH))
-                    .h(px(TAB_HEIGHT))
+                    .h(px(TAB_HEIGHT - 8.0))
                     .bg(colors.accent)
-                    .rounded_r(px(2.0)),
+                    .rounded_full(),
             )
-            .children(tab_buttons)
     }
 }
