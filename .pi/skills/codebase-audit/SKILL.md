@@ -12,6 +12,8 @@ Run a comprehensive audit of the Bludio codebase, producing an in-depth report o
 
 **Input**: Optionally specify a mode — "full" for a complete scan, "compare" to audit only the diff between the current branch and `main`. If omitted, defaults to "full".
 
+**Output**: A single markdown document detailing the audit results, with YAML frontmatter. The output is written to `audit-x-YYYY-MM-DD.md` in `./openspec/audit/` where `x` is the next audit iteration in the sequence, e.g. `audit-5-YYYY-MM-DD.md`.
+
 ---
 
 ## Modes
@@ -281,7 +283,7 @@ These patterns exist in the current codebase. New code must follow them. Flag de
 
 ## Report Format
 
-Produce the report as a single markdown document with YAML frontmatter.
+Produce the report as a single markdown document with YAML frontmatter. The report should be written to `audit-x-YYYY-MM-DD.md` in `./openspec/audit/` where `x` is the next audit iteration in the sequence, e.g. `audit-5-YYYY-MM-DD.md`.
 
 ```markdown
 ---
