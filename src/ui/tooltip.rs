@@ -3,7 +3,10 @@
 //! Provides a `tooltip_text()` helper that returns the closure expected
 //! by GPUI's `.tooltip()` builder, rendering a simple styled label.
 
-use gpui::{IntoElement, Render, SharedString, Window, div, hsla, prelude::*};
+use gpui::{IntoElement, Render, SharedString, Window, div, prelude::*};
+
+use crate::ui::StyledExt;
+use crate::ui::theme::{self};
 
 /// A minimal tooltip view that renders a single line of text.
 struct TooltipLabel {
@@ -11,14 +14,16 @@ struct TooltipLabel {
 }
 
 impl Render for TooltipLabel {
-    fn render(&mut self, _window: &mut Window, _cx: &mut gpui::Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
+        let colors = &theme::theme(cx).colors;
+        let text_styles = &theme::theme(cx).text_styles;
         div()
             .px_2()
             .py_1()
-            .bg(hsla(0.0, 0.0, 0.14, 1.0))
-            .text_color(hsla(0.0, 0.0, 0.95, 1.0))
+            .bg(colors.surface)
+            .text_color(colors.text)
             .rounded_md()
-            .text_sm()
+            .styled(text_styles.body_small)
             .child(self.text.clone())
     }
 }

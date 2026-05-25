@@ -35,6 +35,18 @@ where
 
 fn main() {
     application().run(|cx: &mut App| {
+        // ── Load bundled fonts ────────────────────────────────────────
+        let fonts: Vec<std::borrow::Cow<'static, [u8]>> = vec![
+            std::borrow::Cow::Borrowed(include_bytes!("../fonts/NotoSans.ttf")),
+            std::borrow::Cow::Borrowed(include_bytes!("../fonts/NotoSans-Italic.ttf")),
+        ];
+        cx.text_system()
+            .add_fonts(fonts)
+            .expect("Failed to load bundled fonts");
+
+        // ── Init theme ───────────────────────────────────────────────
+        cx.set_global(ui::theme::GlobalTheme::new(ui::theme::Theme::dark()));
+
         let bounds = Bounds::centered(None, size(px(1100.0), px(700.0)), cx);
 
         cx.open_window(

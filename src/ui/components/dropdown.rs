@@ -7,10 +7,11 @@
 //! Matches the `TextField` pattern: emits `DropdownEvent`s via `cx.emit()`
 //! (`EventEmitter` pattern).
 
+use crate::ui::StyledExt;
 use gpui::{
     Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity, EventEmitter, FocusHandle,
-    Focusable, Hsla, IntoElement, KeyDownEvent, MouseButton, MouseUpEvent, Pixels, Render,
-    RenderOnce, SharedString, Window, anchored, canvas, deferred, div, hsla, prelude::*, px,
+    Focusable, IntoElement, KeyDownEvent, MouseButton, MouseUpEvent, Pixels, Render, RenderOnce,
+    SharedString, Window, anchored, canvas, deferred, div, prelude::*, px,
 };
 
 use crate::ui::v_flex;
@@ -39,11 +40,6 @@ pub(crate) struct Dropdown {
     is_open: bool,
     focus_handle: FocusHandle,
     placeholder: SharedString,
-    accent: Hsla,
-    bg: Hsla,
-    hover_bg: Hsla,
-    menu_bg: Hsla,
-    menu_border: Hsla,
     /// Bounds of the trigger element, captured during prepaint for positioning.
     trigger_bounds: Option<Bounds<Pixels>>,
 }
@@ -57,11 +53,6 @@ impl Dropdown {
             is_open: false,
             focus_handle: cx.focus_handle(),
             placeholder: SharedString::from(""),
-            accent: hsla(210.0 / 360.0, 0.7, 0.55, 1.0),
-            bg: hsla(0.0, 0.0, 0.22, 1.0),
-            hover_bg: hsla(0.0, 0.0, 0.3, 1.0),
-            menu_bg: hsla(0.0, 0.0, 0.16, 1.0),
-            menu_border: hsla(0.0, 0.0, 0.3, 1.0),
             trigger_bounds: None,
         }
     }
@@ -92,36 +83,6 @@ impl Dropdown {
     /// Set the placeholder text shown when no item is selected.
     pub fn placeholder(mut self, text: impl Into<SharedString>) -> Self {
         self.placeholder = text.into();
-        self
-    }
-
-    /// Accent color for the selected item and trigger text.
-    pub fn accent(mut self, color: Hsla) -> Self {
-        self.accent = color;
-        self
-    }
-
-    /// Background color for the trigger button.
-    pub fn bg(mut self, color: Hsla) -> Self {
-        self.bg = color;
-        self
-    }
-
-    /// Hover background color for the trigger button.
-    pub fn hover_bg(mut self, color: Hsla) -> Self {
-        self.hover_bg = color;
-        self
-    }
-
-    /// Background color for the menu.
-    pub fn menu_bg(mut self, color: Hsla) -> Self {
-        self.menu_bg = color;
-        self
-    }
-
-    /// Border color for the menu.
-    pub fn menu_border(mut self, color: Hsla) -> Self {
-        self.menu_border = color;
         self
     }
 }
@@ -158,18 +119,7 @@ impl RenderOnce for DropdownComponent {
         let entity = self.entity;
 
         // Read all state up front.
-        let (
-            is_open,
-            selected,
-            items,
-            selected_idx,
-            trigger_pos,
-            accent,
-            bg,
-            hover_bg,
-            menu_bg,
-            menu_border,
-        ) = {
+        let (is_open, selected, items, selected_idx, trigger_pos) = {
             let d = entity.read(cx);
             (
                 d.is_open,
@@ -177,13 +127,10 @@ impl RenderOnce for DropdownComponent {
                 d.items.clone(),
                 d.selected_index,
                 d.trigger_bounds.map(|b| b.origin),
-                d.accent,
-                d.bg,
-                d.hover_bg,
-                d.menu_bg,
-                d.menu_border,
             )
         };
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
 
         // Register click-outside-to-close when open (must happen during paint, not render).
         let click_outside = if is_open {
@@ -227,9 +174,9 @@ impl RenderOnce for DropdownComponent {
                 deferred(
                     anchored_menu.child(
                         v_flex()
-                            .bg(menu_bg)
+                            .bg(colors.menu_background)
                             .border_1()
-                            .border_color(menu_border)
+                            .border_color(colors.menu_border)
                             .rounded_md()
                             .children(items.iter().enumerate().map(|(i, item)| {
                                 let item = item.clone();
@@ -239,10 +186,10 @@ impl RenderOnce for DropdownComponent {
                                     .id(SharedString::from(format!("dropdown-item-{i}")))
                                     .px_2()
                                     .py_1()
-                                    .text_xs()
+                                    .styled(text_styles.caption)
                                     .cursor(CursorStyle::PointingHand)
-                                    .when(is_active, move |el| el.text_color(accent))
-                                    .hover(|el| el.bg(hsla(0.0, 0.0, 1.0, 0.06)))
+                                    .when(is_active, move |el| el.text_color(colors.accent))
+                                    .hover(|el| el.bg(colors.hover_overlay))
                                     .child(SharedString::from(item.clone()))
                                     .on_mouse_up(MouseButton::Left, {
                                         let item = item.clone();
@@ -312,10 +259,10 @@ impl RenderOnce for DropdownComponent {
                     .px_2()
                     .py_1()
                     .rounded_sm()
-                    .text_xs()
-                    .bg(bg)
+                    .styled(text_styles.caption)
+                    .bg(colors.element_background)
                     .cursor(CursorStyle::PointingHand)
-                    .hover(move |el| el.bg(hover_bg))
+                    .hover(move |el| el.bg(colors.element_hover))
                     .child(selected.clone())
                     .on_mouse_up(
                         MouseButton::Left,

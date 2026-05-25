@@ -7,8 +7,8 @@
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, AudioState};
 use crate::ui::audio::card_row::CardRow;
-use crate::ui::{h_flex, v_flex};
-use gpui::{Context, Entity, FontWeight, Render, SharedString, Window, div, hsla, prelude::*, px};
+use crate::ui::{StyledExt, h_flex, v_flex};
+use gpui::{Context, Entity, Render, SharedString, Window, div, prelude::*, px};
 
 // ── Configuration page entity ──────────────────────────────────────────────
 
@@ -73,9 +73,9 @@ impl ConfigurationPage {
 }
 
 impl Render for ConfigurationPage {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let surface = hsla(0.0, 0.0, 0.14, 1.0);
-        let text_secondary = hsla(0.0, 0.0, 0.6, 1.0);
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
 
         v_flex()
             .flex_1()
@@ -84,18 +84,18 @@ impl Render for ConfigurationPage {
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .bg(surface)
+                    .bg(colors.surface)
                     .border_b_1()
-                    .border_color(hsla(0.0, 0.0, 0.25, 1.0))
-                    .child(div().font_weight(FontWeight::BOLD).child("Configuration")),
+                    .border_color(colors.border)
+                    .child(div().styled(text_styles.heading).child("Configuration")),
             )
             .when_some(self.error.clone(), |el, err| {
                 el.child(
                     div()
                         .px_4()
                         .py_2()
-                        .bg(gpui::rgba(0xff3c_3c33))
-                        .text_color(hsla(0.0, 0.8, 0.75, 1.0))
+                        .bg(colors.error_background)
+                        .text_color(colors.danger)
                         .child(SharedString::from(format!("Error: {err}"))),
                 )
             })
@@ -104,7 +104,7 @@ impl Render for ConfigurationPage {
                     h_flex()
                         .justify_center()
                         .flex_1()
-                        .text_color(text_secondary)
+                        .text_color(colors.text_secondary)
                         .child("Connecting to PulseAudio..."),
                 )
             })
@@ -113,7 +113,7 @@ impl Render for ConfigurationPage {
                     h_flex()
                         .justify_center()
                         .h(px(200.0))
-                        .text_color(text_secondary)
+                        .text_color(colors.text_secondary)
                         .child("No audio cards found"),
                 )
             })

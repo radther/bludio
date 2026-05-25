@@ -18,9 +18,7 @@ use crate::ui::icons;
 use crate::ui::tab_bar;
 use crate::ui::{h_flex, v_flex};
 use futures::{FutureExt, StreamExt};
-use gpui::{
-    App, Context, Entity, FocusHandle, Focusable, IntoElement, Render, Window, hsla, prelude::*,
-};
+use gpui::{App, Context, Entity, FocusHandle, Focusable, IntoElement, Render, Window, prelude::*};
 
 // ── Page navigation ───────────────────────────────────────────────────────
 
@@ -584,8 +582,8 @@ impl Render for BludioApp {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let active_page = self.active_page;
 
-        let bg = hsla(0.0, 0.0, 0.08, 1.0);
-        let text = hsla(0.0, 0.0, 0.95, 1.0);
+        let theme = crate::ui::theme::theme(cx);
+        let colors = &theme.colors;
 
         let this = cx.weak_entity();
 
@@ -622,29 +620,35 @@ impl Render for BludioApp {
         h_flex()
             .size_full()
             .items_stretch()
-            .bg(bg)
-            .text_color(text)
+            .font_family(theme.font_family.clone())
+            .bg(colors.background)
+            .text_color(colors.text)
             // ── Left tab bar ──
-            .child(tab_bar::tab_bar_view(&tabs, active_tab_index, {
-                let this = this.clone();
-                move |idx: usize, _window: &mut Window, app: &mut gpui::App| {
-                    if let Some(this) = this.upgrade() {
-                        let new_page = match idx {
-                            0 => Page::BluetoothDevices,
-                            1 => Page::AudioOutputs,
-                            2 => Page::AudioInputs,
-                            3 => Page::Configuration,
-                            _ => Page::DevTest,
-                        };
-                        this.update(app, |this, cx| {
-                            if this.active_page != new_page {
-                                this.active_page = new_page;
-                                cx.notify();
-                            }
-                        });
+            .child(tab_bar::tab_bar_view(
+                &tabs,
+                active_tab_index,
+                {
+                    let this = this.clone();
+                    move |idx: usize, _window: &mut Window, app: &mut gpui::App| {
+                        if let Some(this) = this.upgrade() {
+                            let new_page = match idx {
+                                0 => Page::BluetoothDevices,
+                                1 => Page::AudioOutputs,
+                                2 => Page::AudioInputs,
+                                3 => Page::Configuration,
+                                _ => Page::DevTest,
+                            };
+                            this.update(app, |this, cx| {
+                                if this.active_page != new_page {
+                                    this.active_page = new_page;
+                                    cx.notify();
+                                }
+                            });
+                        }
                     }
-                }
-            }))
+                },
+                cx,
+            ))
             // ── Right content area ──
             .child(
                 v_flex()

@@ -6,11 +6,10 @@
 use crate::bluetooth::BluetoothState;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
-use crate::ui::{h_flex, v_flex};
+use crate::ui::{StyledExt, h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
-    Context, CursorStyle, Entity, FontWeight, MouseButton, MouseUpEvent, Render, Window, div, hsla,
-    prelude::*, px,
+    Context, CursorStyle, Entity, MouseButton, MouseUpEvent, Render, Window, div, prelude::*, px,
 };
 
 // ── Page entity ────────────────────────────────────────────────────────────
@@ -88,13 +87,9 @@ impl BluetoothPage {
 }
 
 impl Render for BluetoothPage {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let surface = hsla(0.0, 0.0, 0.14, 1.0);
-        let text_secondary = hsla(0.0, 0.0, 0.6, 1.0);
-        let accent = hsla(210.0 / 360.0, 0.7, 0.55, 1.0);
-        let accent_hover = hsla(210.0 / 360.0, 0.7, 0.45, 1.0);
-        let danger = hsla(0.0, 0.7, 0.55, 1.0);
-        let danger_hover = hsla(0.0, 0.7, 0.45, 1.0);
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
 
         let discovering = self.discovering;
         let initialized = self.initialized;
@@ -109,10 +104,10 @@ impl Render for BluetoothPage {
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .bg(surface)
+                    .bg(colors.surface)
                     .border_b_1()
-                    .border_color(hsla(0.0, 0.0, 0.25, 1.0))
-                    .child(div().font_weight(FontWeight::BOLD).child("bluetooth"))
+                    .border_color(colors.border)
+                    .child(div().styled(text_styles.heading).child("bluetooth"))
                     .child(
                         // Scan / Stop button
                         div()
@@ -120,13 +115,17 @@ impl Render for BluetoothPage {
                             .px_3()
                             .py_1()
                             .rounded_md()
-                            .bg(if discovering { danger } else { accent })
+                            .bg(if discovering {
+                                colors.danger
+                            } else {
+                                colors.accent
+                            })
                             .cursor(CursorStyle::PointingHand)
                             .hover(|el| {
                                 el.bg(if discovering {
-                                    danger_hover
+                                    colors.danger_hover
                                 } else {
-                                    accent_hover
+                                    colors.accent_hover
                                 })
                             })
                             .child(if discovering { "stop" } else { "scan" })
@@ -144,8 +143,8 @@ impl Render for BluetoothPage {
                     div()
                         .px_4()
                         .py_2()
-                        .bg(gpui::rgba(0xff3c_3c33))
-                        .text_color(hsla(0.0, 0.8, 0.75, 1.0))
+                        .bg(colors.error_background)
+                        .text_color(colors.danger)
                         .child(gpui::SharedString::from(format!("Error: {err}"))),
                 )
             })
@@ -155,7 +154,7 @@ impl Render for BluetoothPage {
                     h_flex()
                         .justify_center()
                         .flex_1()
-                        .text_color(text_secondary)
+                        .text_color(colors.text_secondary)
                         .child("Connecting to Bluetooth..."),
                 )
             })
@@ -171,7 +170,7 @@ impl Render for BluetoothPage {
                                 h_flex()
                                     .justify_center()
                                     .h(px(200.0))
-                                    .text_color(text_secondary)
+                                    .text_color(colors.text_secondary)
                                     .child("No devices. Press \"scan\" to discover."),
                             )
                         })

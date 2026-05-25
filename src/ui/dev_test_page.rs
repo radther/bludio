@@ -1,16 +1,17 @@
-//! Developer test page: sandbox for testing components.
+//! Developer test page: sandbox for testing components and theme switching.
 //!
 //! A self-contained entity that owns interactive components and a log of
 //! confirmed entries. Renders an input field + scrollable list of confirmed
-//! entries. Originally built for `TextField` testing, now a general dev sandbox.
+//! entries + theme toggle buttons.
 
 use gpui::{
-    App, Context, CursorStyle, Entity, FocusHandle, Focusable, FontWeight, MouseButton,
-    MouseUpEvent, Render, SharedString, Subscription, Window, div, hsla, prelude::*, px,
+    App, Context, CursorStyle, Entity, FocusHandle, Focusable, MouseButton, MouseUpEvent, Render,
+    SharedString, Subscription, Window, div, prelude::*, px,
 };
 
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
-use crate::ui::{h_flex, v_flex};
+use crate::ui::theme::{self, Theme};
+use crate::ui::{StyledExt, h_flex, v_flex};
 
 // ── Test page entity ───────────────────────────────────────────────────────
 
@@ -53,24 +54,28 @@ impl Focusable for DevTestPage {
 
 impl Render for DevTestPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let accent = hsla(210.0 / 360.0, 0.7, 0.55, 1.0);
-        let surface = hsla(0.0, 0.0, 0.14, 1.0);
-        let text_secondary = hsla(0.0, 0.0, 0.6, 1.0);
+        let colors = &theme::theme(cx).colors;
+        let text_styles = &theme::theme(cx).text_styles;
+        let is_dark = theme::theme(cx).appearance == theme::Appearance::Dark;
 
         let focus_handle = self.text_field.read(cx).focus_handle(cx);
 
         v_flex()
             .flex_1()
             .child(
-                // Header
+                // Header with theme switcher
                 h_flex()
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .bg(surface)
+                    .bg(colors.surface)
                     .border_b_1()
-                    .border_color(hsla(0.0, 0.0, 0.25, 1.0))
-                    .child(div().font_weight(FontWeight::BOLD).child("Text Field Test")),
+                    .border_color(colors.border)
+                    .child(div().styled(text_styles.heading).child("Text Field Test"))
+                    .child(h_flex().gap_2().children(vec![
+                        dark_theme_btn(is_dark, colors, text_styles),
+                        light_theme_btn(is_dark, colors, text_styles),
+                    ])),
             )
             .child(
                 // Input area
@@ -80,33 +85,32 @@ impl Render for DevTestPage {
                     .gap_2()
                     .child(
                         div()
-                            .text_sm()
-                            .text_color(text_secondary)
+                            .styled(text_styles.body_small)
+                            .text_color(colors.text_secondary)
                             .child("Type in the field and press Enter to confirm:"),
                     )
                     .child(
                         h_flex()
                             .gap_2()
-                            .bg(hsla(0.0, 0.0, 0.18, 1.0))
+                            .bg(colors.input_background)
                             .rounded_md()
                             .border_1()
-                            .border_color(hsla(0.0, 0.0, 0.25, 1.0))
+                            .border_color(colors.border)
                             .px_2()
                             .min_h(px(32.))
                             .child(self.text_field.clone()),
                     )
                     .child(
-                        // Click-to-focus helper
                         h_flex().gap_1().child(
                             div()
-                                .text_xs()
-                                .text_color(text_secondary)
+                                .styled(text_styles.caption)
+                                .text_color(colors.text_secondary)
                                 .px_2()
                                 .py_0p5()
                                 .rounded_sm()
-                                .bg(hsla(0.0, 0.0, 0.22, 1.0))
+                                .bg(colors.element_background)
                                 .cursor(CursorStyle::PointingHand)
-                                .hover(|el| el.bg(hsla(0.0, 0.0, 0.3, 1.0)))
+                                .hover(|el| el.bg(colors.element_hover))
                                 .on_mouse_up(
                                     MouseButton::Left,
                                     move |_: &MouseUpEvent, window, app| {
@@ -127,14 +131,13 @@ impl Render for DevTestPage {
                         h_flex()
                             .px_4()
                             .py_2()
-                            .bg(hsla(0.0, 0.0, 0.11, 1.0))
+                            .bg(colors.sidebar)
                             .border_b_1()
-                            .border_color(hsla(0.0, 0.0, 0.25, 1.0))
+                            .border_color(colors.border)
                             .child(
                                 div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(accent)
+                                    .styled(text_styles.heading)
+                                    .text_color(colors.accent)
                                     .child(format!("Confirmed ({})", self.confirmed_texts.len())),
                             ),
                     )
@@ -144,11 +147,11 @@ impl Render for DevTestPage {
                             .py_2()
                             .gap_2()
                             .border_b_1()
-                            .border_color(hsla(0.0, 0.0, 0.18, 1.0))
+                            .border_color(colors.border_subtle)
                             .child(
                                 div()
-                                    .text_xs()
-                                    .text_color(text_secondary)
+                                    .styled(text_styles.caption)
+                                    .text_color(colors.text_secondary)
                                     .child(format!("#{}:", i + 1)),
                             )
                             .child(div().child(SharedString::from(text.as_str())))
@@ -159,11 +162,73 @@ impl Render for DevTestPage {
                             h_flex()
                                 .justify_center()
                                 .h(px(120.))
-                                .text_color(text_secondary)
-                                .text_sm()
+                                .text_color(colors.text_secondary)
+                                .styled(text_styles.body)
                                 .child("No entries yet. Type something and press Enter."),
                         )
                     }),
             )
     }
+}
+
+// ── Theme toggle buttons ───────────────────────────────────────────────────
+
+fn dark_theme_btn(
+    is_dark: bool,
+    colors: &crate::ui::theme::ThemeColors,
+    text_styles: &crate::ui::theme::TextStyleSet,
+) -> gpui::Stateful<gpui::Div> {
+    div()
+        .id("theme-dark-btn")
+        .px_2()
+        .py_1()
+        .rounded_sm()
+        .styled(text_styles.caption)
+        .bg(if is_dark {
+            colors.accent
+        } else {
+            colors.element_background
+        })
+        .cursor(CursorStyle::PointingHand)
+        .hover(|el| {
+            el.bg(if is_dark {
+                colors.accent
+            } else {
+                colors.element_hover
+            })
+        })
+        .child("Dark")
+        .on_mouse_up(MouseButton::Left, |_: &MouseUpEvent, _, cx| {
+            theme::set_theme(Theme::dark(), cx);
+        })
+}
+
+fn light_theme_btn(
+    is_dark: bool,
+    colors: &crate::ui::theme::ThemeColors,
+    text_styles: &crate::ui::theme::TextStyleSet,
+) -> gpui::Stateful<gpui::Div> {
+    div()
+        .id("theme-light-btn")
+        .px_2()
+        .py_1()
+        .rounded_sm()
+        .styled(text_styles.caption)
+        .bg(if !is_dark {
+            colors.accent
+        } else {
+            colors.element_background
+        })
+        .cursor(CursorStyle::PointingHand)
+        .hover(|el| {
+            el.bg(if !is_dark {
+                colors.accent
+            } else {
+                colors.element_hover
+            })
+        })
+        .child("Light")
+        .on_mouse_up(MouseButton::Left, |_: &MouseUpEvent, _, cx| {
+            theme::set_theme(Theme::light(), cx);
+        })
 }

@@ -14,7 +14,7 @@
 use gpui::{
     App, Bounds, Context, DragMoveEvent, Entity, EntityId, EventEmitter, FocusHandle, Focusable,
     Hsla, IntoElement, MouseButton, MouseDownEvent, Pixels, Point, Render, RenderOnce, Window,
-    canvas, div, hsla, prelude::*, px, relative,
+    canvas, div, prelude::*, px, relative,
 };
 
 use crate::ui::h_flex;
@@ -184,12 +184,13 @@ struct SliderBar {
 
 impl SliderBar {
     /// Create a new slider bar bound to the given Slider entity.
-    fn new(entity: Entity<Slider>) -> Self {
+    fn new(entity: Entity<Slider>, cx: &App) -> Self {
+        let colors = &crate::ui::theme::theme(cx).colors;
         Self {
             entity,
-            track_color: hsla(0.0, 0.0, 0.22, 1.0),
-            fill_color: hsla(210.0 / 360.0, 0.7, 0.55, 1.0),
-            border_color: hsla(210.0 / 360.0, 0.7, 0.55, 1.0),
+            track_color: colors.element_background,
+            fill_color: colors.accent,
+            border_color: colors.accent,
         }
     }
 
@@ -314,6 +315,6 @@ impl RenderOnce for SliderBar {
 
 impl Render for Slider {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        SliderBar::new(cx.entity())
+        SliderBar::new(cx.entity(), cx)
     }
 }

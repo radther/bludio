@@ -5,8 +5,9 @@
 //! hover effect. Click callbacks are wired through closures.
 
 use crate::ui::h_flex;
+use crate::ui::theme;
 use crate::ui::v_flex;
-use gpui::{CursorStyle, Div, MouseButton, MouseUpEvent, SharedString, hsla, prelude::*, px};
+use gpui::{App, CursorStyle, Div, MouseButton, MouseUpEvent, SharedString, prelude::*, px};
 
 /// The width of the tab bar column.
 pub const TAB_BAR_WIDTH: f32 = 48.0;
@@ -27,23 +28,26 @@ pub struct Tab {
 /// * `tabs` — Slice of tab configurations.
 /// * `active_index` — Index into `tabs` of the currently active tab.
 /// * `on_click` — Callback invoked with the clicked tab index on mouse-up.
+/// * `cx` — Application context for reading the theme.
 pub fn tab_bar_view(
     tabs: &[Tab],
     active_index: usize,
     on_click: impl Fn(usize, &mut gpui::Window, &mut gpui::App) + 'static,
+    cx: &App,
 ) -> Div {
-    let bg = hsla(0.0, 0.0, 0.12, 1.0);
-    let hover_color = hsla(0.0, 0.0, 1.0, 0.06);
-    let highlight = hsla(210.0 / 360.0, 0.5, 0.35, 0.5);
+    let colors = &theme::theme(cx).colors;
 
     v_flex()
         .w(px(TAB_BAR_WIDTH))
         .h_full()
-        .bg(bg)
+        .bg(colors.sidebar)
         .border_r_1()
-        .border_color(hsla(0.0, 0.0, 0.25, 1.0))
+        .border_color(colors.border)
         .children(tabs.iter().enumerate().map({
             let on_click = std::rc::Rc::new(on_click);
+            let highlight = colors.accent_hover;
+            let icon_color = colors.icon;
+            let hover_overlay = colors.hover_overlay;
             move |(i, tab)| {
                 let is_active = i == active_index;
                 let icon_fn = tab.icon;
@@ -55,16 +59,16 @@ pub fn tab_bar_view(
                     .w(px(TAB_BAR_WIDTH))
                     .h(px(TAB_HEIGHT))
                     .cursor(CursorStyle::PointingHand)
-                    .when(is_active, |el| el.bg(highlight))
+                    .when(is_active, move |el| el.bg(highlight))
                     .tooltip(crate::ui::tooltip::tooltip_text(tab.tooltip))
                     .hover(move |el| {
                         if is_active {
                             el.bg(highlight)
                         } else {
-                            el.bg(hover_color)
+                            el.bg(hover_overlay)
                         }
                     })
-                    .child(icon_fn().text_color(hsla(0.0, 0.0, 0.9, 1.0)))
+                    .child(icon_fn().text_color(icon_color))
                     .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, window, cx| {
                         on_click(i, window, cx);
                     })

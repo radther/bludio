@@ -9,10 +9,10 @@ use crate::audio::{AudioCommand, DeviceKind};
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
 use crate::ui::components::slider::{Slider, SliderEvent};
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
-use crate::ui::{h_flex, v_flex};
+use crate::ui::{StyledExt, h_flex, v_flex};
 use gpui::{
-    App, Context, CursorStyle, Div, Entity, FocusHandle, Focusable, FontWeight, MouseButton,
-    MouseUpEvent, Render, SharedString, Stateful, Subscription, Window, div, hsla, prelude::*, px,
+    App, Context, CursorStyle, Div, Entity, FocusHandle, Focusable, MouseButton, MouseUpEvent,
+    Render, SharedString, Stateful, Subscription, Window, div, prelude::*, px,
 };
 
 const ROW_HEIGHT: f32 = 64.0;
@@ -146,11 +146,6 @@ impl AudioDeviceRow {
             let (profiles, selected) = params.profile_data.unwrap_or_default();
             crate::ui::components::dropdown::Dropdown::new(profiles, selected, cx)
                 .placeholder("unknown")
-                .accent(hsla(210.0 / 360.0, 0.7, 0.55, 1.0))
-                .bg(hsla(0.0, 0.0, 0.22, 1.0))
-                .hover_bg(hsla(0.0, 0.0, 0.3, 1.0))
-                .menu_bg(hsla(0.0, 0.0, 0.16, 1.0))
-                .menu_border(hsla(0.0, 0.0, 0.3, 1.0))
         });
 
         // ── Slider ──
@@ -298,9 +293,6 @@ impl Focusable for AudioDeviceRow {
 
 impl Render for AudioDeviceRow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let accent = hsla(210.0 / 360.0, 0.7, 0.55, 1.0);
-        let accent_hover = hsla(210.0 / 360.0, 0.7, 0.45, 1.0);
-
         // ── Blur-sync: reset text field to actual volume when unfocused ──
         let tf_focused = self.text_field.read(cx).focus_handle(cx).is_focused(window);
         if !tf_focused {
@@ -311,19 +303,24 @@ impl Render for AudioDeviceRow {
             }
         }
 
+        let (border_subtle, hover_overlay) = {
+            let colors = &crate::ui::theme::theme(cx).colors;
+            (colors.border_subtle, colors.hover_overlay)
+        };
+
         h_flex()
             .justify_between()
             .id(SharedString::from(format!("adevice-{}", self.index)))
             .px_4()
             .h(px(ROW_HEIGHT))
             .border_b_1()
-            .border_color(hsla(0.0, 0.0, 0.20, 1.0))
-            .hover(|el| el.bg(hsla(0.0, 0.0, 1.0, 0.04)))
+            .border_color(border_subtle)
+            .hover(|el| el.bg(hover_overlay))
             .child(
                 v_flex()
                     .w_full()
-                    .child(self.render_device_name(accent))
-                    .child(self.render_controls_row(accent, accent_hover, cx)),
+                    .child(self.render_device_name(cx))
+                    .child(self.render_controls_row(cx)),
             )
     }
 }
@@ -332,40 +329,40 @@ impl Render for AudioDeviceRow {
 
 impl AudioDeviceRow {
     /// Device name row with optional "● Default" badge.
-    fn render_device_name(&self, accent: gpui::Hsla) -> Div {
+    fn render_device_name(&self, cx: &App) -> Div {
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
         h_flex()
             .gap_2()
             .child(
                 div()
-                    .font_weight(FontWeight::MEDIUM)
+                    .styled(text_styles.heading)
                     .child(SharedString::from(self.display_name.clone())),
             )
             .when(self.is_default, |el| {
-                el.child(div().text_xs().text_color(accent).child("● Default"))
+                el.child(
+                    div()
+                        .styled(text_styles.caption)
+                        .text_color(colors.accent)
+                        .child("● Default"),
+                )
             })
     }
 
     /// Volume bar + text field + mute + default button + profile selector.
-    fn render_controls_row(
-        &self,
-        accent: gpui::Hsla,
-        accent_hover: gpui::Hsla,
-        cx: &mut Context<Self>,
-    ) -> Div {
+    fn render_controls_row(&self, cx: &mut Context<Self>) -> Div {
         let idx = self.index;
         let kind = self.kind;
         let cmd_tx = self.cmd_tx.clone();
         let wk = self.wakeup;
 
+        let colors = &crate::ui::theme::theme(cx).colors;
         let vol_color = if self.muted {
-            hsla(0.0, 0.0, 0.4, 1.0)
+            colors.muted
         } else {
-            hsla(210.0 / 360.0, 0.7, 0.55, 1.0)
+            colors.accent
         };
 
-        // Note: `muted` and `kind` are captured by value at render time.
-        // A fresh closure is created each frame via cx.notify(), so the
-        // captured values always match the current row state.
         h_flex()
             .w_full()
             .gap_2()
@@ -376,7 +373,7 @@ impl AudioDeviceRow {
                 h_flex()
                     .w(px(LABEL_WIDTH))
                     .h(px(BAR_HEIGHT))
-                    .bg(hsla(0.0, 0.0, 0.18, 1.0))
+                    .bg(colors.input_background)
                     .rounded_sm()
                     .text_color(vol_color)
                     .child(self.text_field.clone()),
@@ -385,6 +382,7 @@ impl AudioDeviceRow {
             .child(mute_button(
                 SharedString::from(format!("mute-btn-{idx}")),
                 self.muted,
+                cx,
                 {
                     let muted = self.muted;
                     let cmd = cmd_tx.clone();
@@ -398,7 +396,7 @@ impl AudioDeviceRow {
                 },
             ))
             // ── Default button ──
-            .child(self.render_default_button(accent, accent_hover))
+            .child(self.render_default_button(cx))
             // ── Profile dropdown (output devices with profiles only) ──
             .when(
                 self.kind == DeviceKind::Output
@@ -409,43 +407,61 @@ impl AudioDeviceRow {
     }
 
     /// "Default" action button.
-    fn render_default_button(&self, accent: gpui::Hsla, accent_hover: gpui::Hsla) -> Stateful<Div> {
+    fn render_default_button(&self, cx: &App) -> Stateful<Div> {
         let cmd_tx = self.cmd_tx.clone();
         let pa_name = self.pa_name.clone();
         let kind = self.kind;
         let wk = self.wakeup;
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
 
-        action_btn("Default", accent, accent_hover, move || {
-            let _ = match kind {
-                DeviceKind::Output => cmd_tx.send(AudioCommand::SetDefaultSink(pa_name.clone())),
-                DeviceKind::Input => cmd_tx.send(AudioCommand::SetDefaultSource(pa_name.clone())),
-            };
-            wk.wake();
-        })
+        action_btn(
+            "Default",
+            colors.accent,
+            colors.accent_hover,
+            move || {
+                let _ = match kind {
+                    DeviceKind::Output => {
+                        cmd_tx.send(AudioCommand::SetDefaultSink(pa_name.clone()))
+                    }
+                    DeviceKind::Input => {
+                        cmd_tx.send(AudioCommand::SetDefaultSource(pa_name.clone()))
+                    }
+                };
+                wk.wake();
+            },
+            text_styles,
+        )
     }
 }
 
 // ── Mute button ────────────────────────────────────────────────────────────
 
-fn mute_button(id: SharedString, muted: bool, on_toggle: impl Fn() + 'static) -> Stateful<Div> {
+fn mute_button(
+    id: SharedString,
+    muted: bool,
+    cx: &App,
+    on_toggle: impl Fn() + 'static,
+) -> Stateful<Div> {
     let lbl = if muted { "Unmute" } else { "Mute" };
+    let colors = &crate::ui::theme::theme(cx).colors;
+    let text_styles = &crate::ui::theme::theme(cx).text_styles;
     let bg = if muted {
-        hsla(0.0, 0.7, 0.55, 1.0)
+        colors.danger
     } else {
-        hsla(0.0, 0.0, 0.22, 1.0)
+        colors.element_background
     };
     let hbg = if muted {
-        hsla(0.0, 0.7, 0.45, 1.0)
+        colors.danger_hover
     } else {
-        hsla(0.0, 0.0, 0.3, 1.0)
+        colors.element_hover
     };
     div()
         .id(id)
         .px_2()
         .py_1()
         .rounded_sm()
-        .text_xs()
-        .font_weight(FontWeight::MEDIUM)
+        .styled(text_styles.caption)
         .bg(bg)
         .cursor(CursorStyle::PointingHand)
         .hover(move |el| el.bg(hbg))
@@ -460,14 +476,14 @@ fn action_btn(
     bg: gpui::Hsla,
     hover_bg: gpui::Hsla,
     on_click: impl Fn() + 'static,
+    text_styles: &crate::ui::theme::TextStyleSet,
 ) -> Stateful<Div> {
     div()
         .id(SharedString::from(format!("btn-{label}")))
         .px_2()
         .py_1()
         .rounded_sm()
-        .text_xs()
-        .font_weight(FontWeight::MEDIUM)
+        .styled(text_styles.caption)
         .bg(bg)
         .cursor(CursorStyle::PointingHand)
         .hover(move |el| el.bg(hover_bg))

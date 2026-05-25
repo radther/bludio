@@ -5,11 +5,12 @@
 //! Actions are sent as `BluetoothPageCommand`s through a channel — the row
 //! never spawns async tasks directly.
 
+use crate::ui::StyledExt;
 use bluer::Address;
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
-    Context, CursorStyle, FontWeight, MouseButton, MouseUpEvent, Render, SharedString, Window, div,
-    hsla, prelude::*, px,
+    Context, CursorStyle, MouseButton, MouseUpEvent, Render, SharedString, Window, div, prelude::*,
+    px,
 };
 
 use super::BluetoothPageCommand;
@@ -70,20 +71,15 @@ impl BluetoothDeviceRow {
 const ROW_HEIGHT: f32 = 64.0;
 
 impl Render for BluetoothDeviceRow {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let addr = self.address;
         let addr_str = addr.to_string();
         let name = self.display_name.clone();
         let paired = self.paired;
         let connected = self.connected;
 
-        let text_secondary = hsla(0.0, 0.0, 0.6, 1.0);
-        let accent = hsla(210.0 / 360.0, 0.7, 0.55, 1.0);
-        let accent_hover = hsla(210.0 / 360.0, 0.7, 0.45, 1.0);
-        let danger = hsla(0.0, 0.7, 0.55, 1.0);
-        let danger_hover = hsla(0.0, 0.7, 0.45, 1.0);
-        let amber = hsla(45.0 / 360.0, 0.8, 0.55, 1.0);
-        let success = hsla(140.0 / 360.0, 0.6, 0.5, 1.0);
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
 
         let pairing_status = self.pairing_status.as_ref();
 
@@ -95,37 +91,37 @@ impl Render for BluetoothDeviceRow {
             .px_4()
             .h(px(ROW_HEIGHT))
             .border_b_1()
-            .border_color(hsla(0.0, 0.0, 0.20, 1.0))
-            .hover(|el| el.bg(hsla(0.0, 0.0, 1.0, 0.04)))
+            .border_color(colors.border_subtle)
+            .hover(|el| el.bg(colors.hover_overlay))
             .child(
                 // ── Device info ──
                 v_flex()
                     .child(
                         div()
-                            .font_weight(FontWeight::MEDIUM)
+                            .styled(text_styles.heading)
                             .child(SharedString::from(name)),
                     )
                     .child(
                         div()
-                            .text_xs()
-                            .text_color(text_secondary)
+                            .styled(text_styles.body_small)
+                            .text_color(colors.text_secondary)
                             .child(SharedString::from(addr_str)),
                     )
-                    .child(div().text_xs().mt_0p5().child(
+                    .child(div().styled(text_styles.caption).mt_0p5().child(
                         if let Some(ref status) = pairing_status {
                             let (dot_color, label): (gpui::Hsla, String) = match status {
-                                PairingStatus::Connecting => (accent, status.to_string()),
-                                PairingStatus::Pairing => (amber, status.to_string()),
-                                PairingStatus::Trusting => (success, status.to_string()),
-                                PairingStatus::Failed(_) => (danger, status.to_string()),
+                                PairingStatus::Connecting => (colors.accent, status.to_string()),
+                                PairingStatus::Pairing => (colors.warning, status.to_string()),
+                                PairingStatus::Trusting => (colors.success, status.to_string()),
+                                PairingStatus::Failed(_) => (colors.danger, status.to_string()),
                             };
                             div().text_color(dot_color).child(format!("● {label}"))
                         } else if connected {
-                            div().text_color(success).child("● connected")
+                            div().text_color(colors.success).child("● connected")
                         } else if paired {
-                            div().text_color(text_secondary).child("paired")
+                            div().text_color(colors.text_secondary).child("paired")
                         } else {
-                            div().text_color(text_secondary).child("discovered")
+                            div().text_color(colors.text_secondary).child("discovered")
                         },
                     )),
             )
@@ -135,41 +131,45 @@ impl Render for BluetoothDeviceRow {
                     if paired && !connected {
                         btn_row = btn_row.child(action_btn(
                             "Connect",
-                            accent,
-                            accent_hover,
+                            colors.accent,
+                            colors.accent_hover,
                             addr,
                             DeviceRowAction::Connect,
                             &cmd_tx,
+                            text_styles,
                         ));
                     }
                     if connected {
                         btn_row = btn_row.child(action_btn(
                             "Disconnect",
-                            danger,
-                            danger_hover,
+                            colors.danger,
+                            colors.danger_hover,
                             addr,
                             DeviceRowAction::Disconnect,
                             &cmd_tx,
+                            text_styles,
                         ));
                     }
                     if paired {
                         btn_row = btn_row.child(action_btn(
                             "Forget",
-                            danger,
-                            danger_hover,
+                            colors.danger,
+                            colors.danger_hover,
                             addr,
                             DeviceRowAction::Forget,
                             &cmd_tx,
+                            text_styles,
                         ));
                     }
                     if !paired && pairing_status.is_none() {
                         btn_row = btn_row.child(action_btn(
                             "Pair & Trust",
-                            accent,
-                            accent_hover,
+                            colors.accent,
+                            colors.accent_hover,
                             addr,
                             DeviceRowAction::PairAndTrust,
                             &cmd_tx,
+                            text_styles,
                         ));
                     }
                     btn_row
@@ -189,6 +189,7 @@ fn action_btn(
     addr: Address,
     action: DeviceRowAction,
     cmd_tx: &UnboundedSender<BluetoothPageCommand>,
+    text_styles: &crate::ui::theme::TextStyleSet,
 ) -> gpui::Stateful<gpui::Div> {
     let cmd_tx = cmd_tx.clone();
     div()
@@ -196,8 +197,7 @@ fn action_btn(
         .px_2()
         .py_1()
         .rounded_sm()
-        .text_xs()
-        .font_weight(FontWeight::MEDIUM)
+        .styled(text_styles.caption)
         .bg(bg)
         .cursor(CursorStyle::PointingHand)
         .hover(move |el| el.bg(hover_bg))

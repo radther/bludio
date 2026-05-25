@@ -11,6 +11,8 @@ pub mod ext;
 pub mod icons;
 pub mod stack;
 pub mod tab_bar;
+pub(crate) mod theme;
 pub mod tooltip;
 
+pub use ext::StyledExt;
 pub use stack::{h_flex, v_flex};

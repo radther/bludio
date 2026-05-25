@@ -1,0 +1,217 @@
+#!/usr/bin/env python3
+"""Aggregate Pi session usage (tokens + cost) for the current directory."""
+
+import json
+import os
+import re
+import sys
+from dataclasses import dataclass, field
+from datetime import date, timedelta
+from pathlib import Path
+
+# ── Config ────────────────────────────────────────────────────────────
+
+PI_SESSIONS_DIR = Path.home() / ".pi" / "agent" / "sessions"
+CWD = Path.cwd()
+
+
+def session_key(path: str) -> str:
+    """Convert cwd to the directory name Pi uses under sessions/"""
+    return "--" + str(path).lstrip("/").replace("/", "-") + "--"
+
+
+def session_date(filepath: Path) -> date | None:
+    """Extract the date from a session filename (e.g. 2026-05-24T20-51...)."""
+    m = re.match(r"(\d{4}-\d{2}-\d{2})", filepath.name)
+    if not m:
+        return None
+    return date.fromisoformat(m.group(1))
+
+
+def find_session_files(date_from: date | None = None, date_to: date | None = None) -> list[Path]:
+    session_dir = PI_SESSIONS_DIR / session_key(CWD)
+    if not session_dir.is_dir():
+        return []
+    files = sorted(session_dir.glob("*.jsonl"))
+    if date_from is None and date_to is None:
+        return files
+    filtered = []
+    for f in files:
+        d = session_date(f)
+        if d is None:
+            continue
+        if date_from and d < date_from:
+            continue
+        if date_to and d > date_to:
+            continue
+        filtered.append(f)
+    return filtered
+
+
+@dataclass
+class SessionStats:
+    """Per-session aggregated usage."""
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0  # summed across all requests (each request re-reads cache)
+    cache_write_tokens: int = 0  # summed across all requests
+    cost_input: float = 0.0
+    cost_output: float = 0.0
+    cost_cache_read: float = 0.0
+    cost_cache_write: float = 0.0
+    messages: int = 0
+
+
+def parse_session(filepath: Path) -> SessionStats | None:
+    """Extract aggregated usage from a single session JSONL file."""
+    stats = SessionStats()
+    try:
+        with open(filepath) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                entry = json.loads(line)
+                if entry.get("type") != "message":
+                    continue
+                msg = entry.get("message", {})
+                if msg.get("role") != "assistant":
+                    continue
+                usage = msg.get("usage", {})
+                if not usage:
+                    continue
+
+                # All fields: sum across every assistant message (each = one API request)
+                stats.input_tokens += usage.get("input", 0)
+                stats.output_tokens += usage.get("output", 0)
+                stats.cache_read_tokens += usage.get("cacheRead", 0)
+                stats.cache_write_tokens += usage.get("cacheWrite", 0)
+                stats.messages += 1
+
+                cost = usage.get("cost", {})
+                stats.cost_input += cost.get("input", 0)
+                stats.cost_output += cost.get("output", 0)
+                stats.cost_cache_read += cost.get("cacheRead", 0)
+                stats.cost_cache_write += cost.get("cacheWrite", 0)
+
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"  ⚠  Skipping {filepath.name}: {e}", file=sys.stderr)
+        return None
+    return stats
+
+
+def fmt_tokens(n: int) -> str:
+    if n >= 1_000_000_000:
+        return f"{n/1_000_000_000:.1f}B"
+    if n >= 1_000_000:
+        return f"{n/1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n/1_000:.0f}K"
+    return str(n)
+
+
+def fmt_cost(n: float) -> str:
+    if n >= 1:
+        return f"${n:.2f}"
+    return f"${n:.4f}"
+
+
+def print_bar(label: str, tokens: int, cost: float, max_tokens: int):
+    bar_w = 30
+    ratio = tokens / max_tokens if max_tokens > 0 else 0
+    filled = int(ratio * bar_w)
+    bar = "█" * filled + "░" * (bar_w - filled)
+    print(f"  {label:<14} {fmt_tokens(tokens):>7}  {bar}  {fmt_cost(cost):>10}")
+
+
+def parse_date_arg(s: str) -> date:
+    """Parse a YYYY-MM-DD argument, with friendly error."""
+    try:
+        return date.fromisoformat(s)
+    except ValueError:
+        print(f"Invalid date '{s}'. Use YYYY-MM-DD format.", file=sys.stderr)
+        sys.exit(1)
+
+
+def main():
+    args = sys.argv[1:]
+    date_from: date | None = None
+    date_to: date | None = None
+    if len(args) == 1:
+        date_from = date_to = parse_date_arg(args[0])
+    elif len(args) >= 2:
+        date_from = parse_date_arg(args[0])
+        date_to = parse_date_arg(args[1])
+
+    files = find_session_files(date_from, date_to)
+    if not files:
+        what = f"{date_from}" if date_from == date_to else f"{date_from} – {date_to}" if date_from and date_to else ""
+        print(f"No Pi sessions found for {CWD} {what}".strip())
+        sys.exit(0)
+
+    date_desc = ""
+    if date_from and date_from == date_to:
+        date_desc = f" ({date_from})"
+    elif date_from and date_to:
+        date_desc = f" ({date_from} – {date_to})"
+    print(f"\n  Pi session usage for {CWD.name}/{date_desc}\n")
+    print(f"  {'Session':<40} {'Msgs':>4}  {'Tokens':>8}  {'Cost':>10}")
+    print(f"  {'─'*40}  {'─'*4}  {'─'*8}  {'─'*10}")
+
+    all_stats: list[SessionStats] = []
+    for f in files:
+        s = parse_session(f)
+        if s is None:
+            continue
+        all_stats.append(s)
+        total_tok = s.input_tokens + s.output_tokens
+        total_cost = s.cost_input + s.cost_output + s.cost_cache_read + s.cost_cache_write
+        ts = f.stem[:10]
+        print(f"  {ts:<40} {s.messages:>4}  {fmt_tokens(total_tok):>8}  {fmt_cost(total_cost):>10}")
+
+    # ── Grand totals ───────────────────────────────────────────────────
+
+    grand = SessionStats()
+    for s in all_stats:
+        for field_name in [
+            "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
+            "cost_input", "cost_output", "cost_cache_read", "cost_cache_write",
+            "messages",
+        ]:
+            setattr(grand, field_name, getattr(grand, field_name) + getattr(s, field_name))
+
+    total_all_tokens = grand.input_tokens + grand.output_tokens + grand.cache_write_tokens
+    total_all_cost = grand.cost_input + grand.cost_output + grand.cost_cache_read + grand.cost_cache_write
+
+    print(f"\n  ── Totals ({len(all_stats)} sessions, {grand.messages} requests) ──\n")
+
+    # Use input+output as bar scale (cache reads dwarf everything else)
+    bar_max = max(grand.input_tokens, grand.output_tokens, grand.cache_write_tokens, 1)
+
+    print("  Tokens")
+    print_bar("Input", grand.input_tokens, grand.cost_input, bar_max)
+    print_bar("Output", grand.output_tokens, grand.cost_output, bar_max)
+    print(f"  {'─'*14}  {'─'*7}  {'─'*30}  {'─'*10}")
+    print_bar("Subtotal", total_all_tokens, total_all_cost, bar_max)
+
+    # Cache reads: tokens served from DeepSeek's server-side cache.
+    # input = new tokens sent over the wire (delta).
+    # cacheRead = cached prefix already on DeepSeek's servers.
+    # Total prompt processed = input + cacheRead.
+    total_prompt = grand.input_tokens + grand.cache_read_tokens
+    cache_hit_pct = (grand.cache_read_tokens / total_prompt * 100) if total_prompt > 0 else 0
+    avg_cache = grand.cache_read_tokens / grand.messages if grand.messages > 0 else 0
+    avg_prompt = total_prompt / grand.messages if grand.messages > 0 else 0
+
+    print(f"\n  Server-side cache")
+    print(f"    {fmt_tokens(grand.cache_read_tokens)} cached tokens re-used · {fmt_cost(grand.cost_cache_read)} cache cost")
+    print(f"    Hit rate: {fmt_tokens(grand.cache_read_tokens)} / ({fmt_tokens(grand.input_tokens)} sent + {fmt_tokens(grand.cache_read_tokens)} cached)")
+    print(f"           = {cache_hit_pct:.1f}% of full prompt served from cache")
+    print(f"    avg prompt {fmt_tokens(int(avg_prompt))} per request ({fmt_tokens(int(avg_cache))} cached, {fmt_tokens(int(avg_prompt - avg_cache))} sent)")
+
+    print(f"\n  {fmt_tokens(total_all_tokens)} sent tokens ({fmt_tokens(total_prompt)} total with cache) · {fmt_cost(total_all_cost)} total cost\n")
+
+
+if __name__ == "__main__":
+    main()

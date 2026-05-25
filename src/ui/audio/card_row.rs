@@ -6,11 +6,12 @@
 
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, CardInfo};
+use crate::ui::StyledExt;
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
 use crate::ui::h_flex;
 use gpui::{
-    App, Context, Entity, FocusHandle, Focusable, FontWeight, Render, SharedString, Subscription,
-    Window, div, hsla, prelude::*, px,
+    App, Context, Entity, FocusHandle, Focusable, Render, SharedString, Subscription, Window, div,
+    prelude::*, px,
 };
 
 const ROW_HEIGHT: f32 = 64.0;
@@ -55,11 +56,6 @@ impl CardRow {
         let profile_dropdown = cx.new(|cx| {
             crate::ui::components::dropdown::Dropdown::new(profiles, selected_idx, cx)
                 .placeholder("unknown")
-                .accent(hsla(210.0 / 360.0, 0.7, 0.55, 1.0))
-                .bg(hsla(0.0, 0.0, 0.22, 1.0))
-                .hover_bg(hsla(0.0, 0.0, 0.3, 1.0))
-                .menu_bg(hsla(0.0, 0.0, 0.16, 1.0))
-                .menu_border(hsla(0.0, 0.0, 0.3, 1.0))
         });
 
         let dropdown_sub = cx.subscribe_in(&profile_dropdown, window, {
@@ -112,21 +108,23 @@ impl Focusable for CardRow {
 
 impl Render for CardRow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
         h_flex()
             .justify_between()
             .id(SharedString::from(format!("card-{}", self.card_index)))
             .px_4()
             .h(px(ROW_HEIGHT))
             .border_b_1()
-            .border_color(hsla(0.0, 0.0, 0.20, 1.0))
-            .hover(|el| el.bg(hsla(0.0, 0.0, 1.0, 0.04)))
+            .border_color(colors.border_subtle)
+            .hover(|el| el.bg(colors.hover_overlay))
             .child(
                 h_flex()
                     .gap_2()
                     .w_full()
                     .child(
                         div()
-                            .font_weight(FontWeight::MEDIUM)
+                            .styled(text_styles.heading)
                             .child(SharedString::from(self.display_name.clone())),
                     )
                     .when(self.profile_dropdown.read(cx).has_items(), |el| {

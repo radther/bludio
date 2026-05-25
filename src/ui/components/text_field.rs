@@ -10,7 +10,7 @@ use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, Entity, EntityInputHandler, EventEmitter,
     FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
     Pixels, Point, Render, RenderOnce, ShapedLine, SharedString, TextAlign, TextRun, Window,
-    canvas, hsla, point, prelude::*, px, size,
+    canvas, point, prelude::*, px, size,
 };
 use std::ops::Range;
 use std::time::Duration;
@@ -703,9 +703,11 @@ impl RenderOnce for TextFieldComponent {
                             let cursor = input.cursor_offset();
                             let align = input.align;
                             let style = window.text_style();
+                            let theme = crate::ui::theme::theme(cx);
+                            let colors = &theme.colors;
 
                             let (display_text, text_color) = if content.is_empty() {
-                                (input.placeholder.clone(), hsla(0., 0., 0.6, 1.))
+                                (input.placeholder.clone(), colors.text_placeholder)
                             } else {
                                 (content, style.color)
                             };
@@ -758,7 +760,7 @@ impl RenderOnce for TextFieldComponent {
                                                 ),
                                                 size(px(2.), bounds.bottom() - bounds.top()),
                                             ),
-                                            hsla(210. / 360., 0.7, 0.55, 1.),
+                                            colors.accent,
                                         ))
                                     } else {
                                         None
@@ -779,7 +781,7 @@ impl RenderOnce for TextFieldComponent {
                                                 bounds.bottom(),
                                             ),
                                         ),
-                                        hsla(210. / 360., 0.6, 0.5, 0.3),
+                                        colors.selection_background,
                                     )),
                                     if focused && input.blink_visible {
                                         Some(gpui::fill(
@@ -790,7 +792,7 @@ impl RenderOnce for TextFieldComponent {
                                                 ),
                                                 size(px(2.), bounds.bottom() - bounds.top()),
                                             ),
-                                            hsla(210. / 360., 0.7, 0.55, 1.),
+                                            colors.accent,
                                         ))
                                     } else {
                                         None
