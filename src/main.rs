@@ -49,7 +49,7 @@ fn main() {
             .expect("Failed to load bundled fonts");
 
         // ── Init theme ───────────────────────────────────────────────
-        cx.set_global(ui::theme::GlobalTheme::new(ui::theme::Theme::dark()));
+        cx.set_global(ui::theme::GlobalTheme::new(ui::theme::rose_pine()));
 
         let bounds = Bounds::centered(None, size(px(1100.0), px(700.0)), cx);
 

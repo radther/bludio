@@ -10,7 +10,7 @@ use gpui::{
 };
 
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
-use crate::ui::theme::{self, Theme};
+use crate::ui::theme;
 use crate::ui::{StyledExt, h_flex, v_flex};
 
 // ── Test page entity ───────────────────────────────────────────────────────
@@ -198,7 +198,7 @@ fn dark_theme_btn(
         })
         .child("Dark")
         .on_mouse_up(MouseButton::Left, |_: &MouseUpEvent, _, cx| {
-            theme::set_theme(Theme::dark(), cx);
+            theme::set_theme(theme::rose_pine(), cx);
         })
 }
 
@@ -228,6 +228,6 @@ fn light_theme_btn(
         })
         .child("Light")
         .on_mouse_up(MouseButton::Left, |_: &MouseUpEvent, _, cx| {
-            theme::set_theme(Theme::light(), cx);
+            theme::set_theme(theme::rose_pine_dawn(), cx);
         })
 }
