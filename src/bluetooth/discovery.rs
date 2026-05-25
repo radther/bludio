@@ -114,10 +114,10 @@ pub(crate) async fn run_discovery(
     while let Some(event) = rx.next().await {
         match event {
             DiscoveryEvent::DeviceAdded(device) => {
-                let _ = this.update_in(cx, |this, window, cx| {
+                let _ = this.update_in(cx, |this, _window, cx| {
                     this.bt_state.upsert_device(device);
                     this.bluetooth_page
-                        .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
+                        .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
                     cx.notify();
                 });
                 if !this
@@ -134,20 +134,20 @@ pub(crate) async fn run_discovery(
     let a = adapter;
     if let Ok(Some(devices)) = crate::tokio_task(async move { refresh_device_list(&a).await }).await
     {
-        let _ = this.update_in(cx, |this, window, cx| {
+        let _ = this.update_in(cx, |this, _window, cx| {
             this.bt_state.replace_devices(devices);
             this.bt_state.discovering = false;
             this.bluetooth_page
-                .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
+                .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
             cx.notify();
         });
         return;
     }
 
-    let _ = this.update_in(cx, |this, window, cx| {
+    let _ = this.update_in(cx, |this, _window, cx| {
         this.bt_state.discovering = false;
         this.bluetooth_page
-            .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
+            .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
         cx.notify();
     });
 }

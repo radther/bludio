@@ -38,12 +38,7 @@ impl ConfigurationPage {
     }
 
     /// Sync rows with the latest audio state cards.
-    pub(crate) fn sync_cards(
-        &mut self,
-        state: &AudioState,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn sync_cards(&mut self, state: &AudioState, cx: &mut Context<Self>) {
         self.connected = state.connected;
         self.error.clone_from(&state.error);
 
@@ -62,8 +57,7 @@ impl ConfigurationPage {
                     row.update_from_card(card, row_cx);
                 });
             } else {
-                let row =
-                    cx.new(|row_cx| CardRow::new(card, cmd_tx.clone(), wakeup, window, row_cx));
+                let row = cx.new(|row_cx| CardRow::new(card, cmd_tx.clone(), wakeup, row_cx));
                 self.rows.push(row);
             }
         }

@@ -156,9 +156,9 @@ impl AudioDeviceRow {
         });
 
         // ── Subscriptions ──
-        let slider_sub = cx.subscribe_in(&slider, window, {
+        let slider_sub = cx.subscribe(&slider, {
             let cmd_tx = cmd_tx.clone();
-            move |this, _sl, event: &SliderEvent, _window, _cx| {
+            move |this, _sl, event: &SliderEvent, _cx| {
                 let kind = this.kind;
                 let idx = this.index;
                 match event {
@@ -208,9 +208,9 @@ impl AudioDeviceRow {
                 }
             }
         });
-        let dropdown_sub = cx.subscribe_in(&profile_dropdown, window, {
+        let dropdown_sub = cx.subscribe(&profile_dropdown, {
             let cmd_tx = cmd_tx.clone();
-            move |this, _dd, event: &DdEvt, _window, _cx| {
+            move |this, _dd, event: &DdEvt, _cx| {
                 if let DdEvt::Selected(_idx, profile) = event
                     && let Some(card_idx) = this.card_index
                 {

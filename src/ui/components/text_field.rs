@@ -419,7 +419,7 @@ impl TextField {
         }
     }
 
-    fn on_mouse_up(&mut self, _cx: &mut Context<Self>) {
+    fn on_mouse_up(&mut self) {
         self.is_selecting = false;
     }
 
@@ -674,14 +674,14 @@ impl RenderOnce for TextFieldComponent {
             )
             .on_mouse_up(
                 MouseButton::Left,
-                window.listener_for(&entity_for_mouse, |this, _event, _window, cx| {
-                    this.on_mouse_up(cx);
+                window.listener_for(&entity_for_mouse, |this, _event, _window, _cx| {
+                    this.on_mouse_up();
                 }),
             )
             .on_mouse_up_out(
                 MouseButton::Left,
-                window.listener_for(&entity_for_mouse, |this, _event, _window, cx| {
-                    this.on_mouse_up(cx);
+                window.listener_for(&entity_for_mouse, |this, _event, _window, _cx| {
+                    this.on_mouse_up();
                 }),
             )
             .on_mouse_move(window.listener_for(

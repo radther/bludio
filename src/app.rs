@@ -15,10 +15,13 @@ use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::bluetooth_page::BluetoothPage;
 use crate::ui::dev_test_page::DevTestPage;
 use crate::ui::icons;
-use crate::ui::tab_bar;
+use crate::ui::tab_bar::{Tab, TabBar, TabBarEvent};
 use crate::ui::{h_flex, v_flex};
 use futures::{FutureExt, StreamExt};
-use gpui::{App, Context, Entity, FocusHandle, Focusable, IntoElement, Render, Window, prelude::*};
+use gpui::{
+    App, Context, Entity, FocusHandle, Focusable, IntoElement, Render, Subscription, Window,
+    prelude::*,
+};
 
 // ── Page navigation ───────────────────────────────────────────────────────
 
@@ -46,6 +49,9 @@ pub(crate) struct BludioApp {
     dev_test_page: Entity<DevTestPage>,
     /// Bluetooth device page: self-contained entity.
     pub(crate) bluetooth_page: Entity<BluetoothPage>,
+    /// Tab bar entity: owns tab selection visual state + animation.
+    tab_bar: Entity<TabBar>,
+    _tab_bar_sub: Subscription,
     active_page: Page,
     focus_handle: FocusHandle,
 }
@@ -88,6 +94,50 @@ impl BludioApp {
             cx.new(|cx| ConfigurationPage::new(audio_cmd_tx.clone(), pa_wakeup, cx));
         let dev_test_page = cx.new(DevTestPage::new);
 
+        // ── Create tab bar entity and wire up events ──
+        let tabs = vec![
+            Tab {
+                icon: icons::bluetooth,
+                tooltip: "Bluetooth Devices",
+            },
+            Tab {
+                icon: icons::audio_output,
+                tooltip: "Output Devices",
+            },
+            Tab {
+                icon: icons::audio_input,
+                tooltip: "Input Devices",
+            },
+            Tab {
+                icon: icons::audio_card,
+                tooltip: "Configuration",
+            },
+            Tab {
+                icon: icons::text_field_test,
+                tooltip: "Text Field Test",
+            },
+        ];
+        let tab_bar = cx.new(|cx| TabBar::new(tabs, 0, cx));
+        let tab_bar_sub = cx.subscribe(&tab_bar, {
+            move |this, _tb, event: &TabBarEvent, cx| match event {
+                TabBarEvent::TabClicked(idx) => {
+                    let new_page = match idx {
+                        0 => Page::BluetoothDevices,
+                        1 => Page::AudioOutputs,
+                        2 => Page::AudioInputs,
+                        3 => Page::Configuration,
+                        _ => Page::DevTest,
+                    };
+                    if this.active_page != new_page {
+                        this.active_page = new_page;
+                        this.tab_bar
+                            .update(cx, |tab_bar, cx| tab_bar.set_active_index(*idx, cx));
+                        cx.notify();
+                    }
+                }
+            }
+        });
+
         Self::spawn_bluetooth_command_handler(bt_cmd_rx, window, cx);
 
         let mut audio_state = AudioState::default();
@@ -104,6 +154,8 @@ impl BludioApp {
             configuration_page,
             dev_test_page,
             bluetooth_page,
+            tab_bar,
+            _tab_bar_sub: tab_bar_sub,
             active_page: Page::BluetoothDevices,
             focus_handle: cx.focus_handle(),
         }
@@ -127,7 +179,7 @@ impl BludioApp {
                     this.audio_input_page
                         .update(cx, |page, cx| page.sync_rows(&state, window, cx));
                     this.configuration_page
-                        .update(cx, |page, cx| page.sync_cards(&state, window, cx));
+                        .update(cx, |page, cx| page.sync_cards(&state, cx));
                     cx.notify();
                 });
             }
@@ -149,31 +201,31 @@ impl BludioApp {
             let adapter = match rx.await {
                 Ok(Ok((state, agent))) => {
                     let adapter = state.adapter.clone().unwrap();
-                    this.update_in(cx, |this, window, cx| {
+                    this.update_in(cx, |this, _window, cx| {
                         this.bt_state = state;
                         this.bt_agent = agent.ok();
                         this.bluetooth_page
-                            .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
+                            .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
                         cx.notify();
                     })
                     .ok();
                     adapter
                 }
                 Ok(Err(e)) => {
-                    this.update_in(cx, |this, window, cx| {
+                    this.update_in(cx, |this, _window, cx| {
                         this.bt_state.error = Some(e);
                         this.bluetooth_page
-                            .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
+                            .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
                         cx.notify();
                     })
                     .ok();
                     return;
                 }
                 Err(_) => {
-                    this.update_in(cx, |this, window, cx| {
+                    this.update_in(cx, |this, _window, cx| {
                         this.bt_state.error = Some("Bluetooth initialization cancelled".into());
                         this.bluetooth_page
-                            .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
+                            .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
                         cx.notify();
                     })
                     .ok();
@@ -212,10 +264,10 @@ impl BludioApp {
                     if let Ok(Some(device)) =
                         crate::tokio_task(async move { quick_device_status(&a, addr).await }).await
                     {
-                        let _ = this.update_in(cx, |this, window, cx| {
+                        let _ = this.update_in(cx, |this, _window, cx| {
                             this.bt_state.upsert_device(device);
                             this.bluetooth_page.update(cx, |page, cx| {
-                                page.sync_state(&this.bt_state, window, cx);
+                                page.sync_state(&this.bt_state, cx);
                             });
                             cx.notify();
                         });
@@ -231,10 +283,10 @@ impl BludioApp {
                             .read_with(cx, |app, _| devices_changed(&app.bt_state.devices, &fresh))
                             .unwrap_or(true);
                         if changed {
-                            let _ = this.update_in(cx, |this, window, cx| {
+                            let _ = this.update_in(cx, |this, _window, cx| {
                                 this.bt_state.replace_devices(fresh);
                                 this.bluetooth_page.update(cx, |page, cx| {
-                                    page.sync_state(&this.bt_state, window, cx);
+                                    page.sync_state(&this.bt_state, cx);
                                 });
                                 cx.notify();
                             });
@@ -272,7 +324,7 @@ impl BludioApp {
                                 .detach();
                             }
                             this.bluetooth_page
-                                .update(cx, |page, cx| page.sync_state(&this.bt_state, window, cx));
+                                .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
                             cx.notify();
                         });
                     }
@@ -292,7 +344,7 @@ impl BludioApp {
                                         Some(PairingStatus::Connecting);
                                 }
                                 this.bluetooth_page.update(cx, |page, cx| {
-                                    page.sync_state(&this.bt_state, window, cx);
+                                    page.sync_state(&this.bt_state, cx);
                                 });
                                 cx.notify();
 
@@ -302,7 +354,7 @@ impl BludioApp {
                                     let mut push_status =
                                         |status: Option<PairingStatus>| {
                                             let _ =
-                                                this.update_in(cx, |this, window, cx| {
+                                                this.update_in(cx, |this, _window, cx| {
                                                     if let Some(existing) = this
                                                         .bt_state
                                                         .devices
@@ -316,7 +368,6 @@ impl BludioApp {
                                                         |page, cx| {
                                                             page.sync_state(
                                                                 &this.bt_state,
-                                                                window,
                                                                 cx,
                                                             );
                                                         },
@@ -441,14 +492,13 @@ impl BludioApp {
                                     .await
                                     {
                                         let _ =
-                                            this.update_in(cx, |this, window, cx| {
+                                            this.update_in(cx, |this, _window, cx| {
                                                 this.bt_state.upsert_device(device);
                                                 this.bluetooth_page.update(
                                                     cx,
                                                     |page, cx| {
                                                         page.sync_state(
                                                             &this.bt_state,
-                                                            window,
                                                             cx,
                                                         );
                                                     },
@@ -470,14 +520,13 @@ impl BludioApp {
                                     .await
                                     {
                                         let _ =
-                                            this.update_in(cx, |this, window, cx| {
+                                            this.update_in(cx, |this, _window, cx| {
                                                 this.bt_state.replace_devices(devices);
                                                 this.bluetooth_page.update(
                                                     cx,
                                                     |page, cx| {
                                                         page.sync_state(
                                                             &this.bt_state,
-                                                            window,
                                                             cx,
                                                         );
                                                     },
@@ -516,14 +565,13 @@ impl BludioApp {
                                     .await
                                     {
                                         let _ =
-                                            this.update_in(cx, |this, window, cx| {
+                                            this.update_in(cx, |this, _window, cx| {
                                                 this.bt_state.upsert_device(device);
                                                 this.bluetooth_page.update(
                                                     cx,
                                                     |page, cx| {
                                                         page.sync_state(
                                                             &this.bt_state,
-                                                            window,
                                                             cx,
                                                         );
                                                     },
@@ -545,14 +593,13 @@ impl BludioApp {
                                     .await
                                     {
                                         let _ =
-                                            this.update_in(cx, |this, window, cx| {
+                                            this.update_in(cx, |this, _window, cx| {
                                                 this.bt_state.replace_devices(devices);
                                                 this.bluetooth_page.update(
                                                     cx,
                                                     |page, cx| {
                                                         page.sync_state(
                                                             &this.bt_state,
-                                                            window,
                                                             cx,
                                                         );
                                                     },
@@ -585,38 +632,6 @@ impl Render for BludioApp {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
 
-        let this = cx.weak_entity();
-
-        let tabs = [
-            tab_bar::Tab {
-                icon: icons::bluetooth,
-                tooltip: "Bluetooth Devices",
-            },
-            tab_bar::Tab {
-                icon: icons::audio_output,
-                tooltip: "Output Devices",
-            },
-            tab_bar::Tab {
-                icon: icons::audio_input,
-                tooltip: "Input Devices",
-            },
-            tab_bar::Tab {
-                icon: icons::audio_card,
-                tooltip: "Configuration",
-            },
-            tab_bar::Tab {
-                icon: icons::text_field_test,
-                tooltip: "Text Field Test",
-            },
-        ];
-        let active_tab_index = match active_page {
-            Page::BluetoothDevices => 0,
-            Page::AudioOutputs => 1,
-            Page::AudioInputs => 2,
-            Page::Configuration => 3,
-            Page::DevTest => 4,
-        };
-
         h_flex()
             .size_full()
             .items_stretch()
@@ -624,31 +639,7 @@ impl Render for BludioApp {
             .bg(colors.background)
             .text_color(colors.text)
             // ── Left tab bar ──
-            .child(tab_bar::tab_bar_view(
-                &tabs,
-                active_tab_index,
-                {
-                    let this = this.clone();
-                    move |idx: usize, _window: &mut Window, app: &mut gpui::App| {
-                        if let Some(this) = this.upgrade() {
-                            let new_page = match idx {
-                                0 => Page::BluetoothDevices,
-                                1 => Page::AudioOutputs,
-                                2 => Page::AudioInputs,
-                                3 => Page::Configuration,
-                                _ => Page::DevTest,
-                            };
-                            this.update(app, |this, cx| {
-                                if this.active_page != new_page {
-                                    this.active_page = new_page;
-                                    cx.notify();
-                                }
-                            });
-                        }
-                    }
-                },
-                cx,
-            ))
+            .child(self.tab_bar.clone())
             // ── Right content area ──
             .child(
                 v_flex()

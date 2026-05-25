@@ -128,12 +128,7 @@ impl Slider {
 
     /// Update value based on a mouse position relative to the slider's bounds.
     /// Called during click-to-jump and drag.
-    fn update_value_from_position(
-        &mut self,
-        position: Point<Pixels>,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn update_value_from_position(&mut self, position: Point<Pixels>, cx: &mut Context<Self>) {
         self.dragging = true;
         let Some(bounds) = self.bounds else {
             return;
@@ -252,8 +247,8 @@ impl RenderOnce for SliderBar {
                         MouseButton::Left,
                         window.listener_for(
                             &entity_drag,
-                            move |slider, e: &MouseDownEvent, window, cx| {
-                                slider.update_value_from_position(e.position, window, cx);
+                            move |slider, e: &MouseDownEvent, _window, cx| {
+                                slider.update_value_from_position(e.position, cx);
                             },
                         ),
                     )
@@ -263,12 +258,12 @@ impl RenderOnce for SliderBar {
                     })
                     .on_drag_move(window.listener_for(
                         &entity_drag,
-                        move |slider, e: &DragMoveEvent<DragSlider>, window, cx| match e.drag(cx) {
+                        move |slider, e: &DragMoveEvent<DragSlider>, _window, cx| match e.drag(cx) {
                             DragSlider(id) => {
                                 if *id != entity_id {
                                     return;
                                 }
-                                slider.update_value_from_position(e.event.position, window, cx);
+                                slider.update_value_from_position(e.event.position, cx);
                             }
                         },
                     ))

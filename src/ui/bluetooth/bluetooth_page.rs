@@ -41,12 +41,7 @@ impl BluetoothPage {
     /// Sync rows with the latest Bluetooth state.
     /// Creates/updates/removes rows to match the device list, and caches
     /// the discovering/error/initialized flags.
-    pub(crate) fn sync_state(
-        &mut self,
-        state: &BluetoothState,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    pub(crate) fn sync_state(&mut self, state: &BluetoothState, cx: &mut Context<Self>) {
         self.discovering = state.discovering;
         self.error.clone_from(&state.error);
         self.initialized = state.adapter.is_some();

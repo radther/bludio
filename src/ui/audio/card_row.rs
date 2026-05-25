@@ -39,7 +39,6 @@ impl CardRow {
         card: &CardInfo,
         cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
         wakeup: PaWakeup,
-        window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
         let display_name = card
@@ -58,9 +57,9 @@ impl CardRow {
                 .placeholder("unknown")
         });
 
-        let dropdown_sub = cx.subscribe_in(&profile_dropdown, window, {
+        let dropdown_sub = cx.subscribe(&profile_dropdown, {
             let cmd_tx = cmd_tx.clone();
-            move |this, _dd, event: &DdEvt, _window, _cx| {
+            move |this, _dd, event: &DdEvt, _cx| {
                 if let DdEvt::Selected(_idx, profile) = event {
                     let _ = cmd_tx.send(AudioCommand::SetCardProfile(
                         this.card_index,
