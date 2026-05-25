@@ -98,12 +98,12 @@ impl Render for BluetoothDeviceRow {
                 v_flex()
                     .child(
                         div()
-                            .styled(text_styles.heading)
+                            .styled(text_styles.body)
                             .child(SharedString::from(name)),
                     )
                     .child(
                         div()
-                            .styled(text_styles.body_small)
+                            .styled(text_styles.caption)
                             .text_color(colors.text_secondary)
                             .child(SharedString::from(addr_str)),
                     )

@@ -325,7 +325,7 @@ impl AudioDeviceRow {
             .gap_2()
             .child(
                 div()
-                    .styled(text_styles.heading)
+                    .styled(text_styles.body)
                     .child(SharedString::from(self.display_name.clone())),
             )
             .when(self.is_default, |el| {

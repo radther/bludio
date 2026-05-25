@@ -7,7 +7,8 @@
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, AudioState};
 use crate::ui::audio::card_row::CardRow;
-use crate::ui::{StyledExt, h_flex, v_flex};
+use crate::ui::components::page_header::page_header;
+use crate::ui::{h_flex, v_flex};
 use gpui::{Context, Entity, Render, SharedString, Window, div, prelude::*, px};
 
 // ── Configuration page entity ──────────────────────────────────────────────
@@ -68,8 +69,9 @@ impl ConfigurationPage {
 
 impl Render for ConfigurationPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let theme = crate::ui::theme::theme(cx);
+        let colors = &theme.colors;
+        let text_styles = &theme.text_styles;
 
         v_flex()
             .flex_1()
@@ -78,10 +80,7 @@ impl Render for ConfigurationPage {
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .bg(colors.surface)
-                    .border_b_1()
-                    .border_color(colors.border)
-                    .child(div().styled(text_styles.heading).child("Configuration")),
+                    .child(page_header("Configuration", "Audio hardware cards and profiles", colors, text_styles)),
             )
             .when_some(self.error.clone(), |el, err| {
                 el.child(

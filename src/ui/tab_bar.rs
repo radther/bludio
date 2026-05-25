@@ -78,7 +78,7 @@ impl TabBar {
     /// Create a new tab bar entity.
     pub(crate) fn new(tabs: Vec<Tab>, active_index: usize, cx: &mut Context<Self>) -> Self {
         Self {
-            indicator_offset: active_index as f32 * TAB_HEIGHT + 12.0,
+            indicator_offset: active_index as f32 * TAB_HEIGHT + 28.0,
             active_index,
             tabs,
             animation_generation: 0,
@@ -99,7 +99,7 @@ impl TabBar {
         let from = self.indicator_offset;
         self.animation_generation = self.animation_generation.wrapping_add(1);
         let generation = self.animation_generation;
-        let target = index as f32 * (TAB_HEIGHT) + 12.0;
+        let target = index as f32 * (TAB_HEIGHT) + 28.0;
 
         // ── Spawn animation driver (frame loop) ──
         cx.spawn(async move |this, cx| {
@@ -153,7 +153,7 @@ impl Render for TabBar {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = &theme::theme(cx).colors;
         let indicator_y = px(self.indicator_offset);
-        let active_index = self.active_index;
+        // let active_index = self.active_index;
         let entity = cx.entity().clone();
 
         // Build tab button elements
@@ -186,7 +186,7 @@ impl Render for TabBar {
         v_flex()
             .w(px(TAB_BAR_WIDTH))
             .h_full()
-            .pt_2()
+            .pt_6()
             .bg(colors.sidebar)
             // .border_r_1()
             // .border_color(colors.border)

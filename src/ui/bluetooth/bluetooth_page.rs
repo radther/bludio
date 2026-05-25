@@ -6,7 +6,8 @@
 use crate::bluetooth::BluetoothState;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
-use crate::ui::{StyledExt, h_flex, v_flex};
+use crate::ui::components::page_header::page_header;
+use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
     Context, CursorStyle, Entity, MouseButton, MouseUpEvent, Render, Window, div, prelude::*, px,
@@ -83,8 +84,9 @@ impl BluetoothPage {
 
 impl Render for BluetoothPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let theme = crate::ui::theme::theme(cx);
+        let colors = &theme.colors;
+        let text_styles = &theme.text_styles;
 
         let discovering = self.discovering;
         let initialized = self.initialized;
@@ -99,10 +101,7 @@ impl Render for BluetoothPage {
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .bg(colors.surface)
-                    .border_b_1()
-                    .border_color(colors.border)
-                    .child(div().styled(text_styles.heading).child("bluetooth"))
+                    .child(page_header("Bluetooth", "Discover and manage devices", colors, text_styles))
                     .child(
                         // Scan / Stop button
                         div()

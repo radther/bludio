@@ -7,7 +7,8 @@
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, AudioState, DeviceKind};
 use crate::ui::audio::device_row::AudioDeviceRow;
-use crate::ui::{StyledExt, h_flex, v_flex};
+use crate::ui::components::page_header::page_header;
+use crate::ui::{h_flex, v_flex};
 use gpui::{Context, Entity, Render, SharedString, Window, div, prelude::*, px};
 
 // ── Audio page entity ──────────────────────────────────────────────────────
@@ -116,12 +117,13 @@ impl AudioPage {
 
 impl Render for AudioPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let theme = crate::ui::theme::theme(cx);
+        let colors = &theme.colors;
+        let text_styles = &theme.text_styles;
 
-        let title = match self.kind {
-            DeviceKind::Output => "Output Devices",
-            DeviceKind::Input => "Input Devices",
+        let (title, caption) = match self.kind {
+            DeviceKind::Output => ("Output Devices", "Manage output devices"),
+            DeviceKind::Input => ("Input Devices", "Manage input devices"),
         };
 
         v_flex()
@@ -131,10 +133,7 @@ impl Render for AudioPage {
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .bg(colors.surface)
-                    .border_b_1()
-                    .border_color(colors.border)
-                    .child(div().styled(text_styles.heading).child(title)),
+                    .child(page_header(title, caption, colors, text_styles)),
             )
             .when_some(self.error.clone(), |el, err| {
                 el.child(

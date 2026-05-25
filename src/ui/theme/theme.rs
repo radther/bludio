@@ -117,17 +117,15 @@ pub(crate) struct ThemeColors {
 pub(crate) struct TextStyleSet {
     pub body: (gpui::AbsoluteLength, FontWeight),
     pub heading: (gpui::AbsoluteLength, FontWeight),
-    pub body_small: (gpui::AbsoluteLength, FontWeight),
     pub caption: (gpui::AbsoluteLength, FontWeight),
 }
 
 impl Default for TextStyleSet {
     fn default() -> Self {
         Self {
-            body: (gpui::rems(1.0).into(), FontWeight::NORMAL),
-            heading: (gpui::rems(1.0).into(), FontWeight::BOLD),
-            body_small: (gpui::rems(0.875).into(), FontWeight::NORMAL),
-            caption: (gpui::rems(0.75).into(), FontWeight::MEDIUM),
+            body: (gpui::rems(1.0).into(), FontWeight::MEDIUM),
+            heading: (gpui::rems(1.5).into(), FontWeight::EXTRA_BOLD),
+            caption: (gpui::rems(0.75).into(), FontWeight::BOLD),
         }
     }
 }

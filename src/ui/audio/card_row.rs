@@ -118,7 +118,7 @@ impl Render for CardRow {
                     .w_full()
                     .child(
                         div()
-                            .styled(text_styles.heading)
+                            .styled(text_styles.body)
                             .child(SharedString::from(self.display_name.clone())),
                     )
                     .when(self.profile_dropdown.read(cx).has_items(), |el| {
