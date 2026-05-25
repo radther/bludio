@@ -1,3 +1,5 @@
+//! BluetoothDevice data type, sorting, actions, and pairing status model.
+
 use bluer::Address;
 use std::fmt;
 

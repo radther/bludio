@@ -1,3 +1,7 @@
+//! Bludio — GPUI Bluetooth and audio manager.
+//!
+//! Entry point: Tokio bridge setup, font loading, theme init, window creation.
+
 mod app;
 mod audio;
 mod bluetooth;

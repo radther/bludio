@@ -8,9 +8,9 @@
 use crate::ui::h_flex;
 use gpui::{
     App, Bounds, ClipboardItem, Context, CursorStyle, Entity, EntityInputHandler, EventEmitter,
-    FocusHandle, Focusable, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent,
-    Pixels, Point, Render, RenderOnce, ShapedLine, SharedString, TextAlign, TextRun, Window,
-    canvas, point, prelude::*, px, size,
+    FocusHandle, Focusable, Hsla, IntoElement, KeyDownEvent, MouseButton, MouseDownEvent,
+    MouseMoveEvent, Pixels, Point, Render, RenderOnce, ShapedLine, SharedString, TextAlign,
+    TextRun, Window, canvas, point, prelude::*, px, size,
 };
 use std::ops::Range;
 use std::time::Duration;
@@ -567,11 +567,20 @@ impl Focusable for TextField {
 #[derive(IntoElement)]
 struct TextFieldComponent {
     entity: Entity<TextField>,
+    accent: Hsla,
+    text_placeholder: Hsla,
+    selection_background: Hsla,
 }
 
 impl TextFieldComponent {
-    fn new(entity: Entity<TextField>) -> Self {
-        Self { entity }
+    fn new(entity: Entity<TextField>, cx: &App) -> Self {
+        let colors = &crate::ui::theme::theme(cx).colors;
+        Self {
+            entity,
+            accent: colors.accent,
+            text_placeholder: colors.text_placeholder,
+            selection_background: colors.selection_background,
+        }
     }
 }
 
@@ -703,11 +712,12 @@ impl RenderOnce for TextFieldComponent {
                             let cursor = input.cursor_offset();
                             let align = input.align;
                             let style = window.text_style();
-                            let theme = crate::ui::theme::theme(cx);
-                            let colors = &theme.colors;
+                            let colors_accent = self.accent;
+                            let colors_text_placeholder = self.text_placeholder;
+                            let colors_selection_bg = self.selection_background;
 
                             let (display_text, text_color) = if content.is_empty() {
-                                (input.placeholder.clone(), colors.text_placeholder)
+                                (input.placeholder.clone(), colors_text_placeholder)
                             } else {
                                 (content, style.color)
                             };
@@ -760,7 +770,7 @@ impl RenderOnce for TextFieldComponent {
                                                 ),
                                                 size(px(2.), bounds.bottom() - bounds.top()),
                                             ),
-                                            colors.accent,
+                                            colors_accent,
                                         ))
                                     } else {
                                         None
@@ -781,7 +791,7 @@ impl RenderOnce for TextFieldComponent {
                                                 bounds.bottom(),
                                             ),
                                         ),
-                                        colors.selection_background,
+                                        colors_selection_bg,
                                     )),
                                     if focused && input.blink_visible {
                                         Some(gpui::fill(
@@ -792,7 +802,7 @@ impl RenderOnce for TextFieldComponent {
                                                 ),
                                                 size(px(2.), bounds.bottom() - bounds.top()),
                                             ),
-                                            colors.accent,
+                                            colors_accent,
                                         ))
                                     } else {
                                         None
@@ -872,6 +882,6 @@ impl RenderOnce for TextFieldComponent {
 
 impl Render for TextField {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        TextFieldComponent::new(cx.entity())
+        TextFieldComponent::new(cx.entity(), cx)
     }
 }

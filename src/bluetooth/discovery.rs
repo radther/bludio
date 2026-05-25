@@ -1,3 +1,5 @@
+//! Device discovery scan orchestration and full list refresh.
+
 use super::device;
 use super::properties::{self, PropertyTimeouts};
 use bluer::Adapter;

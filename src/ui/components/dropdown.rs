@@ -9,9 +9,10 @@
 
 use crate::ui::StyledExt;
 use gpui::{
-    Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity, EventEmitter, FocusHandle,
-    Focusable, IntoElement, KeyDownEvent, MouseButton, MouseUpEvent, Pixels, Render, RenderOnce,
-    SharedString, Window, anchored, canvas, deferred, div, prelude::*, px,
+    AbsoluteLength, Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity,
+    EventEmitter, FocusHandle, Focusable, FontWeight, Hsla, IntoElement, KeyDownEvent,
+    MouseButton, MouseUpEvent, Pixels, Render, RenderOnce, SharedString, Window, anchored,
+    canvas, deferred, div, prelude::*, px,
 };
 
 use crate::ui::v_flex;
@@ -106,11 +107,27 @@ impl Focusable for Dropdown {
 #[derive(IntoElement)]
 struct DropdownComponent {
     entity: Entity<Dropdown>,
+    bg: Hsla,
+    hover: Hsla,
+    accent: Hsla,
+    menu_bg: Hsla,
+    menu_border: Hsla,
+    caption: (AbsoluteLength, FontWeight),
 }
 
 impl DropdownComponent {
-    fn new(entity: Entity<Dropdown>) -> Self {
-        Self { entity }
+    fn new(entity: Entity<Dropdown>, cx: &App) -> Self {
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        Self {
+            entity,
+            bg: colors.element_background,
+            hover: colors.element_hover,
+            accent: colors.accent,
+            menu_bg: colors.menu_background,
+            menu_border: colors.menu_border,
+            caption: text_styles.caption,
+        }
     }
 }
 
@@ -129,9 +146,6 @@ impl RenderOnce for DropdownComponent {
                 d.trigger_bounds.map(|b| b.origin),
             )
         };
-        let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
-
         // Register click-outside-to-close when open (must happen during paint, not render).
         let click_outside = if is_open {
             let e = entity.clone();
@@ -174,22 +188,23 @@ impl RenderOnce for DropdownComponent {
                 deferred(
                     anchored_menu.child(
                         v_flex()
-                            .bg(colors.menu_background)
+                            .bg(self.menu_bg)
                             .border_1()
-                            .border_color(colors.menu_border)
+                            .border_color(self.menu_border)
                             .rounded_md()
                             .children(items.iter().enumerate().map(|(i, item)| {
                                 let item = item.clone();
                                 let is_active = i == selected_idx;
                                 let entity = entity.clone();
+                                let accent = self.accent;
                                 div()
                                     .id(SharedString::from(format!("dropdown-item-{i}")))
                                     .px_2()
                                     .py_1()
-                                    .styled(text_styles.caption)
+                                    .styled(self.caption)
                                     .cursor(CursorStyle::PointingHand)
-                                    .when(is_active, move |el| el.text_color(colors.accent))
-                                    .hover(|el| el.bg(colors.hover_overlay))
+                                    .when(is_active, move |el| el.text_color(accent))
+                                    .hover(|el| el.bg(self.hover))
                                     .child(SharedString::from(item.clone()))
                                     .on_mouse_up(MouseButton::Left, {
                                         let item = item.clone();
@@ -259,10 +274,10 @@ impl RenderOnce for DropdownComponent {
                     .px_2()
                     .py_1()
                     .rounded_sm()
-                    .styled(text_styles.caption)
-                    .bg(colors.element_background)
+                    .styled(self.caption)
+                    .bg(self.bg)
                     .cursor(CursorStyle::PointingHand)
-                    .hover(move |el| el.bg(colors.element_hover))
+                    .hover(move |el| el.bg(self.hover))
                     .child(selected.clone())
                     .on_mouse_up(
                         MouseButton::Left,
@@ -297,6 +312,6 @@ impl RenderOnce for DropdownComponent {
 
 impl Render for Dropdown {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        DropdownComponent::new(cx.entity())
+        DropdownComponent::new(cx.entity(), cx)
     }
 }

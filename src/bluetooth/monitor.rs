@@ -1,3 +1,5 @@
+//! Background D-Bus property-change monitoring via per-device event listeners.
+
 use std::collections::HashMap;
 
 use bluer::{Adapter, DeviceProperty};

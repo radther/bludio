@@ -1,3 +1,5 @@
+//! Bluetooth state management: session, adapter, device list, blueman-parity filtering.
+
 pub mod agent;
 pub mod device;
 pub mod discovery;
@@ -105,7 +107,7 @@ impl BluetoothState {
             let new_status = device
                 .pairing_status
                 .take()
-                .or(existing.pairing_status.take());
+                .or_else(|| existing.pairing_status.take());
             *existing = device;
             existing.pairing_status = new_status;
         } else {

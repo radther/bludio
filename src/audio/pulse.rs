@@ -332,6 +332,9 @@ fn execute_command(
 const PA_VOLUME_NORM: f64 = 65536.0;
 
 fn volume_f64_to_pa(vol: f64) -> Volume {
+    // SAFETY: volume is multiplied by PA_VOLUME_NORM (65536) and clamped to
+    // [0, Volume::MAX], so the cast to u32 never truncates significant bits or
+    // loses sign information.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let raw = (vol * PA_VOLUME_NORM) as u32;
     Volume(raw.clamp(0, Volume::MAX.0))

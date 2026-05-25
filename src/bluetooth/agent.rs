@@ -1,3 +1,5 @@
+//! Auto-accept pairing agent registered with BlueZ (test mode only).
+
 use bluer::agent::{RequestConfirmation, RequestPasskey};
 use std::sync::Arc;
 

@@ -1,3 +1,5 @@
+//! BlueZ property fetching with per-category timeouts and device filtering.
+
 use bluer::Device;
 use std::time::Duration;
 
