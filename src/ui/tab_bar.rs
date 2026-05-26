@@ -196,7 +196,7 @@ impl Render for TabBar {
             .child(
                 div()
                     .absolute()
-                    .right(px(2.0))
+                    .left(px(2.0))
                     .top(indicator_y)
                     .w(px(INDICATOR_WIDTH))
                     .h(px(TAB_HEIGHT - 8.0))

@@ -166,7 +166,8 @@ impl Render for BluetoothPage {
             // ── Device list ──
             .when(initialized, |el| {
                 el.child(
-                    div()
+                    v_flex()
+                        .gap_2()
                         .id("device-list")
                         .flex_1()
                         .overflow_y_scroll()
@@ -174,7 +175,6 @@ impl Render for BluetoothPage {
                             el.child(
                                 h_flex()
                                     .justify_center()
-                                    .h(px(200.0))
                                     .text_color(colors.text_secondary)
                                     .child("No devices. Press \"scan\" to discover."),
                             )

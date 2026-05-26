@@ -10,6 +10,7 @@ use bluer::Address;
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
     Context, CursorStyle, MouseButton, MouseUpEvent, Render, SharedString, Window, div, prelude::*,
+    px,
 };
 
 use super::BluetoothPageCommand;
@@ -80,96 +81,120 @@ impl Render for BluetoothDeviceRow {
 
         let pairing_status = self.pairing_status.as_ref();
 
+        let status_color = if let Some(ref status) = pairing_status {
+            match status {
+                PairingStatus::Connecting => colors.accent,
+                PairingStatus::Pairing => colors.warning,
+                PairingStatus::Trusting => colors.success,
+                PairingStatus::Failed(_) => colors.danger,
+            }
+        } else if connected {
+            colors.success
+        } else {
+            colors.text_secondary
+        };
+
         let cmd_tx = self.cmd_tx.clone();
 
         h_flex()
-            .justify_between()
+            .items_stretch()
             .id(SharedString::from(format!("device-{addr}")))
-            .px_4()
-            .border_b_1()
-            .border_color(colors.border_subtle)
             .hover(|el| el.bg(colors.hover_overlay))
             .child(
-                // ── Device info ──
-                v_flex()
-                    .child(
-                        div()
-                            .styled(text_styles.body)
-                            .child(SharedString::from(name)),
-                    )
-                    .child(
-                        div()
-                            .styled(text_styles.caption)
-                            .text_color(colors.text_secondary)
-                            .child(SharedString::from(addr_str)),
-                    )
-                    .child(div().styled(text_styles.caption).mt_0p5().child(
-                        if let Some(ref status) = pairing_status {
-                            let (dot_color, label): (gpui::Hsla, String) = match status {
-                                PairingStatus::Connecting => (colors.accent, status.to_string()),
-                                PairingStatus::Pairing => (colors.warning, status.to_string()),
-                                PairingStatus::Trusting => (colors.success, status.to_string()),
-                                PairingStatus::Failed(_) => (colors.danger, status.to_string()),
-                            };
-                            div().text_color(dot_color).child(format!("● {label}"))
-                        } else if connected {
-                            div().text_color(colors.success).child("● connected")
-                        } else if paired {
-                            div().text_color(colors.text_secondary).child("paired")
-                        } else {
-                            div().text_color(colors.text_secondary).child("discovered")
-                        },
-                    )),
+                // ── Status strip ──
+                div().relative().w_2().ml_2().child(
+                    div()
+                        .absolute()
+                        .left(px(0.))
+                        .top_0()
+                        .bottom_0()
+                        .w_2()
+                        .rounded_l_md()
+                        .rounded_r_xs()
+                        .bg(status_color),
+                ),
             )
             .child(
-                // ── Action buttons ──
-                h_flex().gap_1().map(move |mut btn_row| {
-                    if paired && !connected {
-                        btn_row = btn_row.child(action_btn(
-                            "Connect",
-                            colors.accent,
-                            colors.accent_hover,
-                            addr,
-                            DeviceRowAction::Connect,
-                            &cmd_tx,
-                            text_styles,
-                        ));
-                    }
-                    if connected {
-                        btn_row = btn_row.child(action_btn(
-                            "Disconnect",
-                            colors.danger,
-                            colors.danger_hover,
-                            addr,
-                            DeviceRowAction::Disconnect,
-                            &cmd_tx,
-                            text_styles,
-                        ));
-                    }
-                    if paired {
-                        btn_row = btn_row.child(action_btn(
-                            "Forget",
-                            colors.danger,
-                            colors.danger_hover,
-                            addr,
-                            DeviceRowAction::Forget,
-                            &cmd_tx,
-                            text_styles,
-                        ));
-                    }
-                    if !paired && pairing_status.is_none() {
-                        btn_row = btn_row.child(action_btn(
-                            "Pair & Trust",
-                            colors.accent,
-                            colors.accent_hover,
-                            addr,
-                            DeviceRowAction::PairAndTrust,
-                            &cmd_tx,
-                            text_styles,
-                        ));
-                    }
-                    btn_row
-                }),
+                h_flex()
+                    .justify_between()
+                    .px_4()
+                    .flex_1()
+                    .child(
+                        // ── Device info ──
+                        v_flex()
+                            .child(div().styled(text_styles.caption).mt_0p5().child(
+                                if let Some(ref status) = pairing_status {
+                                    div().text_color(status_color).child(status.to_string())
+                                } else if connected {
+                                    div().text_color(status_color).child("connected")
+                                } else if paired {
+                                    div().text_color(status_color).child("paired")
+                                } else {
+                                    div().text_color(status_color).child("discovered")
+                                },
+                            ))
+                            .child(
+                                div()
+                                    .styled(text_styles.body)
+                                    .child(SharedString::from(name)),
+                            )
+                            .child(
+                                div()
+                                    .styled(text_styles.body2)
+                                    .text_color(colors.muted)
+                                    .child(SharedString::from(addr_str)),
+                            ),
+                    )
+                    .child(
+                        // ── Action buttons ──
+                        h_flex().gap_1().map(move |mut btn_row| {
+                            if paired && !connected {
+                                btn_row = btn_row.child(action_btn(
+                                    "Connect",
+                                    colors.accent,
+                                    colors.accent_hover,
+                                    addr,
+                                    DeviceRowAction::Connect,
+                                    &cmd_tx,
+                                    text_styles,
+                                ));
+                            }
+                            if connected {
+                                btn_row = btn_row.child(action_btn(
+                                    "Disconnect",
+                                    colors.danger,
+                                    colors.danger_hover,
+                                    addr,
+                                    DeviceRowAction::Disconnect,
+                                    &cmd_tx,
+                                    text_styles,
+                                ));
+                            }
+                            if paired {
+                                btn_row = btn_row.child(action_btn(
+                                    "Forget",
+                                    colors.danger,
+                                    colors.danger_hover,
+                                    addr,
+                                    DeviceRowAction::Forget,
+                                    &cmd_tx,
+                                    text_styles,
+                                ));
+                            }
+                            if !paired && pairing_status.is_none() {
+                                btn_row = btn_row.child(action_btn(
+                                    "Pair & Trust",
+                                    colors.accent,
+                                    colors.accent_hover,
+                                    addr,
+                                    DeviceRowAction::PairAndTrust,
+                                    &cmd_tx,
+                                    text_styles,
+                                ));
+                            }
+                            btn_row
+                        }),
+                    ),
             )
     }
 }
