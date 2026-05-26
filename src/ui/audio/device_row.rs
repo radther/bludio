@@ -239,6 +239,8 @@ impl AudioDeviceRow {
         self.display_name.clone_from(&sink.description);
         self.pa_name.clone_from(&sink.name);
         self.volume = sink.volume;
+        self.muted = sink.muted;
+        self.is_default = sink.is_default;
 
         let profiles: Vec<String> = sink
             .available_profiles
