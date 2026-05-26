@@ -1,6 +1,7 @@
-//! Reusable UI components: dropdown, slider, text field, page header.
+//! Reusable UI components: dropdown, slider, text field, page header, status strip.
 
 pub mod dropdown;
 pub mod page_header;
 pub mod slider;
+pub mod status_strip;
 pub mod text_field;

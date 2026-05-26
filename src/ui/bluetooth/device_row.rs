@@ -10,11 +10,11 @@ use bluer::Address;
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
     Context, CursorStyle, MouseButton, MouseUpEvent, Render, SharedString, Window, div, prelude::*,
-    px,
 };
 
 use super::BluetoothPageCommand;
 use crate::bluetooth::device::{DeviceRowAction, PairingStatus};
+use crate::ui::components::status_strip::status_strip;
 use crate::ui::{h_flex, v_flex};
 
 // ── Row entity ─────────────────────────────────────────────────────────────
@@ -100,20 +100,7 @@ impl Render for BluetoothDeviceRow {
             .items_stretch()
             .id(SharedString::from(format!("device-{addr}")))
             .hover(|el| el.bg(colors.hover_overlay))
-            .child(
-                // ── Status strip ──
-                div().relative().w_2().ml_2().child(
-                    div()
-                        .absolute()
-                        .left(px(0.))
-                        .top_0()
-                        .bottom_0()
-                        .w_2()
-                        .rounded_l_md()
-                        .rounded_r_xs()
-                        .bg(status_color),
-                ),
-            )
+            .child(status_strip(status_color))
             .child(
                 h_flex()
                     .justify_between()

@@ -7,6 +7,7 @@
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, DeviceKind};
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
+use crate::ui::components::status_strip::status_strip;
 use crate::ui::components::slider::{Slider, SliderEvent, SliderState};
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use crate::ui::{StyledExt, h_flex, v_flex};
@@ -292,20 +293,30 @@ impl Render for AudioDeviceRow {
             }
         }
 
-        let (border_subtle, hover_overlay) = {
+        let (hover_overlay, status_color) = {
             let colors = &crate::ui::theme::theme(cx).colors;
-            (colors.border_subtle, colors.hover_overlay)
+            let status = if self.is_default {
+                colors.accent
+            } else {
+                colors.text_secondary
+            };
+            (colors.hover_overlay, status)
         };
 
-        v_flex()
-            .gap_3()
-            // .w_full()
+        h_flex()
+            .items_stretch()
             .id(SharedString::from(format!("adevice-{}", self.index)))
-            .pr_4()
-            .pl_8()
             .hover(|el| el.bg(hover_overlay))
-            .child(self.render_title_row(cx))
-            .child(self.render_volume_row(cx))
+            .child(status_strip(status_color))
+            .child(
+                v_flex()
+                    .gap_3()
+                    .pr_4()
+                    .pl_4()
+                    .flex_1()
+                    .child(self.render_title_row(cx))
+                    .child(self.render_volume_row(cx)),
+            )
     }
 }
 

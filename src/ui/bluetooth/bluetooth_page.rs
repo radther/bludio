@@ -10,7 +10,7 @@ use crate::ui::components::page_header::page_header;
 use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
-    Context, CursorStyle, Entity, MouseButton, MouseUpEvent, Render, Window, div, prelude::*, px,
+    Context, CursorStyle, Entity, MouseButton, MouseUpEvent, Render, Window, div, prelude::*,
 };
 
 // ── Page entity ────────────────────────────────────────────────────────────

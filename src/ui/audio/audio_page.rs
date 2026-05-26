@@ -125,23 +125,30 @@ impl Render for AudioPage {
         let (title, caption) = match self.kind {
             DeviceKind::Output => (
                 "Output Devices",
-                format!("{} output device{}", count, if count == 1 { "" } else { "s" }),
+                format!(
+                    "{} output device{}",
+                    count,
+                    if count == 1 { "" } else { "s" }
+                ),
             ),
             DeviceKind::Input => (
                 "Input Devices",
-                format!("{} input device{}", count, if count == 1 { "" } else { "s" }),
+                format!(
+                    "{} input device{}",
+                    count,
+                    if count == 1 { "" } else { "s" }
+                ),
             ),
         };
 
         v_flex()
             .flex_1()
-            .child(
-                h_flex()
-                    .justify_between()
-                    .px_4()
-                    .py_2()
-                    .child(page_header(title, caption, colors, text_styles)),
-            )
+            .child(h_flex().justify_between().px_4().py_2().child(page_header(
+                title,
+                caption,
+                colors,
+                text_styles,
+            )))
             .when_some(self.error.clone(), |el, err| {
                 el.child(
                     div()
@@ -175,7 +182,8 @@ impl Render for AudioPage {
             })
             .when(self.connected && !self.rows.is_empty(), |el| {
                 el.child(
-                    div()
+                    v_flex()
+                        .gap_2()
                         .id("audio-device-list")
                         .flex_1()
                         .overflow_y_scroll()
