@@ -1,20 +1,16 @@
 //! Self-contained horizontal slider component.
 //!
-//! Entity-based slider that renders as two overlapping rounded rectangles
-//! (background track + bordered fill). Supports click-to-jump and
-//! click-and-hold drag with out-of-bounds clamping.
+//! Follows the gpui-component pattern: `SliderState` (Entity) holds the
+//! value / range / step / bounds state, while `Slider` (`RenderOnce`) is
+//! the visual element. Callers configure the element with `.bg()` /
+//! `.text_color()` etc. to override the fill / track colors.
 //!
 //! Emits `SliderEvent`s via `cx.emit()` (`EventEmitter` pattern).
-//! Follows gpui-component's `SliderState` + `Slider` (`RenderOnce`) pattern.
-//!
-//! Architecture:
-//!   Slider (Entity) — holds state, emits events
-//!   `SliderBar` (`RenderOnce`) — renders the visual track + fill
 
 use gpui::{
     App, Bounds, Context, DragMoveEvent, Entity, EntityId, EventEmitter, FocusHandle, Focusable,
-    Hsla, IntoElement, MouseButton, MouseDownEvent, Pixels, Point, Render, RenderOnce, Window,
-    canvas, div, prelude::*, px, relative,
+    Hsla, IntoElement, MouseButton, MouseDownEvent, Pixels, Point, Render, RenderOnce,
+    Window, canvas, div, prelude::*, px, relative,
 };
 
 use crate::ui::h_flex;
@@ -47,14 +43,12 @@ impl Render for DragSlider {
     }
 }
 
-// ── Entity ─────────────────────────────────────────────────────────────────
+// ── SliderState (Entity) ───────────────────────────────────────────────────
 
-/// A self-contained horizontal slider.
-///
-/// Holds all mutable state (value, range, step, bounds). Emits `SliderEvent`s
-/// via the `EventEmitter` pattern. The visual rendering is handled by `SliderBar`
-/// (a `RenderOnce` component).
-pub(crate) struct Slider {
+/// Holds all mutable slider state (value, range, step, bounds).
+/// Emits `SliderEvent`s via the `EventEmitter` pattern.
+/// Colors and visual appearance are configured on the [`Slider`] element.
+pub(crate) struct SliderState {
     value: f64,
     min: f64,
     max: f64,
@@ -66,8 +60,8 @@ pub(crate) struct Slider {
     focus_handle: FocusHandle,
 }
 
-impl Slider {
-    /// Create a new slider with default range 0.0–1.0, value 0.0, continuous mode.
+impl SliderState {
+    /// Create a new slider state with default range 0.0–1.0, value 0.0, continuous mode.
     pub fn new(cx: &mut Context<Self>) -> Self {
         Self {
             value: 0.0,
@@ -84,6 +78,12 @@ impl Slider {
     pub fn set_value(&mut self, value: f64, cx: &mut Context<Self>) {
         self.value = value.clamp(self.min, self.max);
         cx.notify();
+    }
+
+    /// Get the current value.
+    #[allow(dead_code)]
+    pub fn value(&self) -> f64 {
+        self.value
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────
@@ -140,52 +140,61 @@ impl Slider {
 
 // ── EventEmitter + Focusable ─────────────────────────────────────────────
 
-impl EventEmitter<SliderEvent> for Slider {}
+impl EventEmitter<SliderEvent> for SliderState {}
 
-impl Focusable for Slider {
+impl Focusable for SliderState {
     fn focus_handle(&self, _app: &App) -> FocusHandle {
         self.focus_handle.clone()
     }
 }
 
-// ── SliderBar (RenderOnce element) ─────────────────────────────────────────
+// ── Slider (RenderOnce element) ────────────────────────────────────────────
 
-/// The visual representation of a Slider.
+/// The visual representation of a slider.
 ///
-/// Renders a horizontal track with a filled portion. The fill has a visible
-/// border while the background track does not. Supports click-to-jump and drag.
+/// Renders a horizontal track with a filled portion and supports
+/// click-to-jump and drag. Colors default to the current theme but can
+/// be overridden via `.fill_color()`.
 ///
 /// Use `#[derive(IntoElement)]` to auto-generate the `IntoElement` impl
-/// (wrapping in `Component<SliderBar>`).
+/// (wrapping in `Component<Slider>`).
 #[derive(IntoElement)]
-struct SliderBar {
-    entity: Entity<Slider>,
-    track_color: Hsla,
-    fill_color: Hsla,
-    border_color: Hsla,
+pub(crate) struct Slider {
+    state: Entity<SliderState>,
+    fill_color: Option<Hsla>,
 }
 
-impl SliderBar {
-    /// Create a new slider bar bound to the given Slider entity.
-    fn new(entity: Entity<Slider>, cx: &App) -> Self {
-        let colors = &crate::ui::theme::theme(cx).colors;
+impl Slider {
+    /// Create a new slider element bound to the given [`SliderState`] entity.
+    pub fn new(state: &Entity<SliderState>) -> Self {
         Self {
-            entity,
-            track_color: colors.element_background,
-            fill_color: colors.accent,
-            border_color: colors.accent,
+            state: state.clone(),
+            fill_color: None,
         }
+    }
+
+    /// Override the fill (and border) color. Defaults to the theme accent
+    /// if not set.
+    pub fn fill_color(mut self, color: Hsla) -> Self {
+        self.fill_color = Some(color);
+        self
     }
 }
 
-impl RenderOnce for SliderBar {
+impl RenderOnce for Slider {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let entity = self.entity.clone();
+        let entity = self.state.clone();
         let entity_id = entity.entity_id();
-        let fill = entity.read(cx).fill_fraction();
+        let state = entity.read(cx);
+        let fill = state.fill_fraction();
         // fill is in [0.0, 1.0] — lossless cast to f32
         #[allow(clippy::cast_possible_truncation)]
         let fill_w = relative(fill as f32);
+
+        // ── Colors: explicit override or theme default ──
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let fill_color = self.fill_color.unwrap_or(colors.accent);
+        let track_color = colors.element_background;
 
         // Entity clones for event handlers (each needs ownership for 'static lifetime)
         let entity_mouse = entity.clone();
@@ -197,13 +206,13 @@ impl RenderOnce for SliderBar {
             .flex_1()
             .on_mouse_up(
                 MouseButton::Left,
-                window.listener_for(&entity_mouse, |slider: &mut Slider, _, _, cx| {
+                window.listener_for(&entity_mouse, |slider: &mut SliderState, _, _, cx| {
                     slider.handle_release(cx);
                 }),
             )
             .on_mouse_up_out(
                 MouseButton::Left,
-                window.listener_for(&entity_mouse, |slider: &mut Slider, _, _, cx| {
+                window.listener_for(&entity_mouse, |slider: &mut SliderState, _, _, cx| {
                     slider.handle_release(cx);
                 }),
             )
@@ -242,7 +251,7 @@ impl RenderOnce for SliderBar {
                             .relative()
                             .w_full()
                             .h(px(20.0))
-                            .bg(self.track_color)
+                            .bg(track_color)
                             .rounded_sm()
                             .overflow_hidden()
                             .child(
@@ -252,9 +261,9 @@ impl RenderOnce for SliderBar {
                                     .top(px(0.0))
                                     .h(px(20.0))
                                     .w(fill_w)
-                                    .bg(self.fill_color)
+                                    .bg(fill_color)
                                     .border_1()
-                                    .border_color(self.border_color)
+                                    .border_color(fill_color)
                                     .rounded_sm(),
                             )
                             .child(
@@ -271,13 +280,5 @@ impl RenderOnce for SliderBar {
                             ),
                     ),
             )
-    }
-}
-
-// ── Render (Entity → RenderOnce) ──────────────────────────────────────────
-
-impl Render for Slider {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        SliderBar::new(cx.entity(), cx)
     }
 }

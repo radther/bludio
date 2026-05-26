@@ -7,7 +7,7 @@
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, DeviceKind};
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
-use crate::ui::components::slider::{Slider, SliderEvent};
+use crate::ui::components::slider::{Slider, SliderEvent, SliderState};
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use crate::ui::{StyledExt, h_flex, v_flex};
 use gpui::{
@@ -33,7 +33,7 @@ pub(crate) struct AudioDeviceRow {
     kind: DeviceKind,
     text_field: Entity<TextField>,
     profile_dropdown: Entity<crate::ui::components::dropdown::Dropdown>,
-    slider: Entity<Slider>,
+    slider: Entity<SliderState>,
     cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
     wakeup: PaWakeup,
     focus_handle: FocusHandle,
@@ -146,7 +146,7 @@ impl AudioDeviceRow {
 
         // ── Slider ──
         let slider = cx.new(|cx| {
-            let mut s = Slider::new(cx);
+            let mut s = SliderState::new(cx);
             s.set_value(params.volume, cx);
             s
         });
@@ -298,26 +298,56 @@ impl Render for AudioDeviceRow {
             (colors.border_subtle, colors.hover_overlay)
         };
 
-        h_flex()
-            .justify_between()
+        v_flex()
+            .w_full()
             .id(SharedString::from(format!("adevice-{}", self.index)))
             .px_4()
             .border_b_1()
             .border_color(border_subtle)
             .hover(|el| el.bg(hover_overlay))
-            .child(
-                v_flex()
-                    .w_full()
-                    .child(self.render_device_name(cx))
-                    .child(self.render_controls_row(cx)),
-            )
+            .child(self.render_title_row(cx))
+            .child(self.render_volume_row(cx))
     }
 }
 
 // ── Render sub-views ──────────────────────────────────────────────────────
 
 impl AudioDeviceRow {
-    /// Device name row with optional "● Default" badge.
+    /// Title row: device name on the left, action buttons on the right.
+    fn render_title_row(&self, cx: &mut Context<Self>) -> Div {
+        h_flex()
+            .justify_between()
+            .child(self.render_device_name(cx))
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(mute_button(
+                        SharedString::from(format!("mute-btn-{}", self.index)),
+                        self.muted,
+                        cx,
+                        {
+                            let cmd_tx = self.cmd_tx.clone();
+                            let kind = self.kind;
+                            let idx = self.index;
+                            let muted = self.muted;
+                            let wk = self.wakeup;
+                            move || {
+                                let _ = cmd_tx.send(AudioCommand::SetMute(kind, idx, !muted));
+                                wk.wake();
+                            }
+                        },
+                    ))
+                    .child(self.render_default_button(cx))
+                    .when(
+                        self.kind == DeviceKind::Output
+                            && self.card_index.is_some()
+                            && self.profile_dropdown.read(cx).has_items(),
+                        |el| el.child(self.profile_dropdown.clone()),
+                    ),
+            )
+    }
+
+    /// Device name with optional "● Default" badge.
     fn render_device_name(&self, cx: &App) -> Div {
         let colors = &crate::ui::theme::theme(cx).colors;
         let text_styles = &crate::ui::theme::theme(cx).text_styles;
@@ -338,13 +368,8 @@ impl AudioDeviceRow {
             })
     }
 
-    /// Volume bar + text field + mute + default button + profile selector.
-    fn render_controls_row(&self, cx: &mut Context<Self>) -> Div {
-        let idx = self.index;
-        let kind = self.kind;
-        let cmd_tx = self.cmd_tx.clone();
-        let wk = self.wakeup;
-
+    /// Volume row: slider spanning full width, with text field at the right end.
+    fn render_volume_row(&self, cx: &mut Context<Self>) -> Div {
         let colors = &crate::ui::theme::theme(cx).colors;
         let vol_color = if self.muted {
             colors.muted
@@ -355,8 +380,8 @@ impl AudioDeviceRow {
         h_flex()
             .w_full()
             .gap_2()
-            // ── Volume slider ──
-            .child(self.slider.clone())
+            // ── Volume slider (flex_1, takes all available space) ──
+            .child(Slider::new(&self.slider).fill_color(vol_color))
             // ── Inline text field for numeric volume ──
             .child(
                 h_flex()
@@ -364,31 +389,8 @@ impl AudioDeviceRow {
                     .h(px(BAR_HEIGHT))
                     .bg(colors.input_background)
                     .rounded_sm()
-                    .text_color(vol_color)
+                    .text_color(colors.text)
                     .child(self.text_field.clone()),
-            )
-            // ── Mute / Unmute button ──
-            .child(mute_button(
-                SharedString::from(format!("mute-btn-{idx}")),
-                self.muted,
-                cx,
-                {
-                    let muted = self.muted;
-                    let cmd = cmd_tx.clone();
-                    move || {
-                        let _ = cmd.send(AudioCommand::SetMute(kind, idx, !muted));
-                        wk.wake();
-                    }
-                },
-            ))
-            // ── Default button ──
-            .child(self.render_default_button(cx))
-            // ── Profile dropdown (output devices with profiles only) ──
-            .when(
-                self.kind == DeviceKind::Output
-                    && self.card_index.is_some()
-                    && self.profile_dropdown.read(cx).has_items(),
-                |el| el.child(self.profile_dropdown.clone()),
             )
     }
 
