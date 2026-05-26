@@ -52,6 +52,7 @@ pub(crate) struct BludioApp {
     /// Tab bar entity: owns tab selection visual state + animation.
     tab_bar: Entity<TabBar>,
     _tab_bar_sub: Subscription,
+    _keystroke_sub: Subscription,
     active_page: Page,
     focus_handle: FocusHandle,
 }
@@ -121,22 +122,28 @@ impl BludioApp {
         let tab_bar_sub = cx.subscribe(&tab_bar, {
             move |this, _tb, event: &TabBarEvent, cx| match event {
                 TabBarEvent::TabClicked(idx) => {
-                    let new_page = match idx {
-                        0 => Page::BluetoothDevices,
-                        1 => Page::AudioOutputs,
-                        2 => Page::AudioInputs,
-                        3 => Page::Configuration,
-                        _ => Page::DevTest,
-                    };
-                    if this.active_page != new_page {
-                        this.active_page = new_page;
-                        this.tab_bar
-                            .update(cx, |tab_bar, cx| tab_bar.set_active_index(*idx, cx));
-                        cx.notify();
-                    }
+                    Self::switch_to_tab(this, *idx, cx);
                 }
             }
         });
+
+        // ── Keyboard shortcuts ──
+        let keystroke_sub =
+            cx.observe_keystrokes(move |this, event: &gpui::KeystrokeEvent, _window, cx| {
+                if event.keystroke.modifiers.control {
+                    let idx = match event.keystroke.key.as_str() {
+                        "1" => Some(0),
+                        "2" => Some(1),
+                        "3" => Some(2),
+                        "4" => Some(3),
+                        "5" => Some(4),
+                        _ => None,
+                    };
+                    if let Some(idx) = idx {
+                        Self::switch_to_tab(this, idx, cx);
+                    }
+                }
+            });
 
         Self::spawn_bluetooth_command_handler(bt_cmd_rx, window, cx);
 
@@ -156,6 +163,7 @@ impl BludioApp {
             bluetooth_page,
             tab_bar,
             _tab_bar_sub: tab_bar_sub,
+            _keystroke_sub: keystroke_sub,
             active_page: Page::BluetoothDevices,
             focus_handle: cx.focus_handle(),
         }
@@ -452,6 +460,24 @@ impl BludioApp {
 
         // Refresh device state (regardless of success/failure).
         Self::refresh_device_after_action(adapter, addr, this, cx).await;
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────────
+
+    fn switch_to_tab(this: &mut Self, idx: usize, cx: &mut Context<Self>) {
+        let new_page = match idx {
+            0 => Page::BluetoothDevices,
+            1 => Page::AudioOutputs,
+            2 => Page::AudioInputs,
+            3 => Page::Configuration,
+            _ => Page::DevTest,
+        };
+        if this.active_page != new_page {
+            this.active_page = new_page;
+            this.tab_bar
+                .update(cx, |tab_bar, cx| tab_bar.set_active_index(idx, cx));
+            cx.notify();
+        }
     }
 
     // ── Bluetooth command handler ───────────────────────────────────────
