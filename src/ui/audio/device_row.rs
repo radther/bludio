@@ -15,8 +15,7 @@ use gpui::{
     Render, SharedString, Stateful, Subscription, Window, div, prelude::*, px,
 };
 
-const LABEL_WIDTH: f32 = 44.0;
-const BAR_HEIGHT: f32 = 20.0;
+const LABEL_WIDTH: f32 = 48.0;
 
 // ── Audio device row entity ────────────────────────────────────────────────
 
@@ -299,11 +298,11 @@ impl Render for AudioDeviceRow {
         };
 
         v_flex()
-            .w_full()
+            .gap_3()
+            // .w_full()
             .id(SharedString::from(format!("adevice-{}", self.index)))
-            .px_4()
-            .border_b_1()
-            .border_color(border_subtle)
+            .pr_4()
+            .pl_8()
             .hover(|el| el.bg(hover_overlay))
             .child(self.render_title_row(cx))
             .child(self.render_volume_row(cx))
@@ -371,6 +370,7 @@ impl AudioDeviceRow {
     /// Volume row: slider spanning full width, with text field at the right end.
     fn render_volume_row(&self, cx: &mut Context<Self>) -> Div {
         let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
         let vol_color = if self.muted {
             colors.muted
         } else {
@@ -379,17 +379,18 @@ impl AudioDeviceRow {
 
         h_flex()
             .w_full()
-            .gap_2()
+            .gap_4()
             // ── Volume slider (flex_1, takes all available space) ──
             .child(Slider::new(&self.slider).fill_color(vol_color))
             // ── Inline text field for numeric volume ──
             .child(
                 h_flex()
                     .w(px(LABEL_WIDTH))
-                    .h(px(BAR_HEIGHT))
-                    .bg(colors.input_background)
+                    .bg(colors.element_background)
                     .rounded_sm()
+                    // .p_2()
                     .text_color(colors.text)
+                    .styled(text_styles.caption)
                     .child(self.text_field.clone()),
             )
     }
