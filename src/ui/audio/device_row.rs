@@ -15,7 +15,6 @@ use gpui::{
     Render, SharedString, Stateful, Subscription, Window, div, prelude::*, px,
 };
 
-const ROW_HEIGHT: f32 = 64.0;
 const LABEL_WIDTH: f32 = 44.0;
 const BAR_HEIGHT: f32 = 20.0;
 
@@ -301,7 +300,6 @@ impl Render for AudioDeviceRow {
             .justify_between()
             .id(SharedString::from(format!("adevice-{}", self.index)))
             .px_4()
-            .h(px(ROW_HEIGHT))
             .border_b_1()
             .border_color(border_subtle)
             .hover(|el| el.bg(hover_overlay))

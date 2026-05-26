@@ -10,7 +10,6 @@ use bluer::Address;
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
     Context, CursorStyle, MouseButton, MouseUpEvent, Render, SharedString, Window, div, prelude::*,
-    px,
 };
 
 use super::BluetoothPageCommand;
@@ -68,8 +67,6 @@ impl BluetoothDeviceRow {
 
 // ── Render ─────────────────────────────────────────────────────────────────
 
-const ROW_HEIGHT: f32 = 64.0;
-
 impl Render for BluetoothDeviceRow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let addr = self.address;
@@ -89,7 +86,6 @@ impl Render for BluetoothDeviceRow {
             .justify_between()
             .id(SharedString::from(format!("device-{addr}")))
             .px_4()
-            .h(px(ROW_HEIGHT))
             .border_b_1()
             .border_color(colors.border_subtle)
             .hover(|el| el.bg(colors.hover_overlay))
