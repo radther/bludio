@@ -154,11 +154,10 @@ impl Render for TabBar {
         let colors = &theme::theme(cx).colors;
         let indicator_y = px(self.indicator_offset);
         // let active_index = self.active_index;
-        let entity = cx.entity().clone();
 
         // Build tab button elements
         let tab_buttons = self.tabs.iter().enumerate().map({
-            let entity = entity.clone();
+            let entity = cx.entity().clone();
             move |(i, tab)| {
                 // let is_active = i == active_index;
                 h_flex()
