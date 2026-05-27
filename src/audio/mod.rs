@@ -33,6 +33,8 @@ pub(crate) struct SinkInfo {
     pub(crate) name: String,
     /// Human-readable description (e.g., "Built-in Audio Analog Stereo").
     pub(crate) description: String,
+    /// Number of audio channels (e.g., 2 for stereo, 8 for 7.1).
+    pub(crate) channels: u8,
     /// Average volume across all channels, 0.0–1.0 (mapped from `PA_VOLUME_NORM`).
     pub(crate) volume: f64,
     pub(crate) muted: bool,
@@ -53,6 +55,8 @@ pub(crate) struct SourceInfo {
     pub(crate) index: u32,
     pub(crate) name: String,
     pub(crate) description: String,
+    /// Number of audio channels (e.g., 2 for stereo, 8 for 7.1).
+    pub(crate) channels: u8,
     pub(crate) volume: f64,
     pub(crate) muted: bool,
     pub(crate) is_default: bool,
@@ -93,7 +97,7 @@ pub(crate) struct ProfileInfo {
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug)]
 pub(crate) enum AudioCommand {
-    SetVolume(DeviceKind, u32, f64),
+    SetVolume(DeviceKind, u32, u8, f64),
     SetMute(DeviceKind, u32, bool),
     SetCardProfile(u32, String),
     SetDefaultSink(String),

@@ -28,6 +28,7 @@ pub(crate) struct AudioDeviceRow {
     card_index: Option<u32>,
     display_name: String,
     pa_name: String,
+    channels: u8,
     volume: f64,
     muted: bool,
     is_default: bool,
@@ -49,6 +50,7 @@ struct RowParams {
     index: u32,
     display_name: String,
     pa_name: String,
+    channels: u8,
     volume: f64,
     muted: bool,
     is_default: bool,
@@ -81,6 +83,7 @@ impl AudioDeviceRow {
                 index: sink.index,
                 display_name: sink.description.clone(),
                 pa_name: sink.name.clone(),
+                channels: sink.channels,
                 volume: sink.volume,
                 muted: sink.muted,
                 is_default: sink.is_default,
@@ -108,6 +111,7 @@ impl AudioDeviceRow {
                 index: source.index,
                 display_name: source.description.clone(),
                 pa_name: source.name.clone(),
+                channels: source.channels,
                 volume: source.volume,
                 muted: source.muted,
                 is_default: source.is_default,
@@ -158,9 +162,10 @@ impl AudioDeviceRow {
             move |this, _sl, event: &SliderEvent, _cx| {
                 let kind = this.kind;
                 let idx = this.index;
+                let channels = this.channels;
                 match event {
                     SliderEvent::Change(v) => {
-                        let _ = cmd_tx.send(AudioCommand::SetVolume(kind, idx, *v));
+                        let _ = cmd_tx.send(AudioCommand::SetVolume(kind, idx, channels, *v));
                         this.wakeup.wake();
                     }
                     SliderEvent::Release(_) => {}
@@ -172,7 +177,8 @@ impl AudioDeviceRow {
                 TextFieldEvent::Confirmed(text) => {
                     if let Ok(val) = text.parse::<f64>() {
                         let clamped = val.clamp(0.0, 100.0) / 100.0;
-                        let cmd = AudioCommand::SetVolume(this.kind, this.index, clamped);
+                        let cmd =
+                            AudioCommand::SetVolume(this.kind, this.index, this.channels, clamped);
                         let _ = this.cmd_tx.send(cmd);
                         this.wakeup.wake();
                         this.text_field.update(cx, |f, cx| {
@@ -214,6 +220,7 @@ impl AudioDeviceRow {
             card_index: params.card_index,
             display_name: params.display_name,
             pa_name: params.pa_name,
+            channels: params.channels,
             volume: params.volume,
             muted: params.muted,
             is_default: params.is_default,
@@ -239,6 +246,7 @@ impl AudioDeviceRow {
         self.card_index = sink.card_index;
         self.display_name.clone_from(&sink.description);
         self.pa_name.clone_from(&sink.name);
+        self.channels = sink.channels;
         self.volume = sink.volume;
         self.muted = sink.muted;
         self.is_default = sink.is_default;
@@ -267,6 +275,7 @@ impl AudioDeviceRow {
     ) {
         self.display_name.clone_from(&source.description);
         self.pa_name.clone_from(&source.name);
+        self.channels = source.channels;
         self.volume = source.volume;
         self.muted = source.muted;
         self.is_default = source.is_default;

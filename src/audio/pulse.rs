@@ -155,7 +155,7 @@ fn run_pa_loop(
 
         if let Ok(cmd) = cmd_rx.try_recv() {
             match &cmd {
-                AudioCommand::SetVolume(kind, idx, _) => {
+                AudioCommand::SetVolume(kind, idx, _, _) => {
                     vol_cmds.insert((*kind, *idx), cmd);
                 }
                 _ => other_cmds.push(cmd),
@@ -163,7 +163,7 @@ fn run_pa_loop(
         }
         while let Ok(cmd) = cmd_rx.try_recv() {
             match &cmd {
-                AudioCommand::SetVolume(kind, idx, _) => {
+                AudioCommand::SetVolume(kind, idx, _, _) => {
                     vol_cmds.insert((*kind, *idx), cmd);
                 }
                 _ => other_cmds.push(cmd),
@@ -229,11 +229,12 @@ fn execute_command(
     done: &DoneFlag,
 ) {
     match cmd {
-        AudioCommand::SetVolume(DeviceKind::Output, index, vol) => {
+        AudioCommand::SetVolume(DeviceKind::Output, index, channels, vol) => {
             let index = *index;
             let vol = *vol;
+            let channels = *channels;
             let v = volume_f64_to_pa(vol);
-            let cv = make_channel_volumes(v);
+            let cv = make_channel_volumes(channels, v);
             let mut intro = pa_ctx.borrow_mut().introspect();
             let d = done.clone();
             let _op = intro.set_sink_volume_by_index(
@@ -245,11 +246,12 @@ fn execute_command(
             );
             spin_until(ml, done);
         }
-        AudioCommand::SetVolume(DeviceKind::Input, index, vol) => {
+        AudioCommand::SetVolume(DeviceKind::Input, index, channels, vol) => {
             let index = *index;
             let vol = *vol;
+            let channels = *channels;
             let v = volume_f64_to_pa(vol);
-            let cv = make_channel_volumes(v);
+            let cv = make_channel_volumes(channels, v);
             let mut intro = pa_ctx.borrow_mut().introspect();
             let d = done.clone();
             let _op = intro.set_source_volume_by_index(
@@ -344,12 +346,9 @@ fn pa_volume_to_f64(vol: Volume) -> f64 {
     f64::from(vol.0) / PA_VOLUME_NORM
 }
 
-fn make_channel_volumes(v: Volume) -> pulse::volume::ChannelVolumes {
+fn make_channel_volumes(channels: u8, v: Volume) -> pulse::volume::ChannelVolumes {
     let mut cv = pulse::volume::ChannelVolumes::default();
-    // TODO: preserve channel count from the device instead of hardcoding 2.
-    // PulseAudio handles channel count mismatch for volume setting, but
-    // reading back from a multi-channel device may show a different value.
-    cv.set(2, v);
+    cv.set(channels, v);
     cv
 }
 
@@ -386,6 +385,7 @@ fn build_audio_state(
                         .as_ref()
                         .map(std::string::ToString::to_string)
                         .unwrap_or_default(),
+                    channels: si.volume.len(),
                     volume: pa_volume_to_f64(vol),
                     muted: si.mute,
                     is_default: false,
@@ -419,6 +419,7 @@ fn build_audio_state(
                         .as_ref()
                         .map(std::string::ToString::to_string)
                         .unwrap_or_default(),
+                    channels: si.volume.len(),
                     volume: pa_volume_to_f64(vol),
                     muted: si.mute,
                     is_default: false,
