@@ -1,10 +1,4 @@
-# tab-bar-navigation
-
-## Purpose
-
-Left-mounted icon tab bar providing page navigation for the application. Supports multiple pages with visual active-tab highlighting, hover effects, and tab click handling. The component is reusable and self-contained with no page-specific logic.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Left-mounted tab bar renders icon-only vertical tabs
 
@@ -23,12 +17,6 @@ The system SHALL render a `TabBar` entity as a fixed-width vertical tab bar on t
 - **THEN** it SHALL accept a `Vec<Tab>` where each `Tab` has an icon function (`fn() -> Svg`) and a tooltip string
 - **THEN** the `TabBar` SHALL not hard-code page names or domain-specific logic
 
-#### Scenario: Tab bar icons are loaded from SVG files
-
-- **WHEN** the application renders the tab bar
-- **THEN** each tab SHALL display an icon loaded from an SVG file in the icons directory
-- **THEN** icons SHALL be rendered at 16×16 pixels within the tab
-
 ### Requirement: Tab selection switches the active page
 
 The system SHALL allow users to click a tab icon to switch the main content area to the corresponding page. The `TabBar` entity SHALL emit a `TabBarEvent::TabClicked(index)` event. The parent (`BludioApp`) SHALL subscribe to this event and call `switch_to_tab()` to update the active page.
@@ -45,22 +33,6 @@ The system SHALL allow users to click a tab icon to switch the main content area
 - **WHEN** the user clicks the tab that is already active
 - **THEN** the `TabBar` SHALL still emit `TabBarEvent::TabClicked(index)`
 - **THEN** the parent SHALL detect `active_page == new_page` and skip the update
-
-### Requirement: Active tab is visually highlighted
-
-The system SHALL visually distinguish the active tab from inactive tabs through background color. The active tab background SHALL use a contrasting surface color. Inactive tabs SHALL show a hover effect on mouse-over.
-
-#### Scenario: Active tab has distinct background
-
-- **WHEN** a tab is the active tab
-- **THEN** its background color SHALL differ from inactive tabs
-- **THEN** the active tab background SHALL contrast with the tab bar background
-
-#### Scenario: Hovering an inactive tab shows visual feedback
-
-- **WHEN** the user moves the mouse over an inactive tab
-- **THEN** the tab SHALL change its background color to indicate hover state
-- **THEN** the cursor SHALL change to a pointing hand
 
 ### Requirement: Five tabs are configured
 

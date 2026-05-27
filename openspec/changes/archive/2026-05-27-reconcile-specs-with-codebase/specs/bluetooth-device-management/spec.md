@@ -1,10 +1,4 @@
-# bluetooth-device-management
-
-## Purpose
-
-Manage Bluetooth devices via the BlueZ D-Bus interface. Provides a scrollable UI list of known devices with per-device action buttons (connect, disconnect, forget, pair+trust), real-time device scanning with name resolution, and reactive state tracking via D-Bus property-change signals.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Application displays a scrollable list of Bluetooth devices
 

@@ -1,24 +1,4 @@
-# app-shell
-
-## Purpose
-
-The minimal GPUI application shell that opens a window and renders the app identity. This is the visual foundation all future features compose into.
-
-## Requirements
-
-### Requirement: Application launches and opens a window
-
-The system SHALL compile as a Rust binary that, when executed, opens a native OS window using the GPUI rendering pipeline.
-
-#### Scenario: Binary compiles successfully
-
-- **WHEN** `cargo build` is run in the project root
-- **THEN** the build completes without errors
-
-#### Scenario: Application starts and creates a window
-
-- **WHEN** the compiled binary is executed
-- **THEN** a native OS window opens with no terminal output errors
+## MODIFIED Requirements
 
 ### Requirement: Window uses reasonable default dimensions
 
@@ -103,6 +83,8 @@ The system SHALL render the `ConfigurationPage` entity in the content area when 
 - **THEN** the right content area SHALL display the `ConfigurationPage` entity
 - **THEN** the page SHALL show a scrollable list of card rows
 - **THEN** each card row SHALL include a display name and a profile dropdown
+
+## ADDED Requirements
 
 ### Requirement: App applies theme colors and font at root level
 

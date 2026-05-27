@@ -1,10 +1,4 @@
-# audio-device-management
-
-## Purpose
-
-Display and manage PulseAudio audio devices (sinks and sources), including device properties, card profiles, and default device selection.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Output devices are listed with properties
 
@@ -71,32 +65,6 @@ The system SHALL display the active card profile for each output device row (whe
 - **THEN** the system SHALL send `AudioCommand::SetCardProfile` with the card index and selected profile name
 - **THEN** the PA wakeup SHALL be triggered
 - **THEN** the dropdown SHALL display the newly selected profile after state refresh
-
-### Requirement: Default output device can be set
-
-The system SHALL allow the user to set any sink as the system default output device. The operation SHALL use PulseAudio's `set_default_sink` operation and the UI SHALL reflect the change.
-
-#### Scenario: Setting a sink as default
-
-- **WHEN** the user activates the "set default" control on a non-default sink
-- **THEN** the system SHALL call `set_default_sink` with that sink's name
-- **THEN** that sink SHALL become marked as the default
-- **THEN** the previously default sink SHALL lose its default indicator
-
-#### Scenario: Default sink is visually indicated
-
-- **WHEN** a sink is the system default output device
-- **THEN** its row in the output devices list SHALL display a default indicator (e.g., "● Default" badge)
-
-### Requirement: Default input device can be set
-
-The system SHALL allow the user to set any source as the system default input device. The operation SHALL use PulseAudio's `set_default_source` operation and the UI SHALL reflect the change.
-
-#### Scenario: Setting a source as default
-
-- **WHEN** the user activates the "set default" control on a non-default source
-- **THEN** the system SHALL call `set_default_source` with that source's name
-- **THEN** that source SHALL become marked as the default
 
 ### Requirement: Device list reacts to external changes
 

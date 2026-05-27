@@ -1,10 +1,4 @@
-# audio-volume-control
-
-## Purpose
-
-Volume adjustment and mute toggling for PulseAudio audio devices (sinks and sources) via interactive UI controls including a clickable volume bar, text field for numeric entry, and mute button.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Volume level is displayed and adjustable per device
 
@@ -98,21 +92,6 @@ The system SHALL provide a mute toggle button for each audio device. Activating 
 
 - **WHEN** a device is muted or unmuted externally (e.g., via `pactl set-sink-mute`)
 - **THEN** the mute button label and colors SHALL update to reflect the new state
-
-### Requirement: Volume control is compatible with both output and input devices
-
-The volume bar and mute toggle SHALL work identically for both output devices (sinks) and input devices (sources), using the appropriate PulseAudio operations for each device type.
-
-#### Scenario: Volume bar works on input device
-
-- **WHEN** the user adjusts volume on an input device (source)
-- **THEN** the system SHALL call the source-specific volume set operation
-- **THEN** the input device's volume SHALL be updated
-
-#### Scenario: Mute toggle works on input device
-
-- **WHEN** the user toggles mute on an input device (source)
-- **THEN** the system SHALL call the source-specific mute operation
 
 ### Requirement: Slider communicates via EventEmitter
 

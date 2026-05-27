@@ -1,12 +1,4 @@
-# Theme System
-
-**Purpose:** Centralized design token system providing semantic color tokens, font configuration, text style roles, and light/dark theme switching. All UI components reference theme values rather than hardcoded colors.
-
-**Status:** Implemented (see `src/ui/theme/` module)
-
----
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Theme provides semantic color tokens
 The system SHALL provide a `ThemeColors` struct with named color fields for background levels, text, accent colors, borders, and status indicators. All UI components MUST reference theme colors rather than hardcoded values.
