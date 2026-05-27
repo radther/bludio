@@ -11,8 +11,6 @@ mod rose_pine_dawn_theme;
 mod rose_pine_theme;
 mod types;
 
-#[allow(unused_imports)]
 pub(crate) use rose_pine_dawn_theme::rose_pine_dawn;
-#[allow(unused_imports)]
 pub(crate) use rose_pine_theme::rose_pine;
 pub(crate) use types::*;
