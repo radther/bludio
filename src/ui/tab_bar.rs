@@ -14,8 +14,8 @@ use crate::ui::theme;
 use crate::ui::tooltip;
 use crate::ui::v_flex;
 use gpui::{
-    App, Context, CursorStyle, EventEmitter, FocusHandle, Focusable, MouseButton, MouseUpEvent,
-    Render, SharedString, Window, div, prelude::*, px,
+    App, ClickEvent, Context, CursorStyle, EventEmitter, FocusHandle, Focusable, Render,
+    SharedString, Window, div, prelude::*, px,
 };
 use std::time::{Duration, Instant};
 
@@ -172,9 +172,9 @@ impl Render for TabBar {
                     .tooltip(tooltip::tooltip_text(tab.tooltip))
                     .hover(move |el| el.bg(colors.element_hover))
                     .child((tab.icon)().text_color(colors.text_secondary))
-                    .on_mouse_up(MouseButton::Left, {
+                    .on_click({
                         let entity = entity.clone();
-                        move |_: &MouseUpEvent, _window, app_cx: &mut App| {
+                        move |_: &ClickEvent, _window, app_cx: &mut App| {
                             entity.update(app_cx, |_this, entity_cx| {
                                 entity_cx.emit(TabBarEvent::TabClicked(i));
                             });

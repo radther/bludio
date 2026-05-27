@@ -10,9 +10,7 @@ use crate::ui::components::page_header::page_header;
 use crate::ui::icons;
 use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
-use gpui::{
-    Context, CursorStyle, Entity, MouseButton, MouseUpEvent, Render, Window, div, prelude::*, px,
-};
+use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Window, div, prelude::*, px};
 
 // ── Page entity ────────────────────────────────────────────────────────────
 
@@ -139,9 +137,9 @@ impl Render for BluetoothPage {
                                     .h(px(24.0))
                                     .text_color(icon_color),
                             )
-                            .on_mouse_up(MouseButton::Left, {
+                            .on_click({
                                 let cmd_tx = cmd_tx.clone();
-                                move |_: &MouseUpEvent, _window, _app| {
+                                move |_: &ClickEvent, _window, _app| {
                                     let _ = cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
                                 }
                             })

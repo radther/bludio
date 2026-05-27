@@ -4,9 +4,7 @@
 //! Disconnect, Mute, Default, etc.
 
 use crate::ui::StyledExt;
-use gpui::{
-    CursorStyle, Div, Hsla, MouseButton, MouseUpEvent, SharedString, Stateful, div, prelude::*,
-};
+use gpui::{ClickEvent, CursorStyle, Div, Hsla, SharedString, Stateful, div, prelude::*};
 
 use super::super::theme::TextStyleSet;
 
@@ -36,7 +34,7 @@ pub fn action_btn(
         .cursor(CursorStyle::PointingHand)
         .hover(move |el| el.bg(hover_bg))
         .child(label.into())
-        .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, _window, _cx| {
+        .on_click(move |_: &ClickEvent, _window, _cx| {
             on_click();
         })
 }

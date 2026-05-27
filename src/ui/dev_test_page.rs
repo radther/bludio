@@ -5,8 +5,8 @@
 //! entries + theme toggle buttons.
 
 use gpui::{
-    App, Context, CursorStyle, Entity, FocusHandle, Focusable, MouseButton, MouseUpEvent, Render,
-    SharedString, Subscription, Window, div, prelude::*, px,
+    App, ClickEvent, Context, CursorStyle, Entity, FocusHandle, Focusable, Render, SharedString,
+    Subscription, Window, div, prelude::*, px,
 };
 
 use crate::ui::components::page_header::page_header;
@@ -105,6 +105,7 @@ impl Render for DevTestPage {
                     .child(
                         h_flex().gap_1().child(
                             div()
+                                .id("focus-input-btn")
                                 .styled(text_styles.caption)
                                 .text_color(colors.text_secondary)
                                 .px_2()
@@ -113,12 +114,9 @@ impl Render for DevTestPage {
                                 .bg(colors.element_background)
                                 .cursor(CursorStyle::PointingHand)
                                 .hover(|el| el.bg(colors.element_hover))
-                                .on_mouse_up(
-                                    MouseButton::Left,
-                                    move |_: &MouseUpEvent, window, app| {
-                                        window.focus(&focus_handle, app);
-                                    },
-                                )
+                                .on_click(move |_: &ClickEvent, window, app| {
+                                    window.focus(&focus_handle, app);
+                                })
                                 .child("Click to focus input"),
                         ),
                     ),
@@ -200,7 +198,7 @@ fn dark_theme_btn(
             })
         })
         .child("Dark")
-        .on_mouse_up(MouseButton::Left, |_: &MouseUpEvent, _, cx| {
+        .on_click(|_: &ClickEvent, _, cx| {
             theme::set_theme(theme::rose_pine(), cx);
         })
 }
@@ -226,7 +224,7 @@ fn light_theme_btn(
             })
         })
         .child("Light")
-        .on_mouse_up(MouseButton::Left, |_: &MouseUpEvent, _, cx| {
+        .on_click(|_: &ClickEvent, _, cx| {
             theme::set_theme(theme::rose_pine_dawn(), cx);
         })
 }
