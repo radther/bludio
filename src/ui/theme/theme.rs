@@ -44,16 +44,14 @@ pub(crate) struct ThemeColors {
     pub surface: Hsla,
     /// Sidebar/tab bar background.
     pub sidebar: Hsla,
+
     /// Button, input, element background.
     pub element_background: Hsla,
     /// Button/element hover state.
     pub element_hover: Hsla,
-    /// Button/element selected state.
-    pub element_selected: Hsla,
+
     /// Text input field background.
     pub input_background: Hsla,
-    /// Dropdown/context menu background.
-    pub menu_background: Hsla,
 
     // ── Text colors ────────────────────────────────────────────────────
     /// Primary body text.
@@ -62,6 +60,8 @@ pub(crate) struct ThemeColors {
     pub text_secondary: Hsla,
     /// Muted/placeholder text in inputs.
     pub text_placeholder: Hsla,
+    /// Text color for colored buttons.
+    pub text_colored_button: Hsla,
 
     // ── Borders ────────────────────────────────────────────────────────
     /// Primary border (panel separators, input borders).
@@ -70,16 +70,16 @@ pub(crate) struct ThemeColors {
     pub border_subtle: Hsla,
 
     // ── Accent / Interactive ───────────────────────────────────────────
-    /// Primary accent (buttons, highlights, active selections).
-    pub accent: Hsla,
-    /// Accent hover state.
-    pub accent_hover: Hsla,
+    /// Bluetooth accent color.
+    pub bluetooth_accent: Hsla,
+    /// Audio accent color.
+    pub audio_accent: Hsla,
+    /// Developer accent color.
+    pub dev_accent: Hsla,
 
     // ── Status colors ──────────────────────────────────────────────────
     /// Error/danger (destructive actions, error text).
     pub danger: Hsla,
-    /// Danger hover state.
-    pub danger_hover: Hsla,
     /// Warning (cautionary states).
     pub warning: Hsla,
     /// Success (connected, completed states).

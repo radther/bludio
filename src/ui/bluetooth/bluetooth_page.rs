@@ -7,10 +7,11 @@ use crate::bluetooth::BluetoothState;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
 use crate::ui::components::page_header::page_header;
+use crate::ui::icons;
 use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{
-    Context, CursorStyle, Entity, MouseButton, MouseUpEvent, Render, Window, div, prelude::*,
+    Context, CursorStyle, Entity, MouseButton, MouseUpEvent, Render, Window, div, prelude::*, px,
 };
 
 // ── Page entity ────────────────────────────────────────────────────────────
@@ -113,34 +114,43 @@ impl Render for BluetoothPage {
                         colors,
                         text_styles,
                     ))
-                    .child(
-                        // Scan / Stop button
-                        div()
+                    .child({
+                        let (btn_bg, btn_hover, icon_color) = if discovering {
+                            (
+                                colors.danger,
+                                colors.danger,
+                                colors.text_colored_button,
+                            )
+                        } else {
+                            (
+                                colors.element_background,
+                                colors.element_hover,
+                                colors.text_secondary,
+                            )
+                        };
+                        h_flex()
                             .id("scan-btn")
-                            .px_3()
-                            .py_1()
-                            .rounded_md()
-                            .bg(if discovering {
-                                colors.danger
-                            } else {
-                                colors.accent
-                            })
+                            .justify_center()
+                            .w(px(48.0))
+                            .h(px(48.0))
+                            .rounded_lg()
+                            .bg(btn_bg)
                             .cursor(CursorStyle::PointingHand)
-                            .hover(|el| {
-                                el.bg(if discovering {
-                                    colors.danger_hover
-                                } else {
-                                    colors.accent_hover
-                                })
-                            })
-                            .child(if discovering { "stop" } else { "scan" })
+                            .hover(move |el| el.bg(btn_hover))
+                            .child(
+                                icons::bluetooth()
+                                    .w(px(24.0))
+                                    .h(px(24.0))
+                                    .text_color(icon_color),
+                            )
                             .on_mouse_up(MouseButton::Left, {
                                 let cmd_tx = cmd_tx.clone();
                                 move |_: &MouseUpEvent, _window, _app| {
-                                    let _ = cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
+                                    let _ =
+                                        cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
                                 }
-                            }),
-                    ),
+                            })
+                    }),
             )
             // ── Error banner ──
             .when_some(self.error.clone(), |el, err| {

@@ -200,7 +200,7 @@ impl Render for TabBar {
                     .top(indicator_y)
                     .w(px(INDICATOR_WIDTH))
                     .h(px(TAB_HEIGHT - 8.0))
-                    .bg(colors.accent)
+                    .bg(colors.audio_accent)
                     .rounded_full(),
             )
     }

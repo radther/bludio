@@ -139,7 +139,7 @@ impl Render for DevTestPage {
                             .child(
                                 div()
                                     .styled(text_styles.heading)
-                                    .text_color(colors.accent)
+                                    .text_color(colors.dev_accent)
                                     .child(format!("Confirmed ({})", self.confirmed_texts.len())),
                             ),
                     )
@@ -187,14 +187,14 @@ fn dark_theme_btn(
         .rounded_sm()
         .styled(text_styles.caption)
         .bg(if is_dark {
-            colors.accent
+            colors.dev_accent
         } else {
             colors.element_background
         })
         .cursor(CursorStyle::PointingHand)
         .hover(|el| {
             el.bg(if is_dark {
-                colors.accent
+                colors.dev_accent
             } else {
                 colors.element_hover
             })
@@ -216,15 +216,11 @@ fn light_theme_btn(
         .py_1()
         .rounded_sm()
         .styled(text_styles.caption)
-        .bg(if !is_dark {
-            colors.accent
-        } else {
-            colors.element_background
-        })
+        .bg(colors.dev_accent)
         .cursor(CursorStyle::PointingHand)
         .hover(|el| {
             el.bg(if !is_dark {
-                colors.accent
+                colors.dev_accent
             } else {
                 colors.element_hover
             })

@@ -6,14 +6,15 @@
 
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, DeviceKind};
+use crate::ui::components::button::action_btn;
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
-use crate::ui::components::status_strip::status_strip;
 use crate::ui::components::slider::{Slider, SliderEvent, SliderState};
+use crate::ui::components::status_strip::status_strip;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use crate::ui::{StyledExt, h_flex, v_flex};
 use gpui::{
-    App, Context, CursorStyle, Div, Entity, FocusHandle, Focusable, MouseButton, MouseUpEvent,
-    Render, SharedString, Stateful, Subscription, Window, div, prelude::*, px,
+    App, Context, Div, Entity, FocusHandle, Focusable, Render, SharedString, Stateful, Subscription,
+    Window, div, prelude::*, px,
 };
 
 const LABEL_WIDTH: f32 = 48.0;
@@ -296,7 +297,7 @@ impl Render for AudioDeviceRow {
         let (hover_overlay, status_color) = {
             let colors = &crate::ui::theme::theme(cx).colors;
             let status = if self.is_default {
-                colors.accent
+                colors.audio_accent
             } else {
                 colors.text_secondary
             };
@@ -325,16 +326,37 @@ impl Render for AudioDeviceRow {
 impl AudioDeviceRow {
     /// Title row: device name on the left, action buttons on the right.
     fn render_title_row(&self, cx: &mut Context<Self>) -> Div {
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+
+        let (mute_label, mute_bg, mute_hover, mute_text) = if self.muted {
+            (
+                "Unmute",
+                colors.danger,
+                colors.danger,
+                colors.text_colored_button,
+            )
+        } else {
+            (
+                "Mute",
+                colors.element_background,
+                colors.element_hover,
+                colors.text,
+            )
+        };
+
         h_flex()
             .justify_between()
             .child(self.render_device_name(cx))
             .child(
                 h_flex()
                     .gap_2()
-                    .child(mute_button(
-                        SharedString::from(format!("mute-btn-{}", self.index)),
-                        self.muted,
-                        cx,
+                    .child(action_btn(
+                        format!("mute-btn-{}", self.index),
+                        mute_label,
+                        mute_bg,
+                        mute_hover,
+                        mute_text,
                         {
                             let cmd_tx = self.cmd_tx.clone();
                             let kind = self.kind;
@@ -346,6 +368,7 @@ impl AudioDeviceRow {
                                 wk.wake();
                             }
                         },
+                        text_styles,
                     ))
                     .child(self.render_default_button(cx))
                     .when(
@@ -372,8 +395,8 @@ impl AudioDeviceRow {
                 el.child(
                     div()
                         .styled(text_styles.caption)
-                        .text_color(colors.accent)
-                        .child("● Default"),
+                        .text_color(colors.audio_accent)
+                        .child("Default"),
                 )
             })
     }
@@ -385,7 +408,7 @@ impl AudioDeviceRow {
         let vol_color = if self.muted {
             colors.muted
         } else {
-            colors.accent
+            colors.audio_accent
         };
 
         h_flex()
@@ -416,9 +439,11 @@ impl AudioDeviceRow {
         let text_styles = &crate::ui::theme::theme(cx).text_styles;
 
         action_btn(
+            format!("btn-default-{}", self.index),
             "Default",
-            colors.accent,
-            colors.accent_hover,
+            colors.audio_accent,
+            colors.audio_accent,
+            colors.text_colored_button,
             move || {
                 let _ = match kind {
                     DeviceKind::Output => {
@@ -433,62 +458,4 @@ impl AudioDeviceRow {
             text_styles,
         )
     }
-}
-
-// ── Mute button ────────────────────────────────────────────────────────────
-
-fn mute_button(
-    id: SharedString,
-    muted: bool,
-    cx: &App,
-    on_toggle: impl Fn() + 'static,
-) -> Stateful<Div> {
-    let lbl = if muted { "Unmute" } else { "Mute" };
-    let colors = &crate::ui::theme::theme(cx).colors;
-    let text_styles = &crate::ui::theme::theme(cx).text_styles;
-    let bg = if muted {
-        colors.danger
-    } else {
-        colors.element_background
-    };
-    let hbg = if muted {
-        colors.danger_hover
-    } else {
-        colors.element_hover
-    };
-    div()
-        .id(id)
-        .px_2()
-        .py_1()
-        .rounded_sm()
-        .styled(text_styles.caption)
-        .bg(bg)
-        .cursor(CursorStyle::PointingHand)
-        .hover(move |el| el.bg(hbg))
-        .child(SharedString::from(lbl))
-        .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, _, _| on_toggle())
-}
-
-// ── Action button ──────────────────────────────────────────────────────────
-
-fn action_btn(
-    label: &str,
-    bg: gpui::Hsla,
-    hover_bg: gpui::Hsla,
-    on_click: impl Fn() + 'static,
-    text_styles: &crate::ui::theme::TextStyleSet,
-) -> Stateful<Div> {
-    div()
-        .id(SharedString::from(format!("btn-{label}")))
-        .px_2()
-        .py_1()
-        .rounded_sm()
-        .styled(text_styles.caption)
-        .bg(bg)
-        .cursor(CursorStyle::PointingHand)
-        .hover(move |el| el.bg(hover_bg))
-        .child(SharedString::from(label.to_string()))
-        .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, _window, _cx| {
-            on_click();
-        })
 }

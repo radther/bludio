@@ -577,7 +577,7 @@ impl TextFieldComponent {
         let colors = &crate::ui::theme::theme(cx).colors;
         Self {
             entity,
-            accent: colors.accent,
+            accent: colors.audio_accent,
             text_placeholder: colors.text_placeholder,
             selection_background: colors.selection_background,
         }

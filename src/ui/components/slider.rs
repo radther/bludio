@@ -9,8 +9,8 @@
 
 use gpui::{
     App, Bounds, Context, DragMoveEvent, Entity, EntityId, EventEmitter, FocusHandle, Focusable,
-    Hsla, IntoElement, MouseButton, MouseDownEvent, Pixels, Point, Render, RenderOnce,
-    Window, canvas, div, prelude::*, px, relative,
+    Hsla, IntoElement, MouseButton, MouseDownEvent, Pixels, Point, Render, RenderOnce, Window,
+    canvas, div, prelude::*, px, relative,
 };
 
 use crate::ui::h_flex;
@@ -193,7 +193,7 @@ impl RenderOnce for Slider {
 
         // ── Colors: explicit override or theme default ──
         let colors = &crate::ui::theme::theme(cx).colors;
-        let fill_color = self.fill_color.unwrap_or(colors.accent);
+        let fill_color = self.fill_color.unwrap_or(colors.audio_accent);
         let track_color = colors.element_background;
 
         // Entity clones for event handlers (each needs ownership for 'static lifetime)

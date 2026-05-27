@@ -59,29 +59,29 @@ pub(crate) fn rose_pine() -> Theme {
             background: BASE,
             surface: SURFACE,
             sidebar: OVERLAY,
+
             element_background: HIGHLIGHT_MED,
             element_hover: HIGHLIGHT_HIGH,
-            element_selected: HIGHLIGHT_MED,
             input_background: HIGHLIGHT_LOW,
-            menu_background: OVERLAY,
 
             // ── Text colors ────────────────────────────────────────────────
             text: TEXT,
             text_secondary: SUBTLE,
             text_placeholder: MUTED,
 
+            text_colored_button: BASE,
+
             // ── Borders ────────────────────────────────────────────────────
             border: HIGHLIGHT_HIGH,
             border_subtle: HIGHLIGHT_MED,
 
             // ── Accent / Interactive ───────────────────────────────────────
-            accent: IRIS,
-            accent_hover: hsl!(267.0, 0.57, 0.70),
-            // Lighter iris for hover.
+            bluetooth_accent: FOAM,
+            audio_accent: IRIS,
+            dev_accent: PINE,
 
             // ── Status colors ──────────────────────────────────────────────
             danger: LOVE,
-            danger_hover: hsl!(343.0, 0.76, 0.60),
             // Darker love for hover.
             warning: GOLD,
             success: PINE,

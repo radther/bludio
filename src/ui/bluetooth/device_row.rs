@@ -8,12 +8,11 @@
 use crate::ui::StyledExt;
 use bluer::Address;
 use futures::channel::mpsc::UnboundedSender;
-use gpui::{
-    Context, CursorStyle, MouseButton, MouseUpEvent, Render, SharedString, Window, div, prelude::*,
-};
+use gpui::{Context, Render, SharedString, Window, div, prelude::*};
 
 use super::BluetoothPageCommand;
 use crate::bluetooth::device::{DeviceRowAction, PairingStatus};
+use crate::ui::components::button::action_btn;
 use crate::ui::components::status_strip::status_strip;
 use crate::ui::{h_flex, v_flex};
 
@@ -83,7 +82,7 @@ impl Render for BluetoothDeviceRow {
 
         let status_color = if let Some(ref status) = pairing_status {
             match status {
-                PairingStatus::Connecting => colors.accent,
+                PairingStatus::Connecting => colors.bluetooth_accent,
                 PairingStatus::Pairing => colors.warning,
                 PairingStatus::Trusting => colors.success,
                 PairingStatus::Failed(_) => colors.danger,
@@ -137,45 +136,85 @@ impl Render for BluetoothDeviceRow {
                         h_flex().gap_1().map(move |mut btn_row| {
                             if paired && !connected {
                                 btn_row = btn_row.child(action_btn(
+                                    format!("btn-{addr}-Connect"),
                                     "Connect",
-                                    colors.accent,
-                                    colors.accent_hover,
-                                    addr,
-                                    DeviceRowAction::Connect,
-                                    &cmd_tx,
+                                    colors.bluetooth_accent,
+                                    colors.bluetooth_accent,
+                                    colors.text_colored_button,
+                                    {
+                                        let cmd_tx = cmd_tx.clone();
+                                        move || {
+                                            let _ = cmd_tx.unbounded_send(
+                                                BluetoothPageCommand::DeviceAction {
+                                                    addr,
+                                                    action: DeviceRowAction::Connect,
+                                                },
+                                            );
+                                        }
+                                    },
                                     text_styles,
                                 ));
                             }
                             if connected {
                                 btn_row = btn_row.child(action_btn(
+                                    format!("btn-{addr}-Disconnect"),
                                     "Disconnect",
                                     colors.danger,
-                                    colors.danger_hover,
-                                    addr,
-                                    DeviceRowAction::Disconnect,
-                                    &cmd_tx,
+                                    colors.danger,
+                                    colors.text_colored_button,
+                                    {
+                                        let cmd_tx = cmd_tx.clone();
+                                        move || {
+                                            let _ = cmd_tx.unbounded_send(
+                                                BluetoothPageCommand::DeviceAction {
+                                                    addr,
+                                                    action: DeviceRowAction::Disconnect,
+                                                },
+                                            );
+                                        }
+                                    },
                                     text_styles,
                                 ));
                             }
                             if paired {
                                 btn_row = btn_row.child(action_btn(
+                                    format!("btn-{addr}-Forget"),
                                     "Forget",
                                     colors.danger,
-                                    colors.danger_hover,
-                                    addr,
-                                    DeviceRowAction::Forget,
-                                    &cmd_tx,
+                                    colors.danger,
+                                    colors.text_colored_button,
+                                    {
+                                        let cmd_tx = cmd_tx.clone();
+                                        move || {
+                                            let _ = cmd_tx.unbounded_send(
+                                                BluetoothPageCommand::DeviceAction {
+                                                    addr,
+                                                    action: DeviceRowAction::Forget,
+                                                },
+                                            );
+                                        }
+                                    },
                                     text_styles,
                                 ));
                             }
                             if !paired && pairing_status.is_none() {
                                 btn_row = btn_row.child(action_btn(
+                                    format!("btn-{addr}-PairAndTrust"),
                                     "Pair & Trust",
-                                    colors.accent,
-                                    colors.accent_hover,
-                                    addr,
-                                    DeviceRowAction::PairAndTrust,
-                                    &cmd_tx,
+                                    colors.bluetooth_accent,
+                                    colors.bluetooth_accent,
+                                    colors.text_colored_button,
+                                    {
+                                        let cmd_tx = cmd_tx.clone();
+                                        move || {
+                                            let _ = cmd_tx.unbounded_send(
+                                                BluetoothPageCommand::DeviceAction {
+                                                    addr,
+                                                    action: DeviceRowAction::PairAndTrust,
+                                                },
+                                            );
+                                        }
+                                    },
                                     text_styles,
                                 ));
                             }
@@ -184,33 +223,4 @@ impl Render for BluetoothDeviceRow {
                     ),
             )
     }
-}
-
-// ── Button builder ─────────────────────────────────────────────────────────
-
-/// Build a single action button. Clicking sends a `BluetoothPageCommand`
-/// through the channel (no async tasks spawned here).
-fn action_btn(
-    label: &str,
-    bg: gpui::Hsla,
-    hover_bg: gpui::Hsla,
-    addr: Address,
-    action: DeviceRowAction,
-    cmd_tx: &UnboundedSender<BluetoothPageCommand>,
-    text_styles: &crate::ui::theme::TextStyleSet,
-) -> gpui::Stateful<gpui::Div> {
-    let cmd_tx = cmd_tx.clone();
-    div()
-        .id(SharedString::from(format!("btn-{addr}-{action:?}")))
-        .px_2()
-        .py_1()
-        .rounded_sm()
-        .styled(text_styles.caption)
-        .bg(bg)
-        .cursor(CursorStyle::PointingHand)
-        .hover(move |el| el.bg(hover_bg))
-        .child(SharedString::from(label.to_string()))
-        .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, _window, _app| {
-            let _ = cmd_tx.unbounded_send(BluetoothPageCommand::DeviceAction { addr, action });
-        })
 }
