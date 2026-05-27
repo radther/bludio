@@ -5,14 +5,14 @@
 //!
 //! Core types (`Theme`, `ThemeColors`, `TextStyleSet`, `Appearance`,
 //! `GlobalTheme`) and accessors (`theme()`, `set_theme()`) are defined in
-//! `theme.rs`.
+//! `types.rs`.
 
 mod rose_pine_dawn_theme;
 mod rose_pine_theme;
-mod theme;
+mod types;
 
 #[allow(unused_imports)]
 pub(crate) use rose_pine_dawn_theme::rose_pine_dawn;
 #[allow(unused_imports)]
 pub(crate) use rose_pine_theme::rose_pine;
-pub(crate) use theme::*;
+pub(crate) use types::*;

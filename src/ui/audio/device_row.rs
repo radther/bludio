@@ -13,8 +13,8 @@ use crate::ui::components::status_strip::status_strip;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use crate::ui::{StyledExt, h_flex, v_flex};
 use gpui::{
-    App, Context, Div, Entity, FocusHandle, Focusable, Render, SharedString, Stateful, Subscription,
-    Window, div, prelude::*, px,
+    App, Context, Div, Entity, FocusHandle, Focusable, Render, SharedString, Stateful,
+    Subscription, Window, div, prelude::*, px,
 };
 
 const LABEL_WIDTH: f32 = 48.0;

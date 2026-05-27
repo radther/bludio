@@ -24,7 +24,7 @@ pub fn action_btn(
     on_click: impl Fn() + 'static,
     text_styles: &TextStyleSet,
 ) -> Stateful<Div> {
-    let id = SharedString::from(id.into());
+    let id: SharedString = id.into();
     div()
         .id(id)
         .px_2()
@@ -35,7 +35,7 @@ pub fn action_btn(
         .text_color(text_color)
         .cursor(CursorStyle::PointingHand)
         .hover(move |el| el.bg(hover_bg))
-        .child(SharedString::from(label.into()))
+        .child(label.into())
         .on_mouse_up(MouseButton::Left, move |_: &MouseUpEvent, _window, _cx| {
             on_click();
         })

@@ -116,11 +116,7 @@ impl Render for BluetoothPage {
                     ))
                     .child({
                         let (btn_bg, btn_hover, icon_color) = if discovering {
-                            (
-                                colors.danger,
-                                colors.danger,
-                                colors.text_colored_button,
-                            )
+                            (colors.danger, colors.danger, colors.text_colored_button)
                         } else {
                             (
                                 colors.element_background,
@@ -146,8 +142,7 @@ impl Render for BluetoothPage {
                             .on_mouse_up(MouseButton::Left, {
                                 let cmd_tx = cmd_tx.clone();
                                 move |_: &MouseUpEvent, _window, _app| {
-                                    let _ =
-                                        cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
+                                    let _ = cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
                                 }
                             })
                     }),

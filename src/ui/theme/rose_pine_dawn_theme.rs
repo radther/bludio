@@ -8,7 +8,7 @@
 
 use gpui::Hsla;
 
-use super::theme::{Appearance, Theme, ThemeColors};
+use super::types::{Appearance, Theme, ThemeColors};
 
 // ── Convenience macro ──────────────────────────────────────────────────────
 
