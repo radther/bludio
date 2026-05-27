@@ -1,0 +1,19 @@
+[
+  {
+    "label": "app: run",
+    "command": "cargo",
+    "args": ["run"],
+    "env": { "RUST_BACKTRACE": "1" },
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true
+  },
+  {
+    "label": "app: build",
+    "command": "bash",
+    "args": ["-c", "echo '--- BUILDING ---' && cargo build --release && echo '--- RUNNING ---' && RUST_BACKTRACE=1 ./target/release/bludio"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true
+  },
+]

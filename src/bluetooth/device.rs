@@ -109,6 +109,8 @@ pub(crate) fn devices_changed(old: &[BluetoothDevice], new: &[BluetoothDevice]) 
 
 /// Execute a device action (connect / disconnect / forget / pair+trust)
 /// on the current async runtime.
+// TODO: return Result<(), String> so callers can surface errors in the UI.
+// Currently errors are only logged to stderr — the user sees no feedback.
 pub(crate) async fn execute_device_action(
     adapter: &bluer::Adapter,
     addr: bluer::Address,

@@ -11,10 +11,8 @@ use crate::ui::components::dropdown::DropdownEvent as DdEvt;
 use crate::ui::h_flex;
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, Render, SharedString, Subscription, Window, div,
-    prelude::*, px,
+    prelude::*,
 };
-
-const ROW_HEIGHT: f32 = 64.0;
 
 // ── Card row entity ────────────────────────────────────────────────────────
 
@@ -108,7 +106,6 @@ impl Render for CardRow {
             .justify_between()
             .id(SharedString::from(format!("card-{}", self.card_index)))
             .px_4()
-            .h(px(ROW_HEIGHT))
             .border_b_1()
             .border_color(colors.border_subtle)
             .hover(|el| el.bg(colors.hover_overlay))
@@ -118,7 +115,7 @@ impl Render for CardRow {
                     .w_full()
                     .child(
                         div()
-                            .styled(text_styles.heading)
+                            .styled(text_styles.body)
                             .child(SharedString::from(self.display_name.clone())),
                     )
                     .when(self.profile_dropdown.read(cx).has_items(), |el| {

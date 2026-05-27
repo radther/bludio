@@ -134,6 +134,11 @@ The display name resolution and filtering logic matches [blueman](https://github
 ### Return types
 - Functions whose builder chain includes `.id()`, `.hover()`, or `.on_*()` return `Stateful<Div>` (gpui transitions the builder type). Pure styling functions return `Div`. Trait impls (`Render::render`) keep `impl IntoElement` to match the trait signature.
 
+### Click handling
+- Prefer `.on_click(...)` over `.on_mouse_up(MouseButton::Left, ...)` for button interactions. Zed uses `on_click` as the standard pattern — it requires press AND release on the same element with built-in drag threshold, preventing accidental triggers from drag-overs.
+- `on_click` requires `.id()` first (it's on `Stateful<Div>`, not `Div`).
+- **Exceptions** — use `on_mouse_down` / `on_mouse_up` / `on_mouse_up_out` when the interaction needs lower-level mouse tracking. Examples: `slider.rs` (click-to-jump + drag) and `text_field.rs` (cursor positioning + drag selection). See also `../gpui-component/crates/ui/src/slider.rs`.
+
 ---
 
 ## Agent Notes

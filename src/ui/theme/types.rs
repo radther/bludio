@@ -16,7 +16,7 @@
 //! The active theme is stored as a GPUI global (`GlobalTheme`) and accessed
 //! via the free functions `theme(cx)` and `set_theme(theme, cx)`.
 
-use gpui::{App, BorrowAppContext, FontWeight, Global, Hsla, SharedString, hsla};
+use gpui::{App, BorrowAppContext, FontWeight, Global, Hsla, SharedString};
 use std::sync::Arc;
 
 // ── Appearance ─────────────────────────────────────────────────────────────
@@ -44,14 +44,14 @@ pub(crate) struct ThemeColors {
     pub surface: Hsla,
     /// Sidebar/tab bar background.
     pub sidebar: Hsla,
+
     /// Button, input, element background.
     pub element_background: Hsla,
     /// Button/element hover state.
     pub element_hover: Hsla,
+
     /// Text input field background.
     pub input_background: Hsla,
-    /// Dropdown/context menu background.
-    pub menu_background: Hsla,
 
     // ── Text colors ────────────────────────────────────────────────────
     /// Primary body text.
@@ -60,6 +60,8 @@ pub(crate) struct ThemeColors {
     pub text_secondary: Hsla,
     /// Muted/placeholder text in inputs.
     pub text_placeholder: Hsla,
+    /// Text color for colored buttons.
+    pub text_colored_button: Hsla,
 
     // ── Borders ────────────────────────────────────────────────────────
     /// Primary border (panel separators, input borders).
@@ -68,16 +70,16 @@ pub(crate) struct ThemeColors {
     pub border_subtle: Hsla,
 
     // ── Accent / Interactive ───────────────────────────────────────────
-    /// Primary accent (buttons, highlights, active selections).
-    pub accent: Hsla,
-    /// Accent hover state.
-    pub accent_hover: Hsla,
+    /// Bluetooth accent color.
+    pub bluetooth_accent: Hsla,
+    /// Audio accent color.
+    pub audio_accent: Hsla,
+    /// Developer accent color.
+    pub dev_accent: Hsla,
 
     // ── Status colors ──────────────────────────────────────────────────
     /// Error/danger (destructive actions, error text).
     pub danger: Hsla,
-    /// Danger hover state.
-    pub danger_hover: Hsla,
     /// Warning (cautionary states).
     pub warning: Hsla,
     /// Success (connected, completed states).
@@ -114,18 +116,18 @@ pub(crate) struct ThemeColors {
 #[derive(Clone, Debug)]
 pub(crate) struct TextStyleSet {
     pub body: (gpui::AbsoluteLength, FontWeight),
+    pub body2: (gpui::AbsoluteLength, FontWeight),
     pub heading: (gpui::AbsoluteLength, FontWeight),
-    pub body_small: (gpui::AbsoluteLength, FontWeight),
     pub caption: (gpui::AbsoluteLength, FontWeight),
 }
 
-impl TextStyleSet {
+impl Default for TextStyleSet {
     fn default() -> Self {
         Self {
-            body: (gpui::rems(1.0).into(), FontWeight::NORMAL),
-            heading: (gpui::rems(1.0).into(), FontWeight::BOLD),
-            body_small: (gpui::rems(0.875).into(), FontWeight::NORMAL),
-            caption: (gpui::rems(0.75).into(), FontWeight::MEDIUM),
+            body: (gpui::rems(1.0).into(), FontWeight::MEDIUM),
+            body2: (gpui::rems(0.875).into(), FontWeight::MEDIUM),
+            heading: (gpui::rems(1.5).into(), FontWeight::EXTRA_BOLD),
+            caption: (gpui::rems(0.75).into(), FontWeight::BOLD),
         }
     }
 }
@@ -139,78 +141,6 @@ pub(crate) struct Theme {
     pub font_family: SharedString,
     pub colors: ThemeColors,
     pub text_styles: TextStyleSet,
-}
-
-impl Theme {
-    /// The dark theme (default, matches the original hardcoded look).
-    pub fn dark() -> Self {
-        Self {
-            appearance: Appearance::Dark,
-            font_family: "Noto Sans".into(),
-            text_styles: TextStyleSet::default(),
-            colors: ThemeColors {
-                background: hsla(0.0, 0.0, 0.08, 1.0),
-                surface: hsla(0.0, 0.0, 0.14, 1.0),
-                sidebar: hsla(0.0, 0.0, 0.12, 1.0),
-                element_background: hsla(0.0, 0.0, 0.22, 1.0),
-                element_hover: hsla(0.0, 0.0, 0.30, 1.0),
-                input_background: hsla(0.0, 0.0, 0.18, 1.0),
-                menu_background: hsla(0.0, 0.0, 0.16, 1.0),
-                text: hsla(0.0, 0.0, 0.95, 1.0),
-                text_secondary: hsla(0.0, 0.0, 0.60, 1.0),
-                text_placeholder: hsla(0.0, 0.0, 0.45, 1.0),
-                border: hsla(0.0, 0.0, 0.25, 1.0),
-                border_subtle: hsla(0.0, 0.0, 0.20, 1.0),
-                accent: hsla(210.0 / 360.0, 0.7, 0.55, 1.0),
-                accent_hover: hsla(210.0 / 360.0, 0.7, 0.45, 1.0),
-                danger: hsla(0.0, 0.7, 0.55, 1.0),
-                danger_hover: hsla(0.0, 0.7, 0.45, 1.0),
-                warning: hsla(45.0 / 360.0, 0.8, 0.55, 1.0),
-                success: hsla(140.0 / 360.0, 0.6, 0.50, 1.0),
-                error_background: Hsla::from(gpui::rgba(0xff3c_3c33)),
-                hover_overlay: hsla(0.0, 0.0, 1.0, 0.04),
-                selection_background: hsla(210.0 / 360.0, 0.6, 0.5, 0.3),
-                icon: hsla(0.0, 0.0, 0.90, 1.0),
-                muted: hsla(0.0, 0.0, 0.40, 1.0),
-                menu_border: hsla(0.0, 0.0, 0.30, 1.0),
-            },
-        }
-    }
-
-    /// The light theme (warm off-white background, dark text).
-    pub fn light() -> Self {
-        Self {
-            appearance: Appearance::Light,
-            font_family: "Noto Sans".into(),
-            text_styles: TextStyleSet::default(),
-            colors: ThemeColors {
-                background: hsla(36.0 / 360.0, 0.16, 0.94, 1.0),
-                surface: hsla(40.0 / 360.0, 0.08, 0.88, 1.0),
-                sidebar: hsla(40.0 / 360.0, 0.08, 0.82, 1.0),
-                element_background: hsla(36.0 / 360.0, 0.06, 0.72, 1.0),
-                element_hover: hsla(36.0 / 360.0, 0.08, 0.64, 1.0),
-                input_background: hsla(36.0 / 360.0, 0.06, 0.78, 1.0),
-                menu_background: hsla(40.0 / 360.0, 0.08, 0.90, 1.0),
-                text: hsla(15.0 / 360.0, 0.03, 0.31, 1.0),
-                text_secondary: hsla(36.0 / 360.0, 0.02, 0.43, 1.0),
-                text_placeholder: hsla(34.0 / 360.0, 0.03, 0.55, 1.0),
-                border: hsla(50.0 / 360.0, 0.05, 0.76, 1.0),
-                border_subtle: hsla(50.0 / 360.0, 0.03, 0.82, 1.0),
-                accent: hsla(210.0 / 360.0, 0.7, 0.45, 1.0),
-                accent_hover: hsla(210.0 / 360.0, 0.7, 0.38, 1.0),
-                danger: hsla(0.0, 0.7, 0.48, 1.0),
-                danger_hover: hsla(0.0, 0.7, 0.40, 1.0),
-                warning: hsla(45.0 / 360.0, 0.8, 0.45, 1.0),
-                success: hsla(140.0 / 360.0, 0.5, 0.40, 1.0),
-                error_background: Hsla::from(gpui::rgba(0xffe0_e0e0)),
-                hover_overlay: hsla(0.0, 0.0, 0.0, 0.04),
-                selection_background: hsla(210.0 / 360.0, 0.6, 0.5, 0.15),
-                icon: hsla(0.0, 0.0, 0.30, 1.0),
-                muted: hsla(0.0, 0.0, 0.55, 1.0),
-                menu_border: hsla(50.0 / 360.0, 0.05, 0.76, 1.0),
-            },
-        }
-    }
 }
 
 // ── Global theme ───────────────────────────────────────────────────────────

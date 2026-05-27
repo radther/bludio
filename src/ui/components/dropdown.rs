@@ -9,10 +9,9 @@
 
 use crate::ui::StyledExt;
 use gpui::{
-    AbsoluteLength, Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity,
-    EventEmitter, FocusHandle, Focusable, FontWeight, Hsla, IntoElement, KeyDownEvent,
-    MouseButton, MouseUpEvent, Pixels, Render, RenderOnce, SharedString, Window, anchored,
-    canvas, deferred, div, prelude::*, px,
+    AbsoluteLength, Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity, EventEmitter,
+    FocusHandle, Focusable, FontWeight, Hsla, IntoElement, KeyDownEvent, MouseUpEvent, Pixels,
+    Render, RenderOnce, SharedString, Window, anchored, canvas, deferred, div, prelude::*, px,
 };
 
 use crate::ui::v_flex;
@@ -123,8 +122,8 @@ impl DropdownComponent {
             entity,
             bg: colors.element_background,
             hover: colors.element_hover,
-            accent: colors.accent,
-            menu_bg: colors.menu_background,
+            accent: colors.audio_accent,
+            menu_bg: colors.background,
             menu_border: colors.menu_border,
             caption: text_styles.caption,
         }
@@ -206,7 +205,7 @@ impl RenderOnce for DropdownComponent {
                                     .when(is_active, move |el| el.text_color(accent))
                                     .hover(|el| el.bg(self.hover))
                                     .child(SharedString::from(item.clone()))
-                                    .on_mouse_up(MouseButton::Left, {
+                                    .on_click({
                                         let item = item.clone();
                                         let entity = entity.clone();
                                         window.listener_for(
@@ -279,16 +278,13 @@ impl RenderOnce for DropdownComponent {
                     .cursor(CursorStyle::PointingHand)
                     .hover(move |el| el.bg(self.hover))
                     .child(selected.clone())
-                    .on_mouse_up(
-                        MouseButton::Left,
-                        window.listener_for(
-                            &entity_for_trigger,
-                            |this: &mut Dropdown, _, _, cx| {
-                                this.is_open = !this.is_open;
-                                cx.notify();
-                            },
-                        ),
-                    ),
+                    .on_click(window.listener_for(
+                        &entity_for_trigger,
+                        |this: &mut Dropdown, _, _, cx| {
+                            this.is_open = !this.is_open;
+                            cx.notify();
+                        },
+                    )),
             )
             .when_some(menu, gpui::ParentElement::child)
             .when_some(click_outside, gpui::ParentElement::child)

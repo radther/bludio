@@ -18,31 +18,25 @@ fn icon(name: &str) -> gpui::Svg {
 
 /// Bluetooth icon (bolt — Lucide's lightning bolt approximates the Bluetooth rune).
 pub fn bluetooth() -> gpui::Svg {
-    icon("bolt")
-}
-
-/// Placeholder page icon (plus — generic add/new page indicator).
-#[allow(dead_code)]
-pub fn page_placeholder() -> gpui::Svg {
-    icon("plus")
+    icon("radar")
 }
 
 /// Audio output icon (speaker — Lucide's volume-2 approximates a speaker).
 pub fn audio_output() -> gpui::Svg {
-    icon("bolt") // TODO: replace with proper speaker icon
+    icon("speaker")
 }
 
 /// Audio input icon (mic — Lucide's mic approximates a microphone).
 pub fn audio_input() -> gpui::Svg {
-    icon("plus") // TODO: replace with proper mic icon
+    icon("mic")
 }
 
 /// Audio card configuration icon (settings gear).
 pub fn audio_card() -> gpui::Svg {
-    icon("settings")
+    icon("form")
 }
 
 /// Text field test page icon.
 pub fn text_field_test() -> gpui::Svg {
-    icon("inbox")
+    icon("test-tube-diagonal")
 }

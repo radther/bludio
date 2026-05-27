@@ -23,7 +23,7 @@ impl Render for TooltipLabel {
             .bg(colors.surface)
             .text_color(colors.text)
             .rounded_md()
-            .styled(text_styles.body_small)
+            .styled(text_styles.caption)
             .child(self.text.clone())
     }
 }
