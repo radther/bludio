@@ -6,10 +6,11 @@
 
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, AudioState};
+use crate::subsystem::SubsystemStatus;
 use crate::ui::audio::card_row::CardRow;
 use crate::ui::components::page_header::page_header;
 use crate::ui::{h_flex, v_flex};
-use gpui::{Context, Entity, Render, SharedString, Window, div, prelude::*, px};
+use gpui::{Context, Entity, Render, Window, div, prelude::*, px};
 
 // ── Configuration page entity ──────────────────────────────────────────────
 
@@ -18,8 +19,7 @@ pub(crate) struct ConfigurationPage {
     rows: Vec<Entity<CardRow>>,
     cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
     wakeup: Option<PaWakeup>,
-    connected: bool,
-    error: Option<String>,
+    subsystem_status: SubsystemStatus,
 }
 
 impl ConfigurationPage {
@@ -33,15 +33,29 @@ impl ConfigurationPage {
             rows: Vec::new(),
             cmd_tx,
             wakeup,
-            connected: false,
-            error: None,
+            subsystem_status: SubsystemStatus::Connecting,
         }
+    }
+
+    /// Swap the command sender (used after audio reconnect).
+    pub(crate) fn update_cmd_tx(
+        &mut self,
+        cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
+        wakeup: Option<PaWakeup>,
+    ) {
+        self.cmd_tx = cmd_tx;
+        self.wakeup = wakeup;
     }
 
     /// Sync rows with the latest audio state cards.
     pub(crate) fn sync_cards(&mut self, state: &AudioState, cx: &mut Context<Self>) {
-        self.connected = state.connected;
-        self.error.clone_from(&state.error);
+        self.subsystem_status = state.subsystem_status.clone();
+
+        // Only sync card rows when connected.
+        if self.subsystem_status != SubsystemStatus::Connected {
+            self.rows.clear();
+            return;
+        }
 
         let Some(wakeup) = self.wakeup else {
             return;
@@ -77,50 +91,53 @@ impl Render for ConfigurationPage {
             .flex_1()
             .child(h_flex().justify_between().px_4().py_2().child(page_header(
                 "Configuration",
-                format!(
-                    "{} card{}",
-                    self.rows.len(),
-                    if self.rows.len() == 1 { "" } else { "s" }
-                ),
+                match &self.subsystem_status {
+                    SubsystemStatus::Connected => format!(
+                        "{} card{}",
+                        self.rows.len(),
+                        if self.rows.len() == 1 { "" } else { "s" }
+                    ),
+                    _ => String::new(),
+                },
                 colors,
                 text_styles,
             )))
-            .when_some(self.error.clone(), |el, err| {
-                el.child(
-                    div()
-                        .px_4()
-                        .py_2()
-                        .bg(colors.error_background)
-                        .text_color(colors.danger)
-                        .child(SharedString::from(format!("Error: {err}"))),
-                )
-            })
-            .when(!self.connected, |el| {
-                el.child(
-                    h_flex()
-                        .justify_center()
-                        .flex_1()
-                        .text_color(colors.text_secondary)
-                        .child("Connecting to PulseAudio..."),
-                )
-            })
-            .when(self.connected && self.rows.is_empty(), |el| {
-                el.child(
-                    h_flex()
-                        .justify_center()
-                        .h(px(200.0))
-                        .text_color(colors.text_secondary)
-                        .child("No audio cards found"),
-                )
-            })
-            .when(self.connected && !self.rows.is_empty(), |el| {
-                el.child(
-                    div()
-                        .id("audio-card-list")
-                        .flex_1()
-                        .overflow_y_scroll()
-                        .children(self.rows.clone()),
-                )
+            .child(match &self.subsystem_status {
+                SubsystemStatus::Connecting => h_flex()
+                    .justify_center()
+                    .flex_1()
+                    .text_color(colors.text_secondary)
+                    .child("Connecting to PulseAudio...")
+                    .into_any_element(),
+                SubsystemStatus::Disconnected(msg) => h_flex()
+                    .justify_center()
+                    .flex_1()
+                    .text_color(colors.danger)
+                    .child(format!("Error: {msg}"))
+                    .into_any_element(),
+                SubsystemStatus::Reconnecting => h_flex()
+                    .justify_center()
+                    .flex_1()
+                    .text_color(colors.text_secondary)
+                    .child("Reconnecting to PulseAudio...")
+                    .into_any_element(),
+                SubsystemStatus::Connected => {
+                    if self.rows.is_empty() {
+                        h_flex()
+                            .justify_center()
+                            .h(px(200.0))
+                            .text_color(colors.text_secondary)
+                            .child("No audio cards found")
+                            .into_any_element()
+                    } else {
+                        div()
+                            .id("audio-card-list")
+                            .flex_1()
+                            .overflow_y_scroll()
+                            .children(self.rows.clone())
+                            .into_any_element()
+                    }
+                }
             })
     }
 }

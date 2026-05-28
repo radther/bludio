@@ -6,10 +6,11 @@ pub mod discovery;
 pub(crate) mod monitor;
 pub(crate) mod properties;
 
+use crate::subsystem::SubsystemStatus;
 use device::BluetoothDevice;
 
 /// Holds the Bluetooth session and adapter state shared with the UI.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct BluetoothState {
     /// The `BlueZ` session connection (None until initialized).
     pub session: Option<bluer::Session>,
@@ -19,8 +20,20 @@ pub struct BluetoothState {
     pub discovering: bool,
     /// List of known Bluetooth devices (sorted: paired → connected → alpha).
     pub devices: Vec<BluetoothDevice>,
-    /// Human-readable error message if Bluetooth is unavailable.
-    pub error: Option<String>,
+    /// Unified subsystem health status.
+    pub subsystem_status: SubsystemStatus,
+}
+
+impl Default for BluetoothState {
+    fn default() -> Self {
+        Self {
+            session: None,
+            adapter: None,
+            discovering: false,
+            devices: Vec::new(),
+            subsystem_status: SubsystemStatus::Connecting,
+        }
+    }
 }
 
 impl BluetoothState {
@@ -51,7 +64,7 @@ impl BluetoothState {
             adapter: Some(adapter),
             discovering: false,
             devices: Vec::new(),
-            error: None,
+            subsystem_status: SubsystemStatus::Connected,
         };
 
         state.list_devices().await?;

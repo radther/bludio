@@ -8,6 +8,7 @@
 use crate::audio::{
     AudioCommand, AudioState, CardInfo, DeviceKind, ProfileInfo, SinkInfo, SourceInfo,
 };
+use crate::subsystem::SubsystemStatus;
 use libpulse_binding as pulse;
 use pulse::callbacks::ListResult;
 use pulse::context::{Context, FlagSet as ContextFlags, State as ContextState};
@@ -181,6 +182,23 @@ fn run_pa_loop(
             *needs_rebuild.borrow_mut() = true;
         }
 
+        // ── Check PA context health BEFORE rebuilding state ──
+        // If the context is dead, introspecting it will panic (null pointer).
+        match pa_ctx.borrow().get_state() {
+            ContextState::Failed | ContextState::Terminated => {
+                let _ = state_tx.send(AudioState {
+                    sinks: Vec::new(),
+                    sources: Vec::new(),
+                    cards: Vec::new(),
+                    subsystem_status: SubsystemStatus::Disconnected(
+                        "PulseAudio connection lost".into(),
+                    ),
+                });
+                return Ok(());
+            }
+            _ => {}
+        }
+
         // ── Rebuild state if needed ──
         if *needs_rebuild.borrow() {
             *needs_rebuild.borrow_mut() = false;
@@ -191,12 +209,20 @@ fn run_pa_loop(
         // ── Block until PA event OR wakeup() from GPUI ──
         // Pure event-driven, no timeouts or delays.
         match ml.borrow_mut().iterate(true) {
-            IterateResult::Quit(_) | IterateResult::Err(_) => break,
+            IterateResult::Quit(_) | IterateResult::Err(_) => {
+                let _ = state_tx.send(AudioState {
+                    sinks: Vec::new(),
+                    sources: Vec::new(),
+                    cards: Vec::new(),
+                    subsystem_status: SubsystemStatus::Disconnected(
+                        "PulseAudio connection lost".into(),
+                    ),
+                });
+                return Ok(());
+            }
             IterateResult::Success(_) => {}
         }
     }
-
-    Ok(())
 }
 
 // ── PA connection helpers ──────────────────────────────────────────────────
@@ -525,7 +551,6 @@ fn build_audio_state(
         sinks: sinks.clone(),
         sources: sources.clone(),
         cards: cards.clone(),
-        connected: true,
-        error: None,
+        subsystem_status: SubsystemStatus::Connected,
     }
 }

@@ -340,6 +340,7 @@ What's done well — specific modules, functions, or patterns that exemplify goo
 
 ## Operating Guidelines
 
+- **Report only — do not fix.** The audit produces a report and stops. Do not apply fixes, run `cargo fmt`, edit files, or make any changes to the codebase during or after the audit. The user reviews the report first and decides what to act on. If the user asks you to fix issues from the report, do so in a separate step.
 - **Read before flagging.** Read the actual code at each flagged location before opening an issue. Don't pattern-match from memory or guess.
 - **Documented intent is guidance, not immunity.** AGENTS.md documents patterns discovered so far — it's a living document. If a documented convention is actively worsening the codebase, flag it and propose updating AGENTS.md. Conventions that serve the project well should be reinforced; conventions that don't should be questioned. This audit skill itself is under the same scrutiny — if its dimensions are bloated, unclear, or flagging things that shouldn't be flagged, propose improvements to it as well.
 - **Missing or stale justifications are always fair game.** If a code comment or `#[allow(...)]` explains a deviation, verify the explanation still holds. Flag if the justification is missing, stale, or wrong.

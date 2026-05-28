@@ -5,11 +5,46 @@
 
 use crate::audio::AudioState;
 use crate::audio::DeviceKind;
+use crate::audio::pulse::PaWakeup;
 use crate::bluetooth::BluetoothState;
 use crate::bluetooth::device::{
     DeviceRowAction, PairingStatus, devices_changed, execute_device_action, format_device_error,
     quick_device_status,
 };
+use crate::bluetooth::monitor::MonitorEvent;
+use crate::subsystem::SubsystemStatus;
+
+// ── Audio connection helper ────────────────────────────────────────────────
+
+/// Channels and receiver from a PulseAudio thread spawn attempt.
+struct AudioConnection {
+    cmd_tx: tokio::sync::mpsc::UnboundedSender<crate::audio::AudioCommand>,
+    state_rx: tokio::sync::mpsc::UnboundedReceiver<AudioState>,
+    wakeup_rx: std::sync::mpsc::Receiver<PaWakeup>,
+}
+
+impl AudioConnection {
+    /// Spawn a PA thread and return the channels + wakeup receiver.
+    /// The caller decides how to wait for the wakeup (blocking or timeout).
+    ///
+    /// If the caller drops the receivers, the PA thread will self-terminate
+    /// on the next mainloop iteration (cmd_rx closed or state_tx send fails).
+    fn spawn() -> Self {
+        let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (state_tx, state_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (wakeup_tx, wakeup_rx) = std::sync::mpsc::channel();
+
+        std::thread::spawn(move || {
+            crate::audio::pulse::run_pa_thread_from_channels(cmd_rx, &state_tx, &wakeup_tx);
+        });
+
+        Self {
+            cmd_tx,
+            state_rx,
+            wakeup_rx,
+        }
+    }
+}
 use crate::ui::audio::audio_page::AudioPage;
 use crate::ui::audio::configuration_page::ConfigurationPage;
 use crate::ui::bluetooth::BluetoothPageCommand;
@@ -61,20 +96,10 @@ pub(crate) struct BludioApp {
 impl BludioApp {
     pub(crate) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // ── Audio init: spawn PA thread ──
-        let (audio_cmd_tx, audio_cmd_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (audio_state_tx, audio_state_rx) = tokio::sync::mpsc::unbounded_channel();
-        let (wakeup_tx, wakeup_rx) = std::sync::mpsc::channel();
-
-        std::thread::spawn(move || {
-            crate::audio::pulse::run_pa_thread_from_channels(
-                audio_cmd_rx,
-                &audio_state_tx,
-                &wakeup_tx,
-            );
-        });
-
-        // Receive the wakeup handle (block briefly, PA thread sends it immediately).
-        let pa_wakeup = wakeup_rx.recv().ok();
+        let conn = AudioConnection::spawn();
+        let pa_wakeup = conn.wakeup_rx.recv().ok();
+        let audio_cmd_tx = conn.cmd_tx;
+        let audio_state_rx = conn.state_rx;
         let pa_init_error = pa_wakeup
             .is_none()
             .then(|| "PulseAudio failed to initialize".to_string());
@@ -150,7 +175,7 @@ impl BludioApp {
 
         let mut audio_state = AudioState::default();
         if let Some(err) = pa_init_error {
-            audio_state.error = Some(err);
+            audio_state.subsystem_status = SubsystemStatus::Disconnected(err);
         }
 
         Self {
@@ -181,6 +206,8 @@ impl BludioApp {
             let _tokio_guard = crate::TOKIO.enter();
             let mut rx = audio_state_rx;
             while let Some(state) = rx.recv().await {
+                let is_disconnected =
+                    matches!(state.subsystem_status, SubsystemStatus::Disconnected(_));
                 let _ = this.update_in(cx, |this, window, cx| {
                     this.audio_state = state.clone();
                     this.audio_output_page
@@ -191,6 +218,118 @@ impl BludioApp {
                         .update(cx, |page, cx| page.sync_cards(&state, cx));
                     cx.notify();
                 });
+                // If PA thread sent a Disconnected state, stop reading and
+                // trigger reconnection.
+                if is_disconnected {
+                    break;
+                }
+            }
+
+            // Channel closed or received Disconnected — trigger reconnect.
+            let _ = this.update_in(cx, |this, window, cx| {
+                if !matches!(
+                    this.audio_state.subsystem_status,
+                    SubsystemStatus::Disconnected(_)
+                ) {
+                    this.audio_state.subsystem_status =
+                        SubsystemStatus::Disconnected("PulseAudio connection lost".into());
+                    this.audio_output_page.update(cx, |page, cx| {
+                        page.sync_rows(&this.audio_state, window, cx);
+                    });
+                    this.audio_input_page.update(cx, |page, cx| {
+                        page.sync_rows(&this.audio_state, window, cx);
+                    });
+                    this.configuration_page.update(cx, |page, cx| {
+                        page.sync_cards(&this.audio_state, cx);
+                    });
+                    cx.notify();
+                }
+                Self::spawn_audio_reconnect(window, cx);
+            });
+        })
+        .detach();
+    }
+
+    // ── Audio reconnect loop ───────────────────────────────────────────
+
+    /// Attempt to reconnect to PulseAudio on a fixed 3-second interval.
+    /// Spawns a new PA thread, wires channels, and restarts the state loop.
+    fn spawn_audio_reconnect(window: &mut Window, cx: &mut Context<Self>) {
+        cx.spawn_in(window, async move |this, cx| {
+            let _tokio_guard = crate::TOKIO.enter();
+            // Brief pause before first attempt.
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(1))
+                .await;
+
+            loop {
+                // Check if already reconnected (another path may have succeeded).
+                let already_connected = this
+                    .read_with(cx, |app, _| {
+                        app.audio_state.subsystem_status == SubsystemStatus::Connected
+                    })
+                    .unwrap_or(true);
+                if already_connected {
+                    return;
+                }
+
+                // Set Reconnecting status on pages.
+                let _ = this.update_in(cx, |this, window, cx| {
+                    this.audio_state.subsystem_status = SubsystemStatus::Reconnecting;
+                    this.audio_output_page.update(cx, |page, cx| {
+                        page.sync_rows(&this.audio_state, window, cx);
+                    });
+                    this.audio_input_page.update(cx, |page, cx| {
+                        page.sync_rows(&this.audio_state, window, cx);
+                    });
+                    this.configuration_page.update(cx, |page, cx| {
+                        page.sync_cards(&this.audio_state, cx);
+                    });
+                    cx.notify();
+                });
+
+                // Attempt to create a new PA thread.
+                let conn = AudioConnection::spawn();
+
+                // Wait up to 2s for the wakeup handle.
+                let pa_wakeup = {
+                    let (tx, rx) = tokio::sync::oneshot::channel();
+                    let wakeup_rx = conn.wakeup_rx;
+                    std::thread::spawn(move || {
+                        let result = wakeup_rx.recv().ok();
+                        let _ = tx.send(result);
+                    });
+                    match tokio::time::timeout(std::time::Duration::from_secs(2), rx).await {
+                        Ok(Ok(Some(wakeup))) => Some(wakeup),
+                        _ => None,
+                    }
+                };
+
+                if pa_wakeup.is_some() {
+                    // Success — wire new channels into pages.
+                    let audio_cmd_tx = conn.cmd_tx;
+                    let audio_state_rx = conn.state_rx;
+                    let _ = this.update_in(cx, |this, window, cx| {
+                        this.audio_output_page.update(cx, |page, _cx| {
+                            page.update_cmd_tx(audio_cmd_tx.clone(), pa_wakeup);
+                        });
+                        this.audio_input_page.update(cx, |page, _cx| {
+                            page.update_cmd_tx(audio_cmd_tx.clone(), pa_wakeup);
+                        });
+                        this.configuration_page.update(cx, |page, _cx| {
+                            page.update_cmd_tx(audio_cmd_tx.clone(), pa_wakeup);
+                        });
+
+                        // Spawn new state loop with the new receiver.
+                        Self::spawn_audio_state_loop(audio_state_rx, window, cx);
+                    });
+                    return;
+                }
+
+                // Failed — wait 3s, retry.
+                cx.background_executor()
+                    .timer(std::time::Duration::from_secs(3))
+                    .await;
             }
         })
         .detach();
@@ -198,21 +337,27 @@ impl BludioApp {
 
     // ── Bluetooth init + monitor loop ──────────────────────────────────
 
+    /// Connect to BlueZ, register agent, return (state, agent).
+    /// Shared by initial connection and reconnection.
+    async fn connect_bluetooth()
+    -> Result<(BluetoothState, crate::bluetooth::agent::AgentHandle), String> {
+        let state = BluetoothState::new().await?;
+        // SAFETY: BluetoothState::new() only returns Ok after session is set.
+        let agent =
+            crate::bluetooth::agent::register_agent(state.session.as_ref().unwrap()).await?;
+        Ok((state, agent))
+    }
+
     fn spawn_bluetooth_init(window: &mut Window, cx: &mut Context<Self>) {
         cx.spawn_in(window, async move |this, cx| {
             // ── Init ──
-            let rx = crate::tokio_task(async {
-                let state = BluetoothState::new().await?;
-                let agent =
-                    crate::bluetooth::agent::register_agent(state.session.as_ref().unwrap()).await;
-                Ok::<_, String>((state, agent))
-            });
+            let rx = crate::tokio_task(async { Self::connect_bluetooth().await });
             let adapter = match rx.await {
                 Ok(Ok((state, agent))) => {
                     let adapter = state.adapter.clone().unwrap();
                     this.update_in(cx, |this, _window, cx| {
                         this.bt_state = state;
-                        this.bt_agent = agent.ok();
+                        this.bt_agent = Some(agent);
                         this.bluetooth_page
                             .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
                         cx.notify();
@@ -222,7 +367,7 @@ impl BludioApp {
                 }
                 Ok(Err(e)) => {
                     this.update_in(cx, |this, _window, cx| {
-                        this.bt_state.error = Some(e);
+                        this.bt_state.subsystem_status = SubsystemStatus::Disconnected(e);
                         this.bluetooth_page
                             .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
                         cx.notify();
@@ -232,7 +377,9 @@ impl BludioApp {
                 }
                 Err(_) => {
                     this.update_in(cx, |this, _window, cx| {
-                        this.bt_state.error = Some("Bluetooth initialization cancelled".into());
+                        this.bt_state.subsystem_status = SubsystemStatus::Disconnected(
+                            "Bluetooth initialization cancelled".into(),
+                        );
                         this.bluetooth_page
                             .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
                         cx.notify();
@@ -243,13 +390,35 @@ impl BludioApp {
             };
 
             // ── Background monitoring (signals + fallback poll) ──
-            let (monitor_tx, mut change_rx) = futures::channel::mpsc::unbounded::<bluer::Address>();
+            let (monitor_tx, mut monitor_rx) = futures::channel::mpsc::unbounded::<MonitorEvent>();
             let monitor_adapter = adapter.clone();
             crate::TOKIO.spawn(async move {
                 crate::bluetooth::monitor::run_monitor(&monitor_adapter, monitor_tx).await;
             });
 
+            // ── Session event watcher (AdapterAdded/Removed = BlueZ restart) ──
+            // The session.events() stream is not easily Send-compatible.
+            // Instead, we rely on:
+            // 1. Adapter Powered property changes (monitor detects rfkill)
+            // 2. Init failures during reconnect (catches BlueZ restarts)
+            // 3. The monitor sync error (catches adapter disappearance)
+
+            // ── Main event loop: process monitor events ──
             loop {
+                // Skip device updates if not connected.
+                let is_connected = this
+                    .read_with(cx, |app, _| {
+                        app.bt_state.subsystem_status == SubsystemStatus::Connected
+                    })
+                    .unwrap_or(false);
+                if !is_connected {
+                    // Wait a bit then check again.
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_secs(1))
+                        .await;
+                    continue;
+                }
+
                 let discovering = this
                     .read_with(cx, |app, _| app.bt_state.discovering)
                     .unwrap_or(false);
@@ -260,40 +429,22 @@ impl BludioApp {
                     continue;
                 }
 
-                // Wait for a D-Bus signal or a 10s fallback timer.
-                let signal_addr: Option<bluer::Address> = futures::select! {
-                    addr = change_rx.next().fuse() => addr,
+                // Wait for a monitor event or a 10s fallback timer.
+                let event: Option<MonitorEvent> = futures::select! {
+                    evt = monitor_rx.next().fuse() => evt,
                     () = cx.background_executor()
                         .timer(std::time::Duration::from_secs(10)).fuse() => None,
                 };
 
-                let a = adapter.clone();
-                if let Some(addr) = signal_addr {
-                    // Single-device quick refresh from D-Bus signal.
-                    if let Ok(Some(device)) =
-                        crate::tokio_task(async move { quick_device_status(&a, addr).await }).await
-                    {
-                        let _ = this.update_in(cx, |this, _window, cx| {
-                            this.bt_state.upsert_device(device);
-                            this.bluetooth_page.update(cx, |page, cx| {
-                                page.sync_state(&this.bt_state, cx);
-                            });
-                            cx.notify();
-                        });
-                    }
-                } else {
-                    // 10s fallback: full list refresh.
-                    if let Ok(Some(fresh)) = crate::tokio_task(async move {
-                        crate::bluetooth::discovery::refresh_device_list(&a).await
-                    })
-                    .await
-                    {
-                        let changed = this
-                            .read_with(cx, |app, _| devices_changed(&app.bt_state.devices, &fresh))
-                            .unwrap_or(true);
-                        if changed {
+                match event {
+                    Some(MonitorEvent::DeviceChanged(addr)) => {
+                        let a = adapter.clone();
+                        if let Ok(Some(device)) =
+                            crate::tokio_task(async move { quick_device_status(&a, addr).await })
+                                .await
+                        {
                             let _ = this.update_in(cx, |this, _window, cx| {
-                                this.bt_state.replace_devices(fresh);
+                                this.bt_state.upsert_device(device);
                                 this.bluetooth_page.update(cx, |page, cx| {
                                     page.sync_state(&this.bt_state, cx);
                                 });
@@ -301,7 +452,124 @@ impl BludioApp {
                             });
                         }
                     }
+                    Some(MonitorEvent::AdapterPoweredOff) => {
+                        let _ = this.update_in(cx, |this, window, cx| {
+                            eprintln!("[bluetooth] Adapter powered off");
+                            this.bt_state.subsystem_status = SubsystemStatus::Disconnected(
+                                "Bluetooth adapter powered off".into(),
+                            );
+                            this.bluetooth_page
+                                .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                            cx.notify();
+                            Self::reconnect_bluetooth(this, window, cx);
+                        });
+                        return;
+                    }
+                    Some(MonitorEvent::AdapterPoweredOn) => {
+                        // If we were disconnected, this is a reconnection signal.
+                        // But if we're already connected, ignore.
+                        let is_disconnected = this
+                            .read_with(cx, |app, _| {
+                                matches!(
+                                    app.bt_state.subsystem_status,
+                                    SubsystemStatus::Disconnected(_)
+                                )
+                            })
+                            .unwrap_or(false);
+                        if is_disconnected {
+                            let _ = this.update_in(cx, |this, window, cx| {
+                                eprintln!("[bluetooth] Adapter powered on, triggering reconnect");
+                                Self::reconnect_bluetooth(this, window, cx);
+                            });
+                            return;
+                        }
+                    }
+                    None => {
+                        // 10s fallback: full list refresh.
+                        let a = adapter.clone();
+                        if let Ok(Some(fresh)) = crate::tokio_task(async move {
+                            crate::bluetooth::discovery::refresh_device_list(&a).await
+                        })
+                        .await
+                        {
+                            let changed = this
+                                .read_with(cx, |app, _| {
+                                    devices_changed(&app.bt_state.devices, &fresh)
+                                })
+                                .unwrap_or(true);
+                            if changed {
+                                let _ = this.update_in(cx, |this, _window, cx| {
+                                    this.bt_state.replace_devices(fresh);
+                                    this.bluetooth_page.update(cx, |page, cx| {
+                                        page.sync_state(&this.bt_state, cx);
+                                    });
+                                    cx.notify();
+                                });
+                            }
+                        }
+                    }
                 }
+            }
+        })
+        .detach();
+    }
+
+    // ── Bluetooth reconnect ────────────────────────────────────────────
+
+    /// Retry loop for Bluetooth reconnection. Attempts `connect_bluetooth()`
+    /// every 3 seconds until success, then spawns the monitor event loop.
+    /// Must be called from within a spawn_in callback (has window access).
+    fn reconnect_bluetooth(this: &mut Self, window: &mut Window, cx: &mut Context<Self>) {
+        // Set Reconnecting status.
+        this.bt_state.subsystem_status = SubsystemStatus::Reconnecting;
+        this.bluetooth_page
+            .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+        cx.notify();
+
+        // Spawn the reconnection as a background task with retry loop.
+        cx.spawn_in(window, async move |this, cx| {
+            // Brief pause before first attempt.
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(1))
+                .await;
+
+            loop {
+                // Attempt reconnection.
+                let rx = crate::tokio_task(async { Self::connect_bluetooth().await });
+
+                match rx.await {
+                    Ok(Ok((state, agent))) => {
+                        let _ = this.update_in(cx, |this, _window, cx| {
+                            this.bt_state = state;
+                            this.bt_agent = Some(agent);
+                            this.bluetooth_page
+                                .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                            cx.notify();
+
+                            // Spawn new monitor + event loop.
+                            Self::spawn_bluetooth_init(_window, cx);
+                        });
+                        return;
+                    }
+                    Ok(Err(e)) => {
+                        eprintln!("[bluetooth] Reconnect failed: {e}, retrying in 3s");
+                        let _ = this.update_in(cx, |this, _window, cx| {
+                            this.bt_state.subsystem_status = SubsystemStatus::Disconnected(e);
+                            this.bluetooth_page
+                                .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                            cx.notify();
+                        });
+                    }
+                    Err(_) => {
+                        eprintln!("[bluetooth] Reconnect task cancelled");
+                        return;
+                    }
+                }
+
+                // Wait 3s before retry.
+                cx.background_executor()
+                    .timer(std::time::Duration::from_secs(3))
+                    .await;
             }
         })
         .detach();

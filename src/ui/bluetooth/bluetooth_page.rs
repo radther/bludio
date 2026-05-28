@@ -6,6 +6,7 @@
 use std::time::Duration;
 
 use crate::bluetooth::BluetoothState;
+use crate::subsystem::SubsystemStatus;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
 use crate::ui::components::error_banner::error_banner;
@@ -13,7 +14,7 @@ use crate::ui::components::page_header::page_header;
 use crate::ui::icons;
 use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
-use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Window, div, prelude::*, px};
+use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Window, prelude::*, px};
 
 // ── Page entity ────────────────────────────────────────────────────────────
 
@@ -21,8 +22,7 @@ use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Window, div, prelud
 pub(crate) struct BluetoothPage {
     rows: Vec<Entity<BluetoothDeviceRow>>,
     discovering: bool,
-    error: Option<String>,
-    initialized: bool,
+    subsystem_status: SubsystemStatus,
     cmd_tx: UnboundedSender<BluetoothPageCommand>,
     /// Error banner text — `None` when banner is hidden.
     error_banner_text: Option<String>,
@@ -39,8 +39,7 @@ impl BluetoothPage {
         Self {
             rows: Vec::new(),
             discovering: false,
-            error: None,
-            initialized: false,
+            subsystem_status: SubsystemStatus::Connecting,
             cmd_tx,
             error_banner_text: None,
             error_banner_generation: 0,
@@ -49,11 +48,16 @@ impl BluetoothPage {
 
     /// Sync rows with the latest Bluetooth state.
     /// Creates/updates/removes rows to match the device list, and caches
-    /// the discovering/error/initialized flags.
+    /// the discovering and subsystem_status flags.
     pub(crate) fn sync_state(&mut self, state: &BluetoothState, cx: &mut Context<Self>) {
         self.discovering = state.discovering;
-        self.error.clone_from(&state.error);
-        self.initialized = state.adapter.is_some();
+        self.subsystem_status = state.subsystem_status.clone();
+
+        // Only sync device rows when connected.
+        if self.subsystem_status != SubsystemStatus::Connected {
+            self.rows.clear();
+            return;
+        }
 
         let cmd_tx = self.cmd_tx.clone();
 
@@ -121,7 +125,6 @@ impl Render for BluetoothPage {
         let text_styles = &theme.text_styles;
 
         let discovering = self.discovering;
-        let initialized = self.initialized;
         let connected_count = self.rows.iter().filter(|r| r.read(cx).connected).count();
 
         let cmd_tx = self.cmd_tx.clone();
@@ -129,6 +132,9 @@ impl Render for BluetoothPage {
         // Capture banner state for the render closure.
         let banner_text = self.error_banner_text.clone();
         let banner_generation = self.error_banner_generation;
+
+        // Scan button is interactive only when Connected.
+        let scan_enabled = self.subsystem_status == SubsystemStatus::Connected;
 
         v_flex()
             .flex_1()
@@ -140,18 +146,27 @@ impl Render for BluetoothPage {
                     .py_2()
                     .child(page_header(
                         "Bluetooth",
-                        format!(
-                            "{} device{}, {} connected",
-                            self.rows.len(),
-                            if self.rows.len() == 1 { "" } else { "s" },
-                            connected_count,
-                        ),
+                        match &self.subsystem_status {
+                            SubsystemStatus::Connected => format!(
+                                "{} device{}, {} connected",
+                                self.rows.len(),
+                                if self.rows.len() == 1 { "" } else { "s" },
+                                connected_count,
+                            ),
+                            _ => String::new(),
+                        },
                         colors,
                         text_styles,
                     ))
                     .child({
                         let (btn_bg, btn_hover, icon_color) = if discovering {
                             (colors.danger, colors.danger, colors.text_colored_button)
+                        } else if !scan_enabled {
+                            (
+                                colors.element_background,
+                                colors.element_background,
+                                colors.text_secondary.opacity(0.4),
+                            )
                         } else {
                             (
                                 colors.element_background,
@@ -166,7 +181,11 @@ impl Render for BluetoothPage {
                             .h(px(48.0))
                             .rounded_lg()
                             .bg(btn_bg)
-                            .cursor(CursorStyle::PointingHand)
+                            .cursor(if scan_enabled {
+                                CursorStyle::PointingHand
+                            } else {
+                                CursorStyle::Arrow
+                            })
                             .hover(move |el| el.bg(btn_hover))
                             .child(
                                 icons::bluetooth()
@@ -174,38 +193,39 @@ impl Render for BluetoothPage {
                                     .h(px(24.0))
                                     .text_color(icon_color),
                             )
-                            .on_click({
-                                let cmd_tx = cmd_tx.clone();
-                                move |_: &ClickEvent, _window, _app| {
-                                    let _ = cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
-                                }
+                            .when(scan_enabled, |el| {
+                                el.on_click({
+                                    let cmd_tx = cmd_tx.clone();
+                                    move |_: &ClickEvent, _window, _app| {
+                                        let _ =
+                                            cmd_tx.unbounded_send(BluetoothPageCommand::ToggleScan);
+                                    }
+                                })
                             })
                     }),
             )
-            // ── Bluetooth initialization error ──
-            .when_some(self.error.clone(), |el, err| {
-                el.child(
-                    div()
-                        .px_4()
-                        .py_2()
-                        .bg(colors.error_background)
-                        .text_color(colors.danger)
-                        .child(gpui::SharedString::from(format!("Error: {err}"))),
-                )
-            })
-            // ── Loading indicator ──
-            .when(!initialized && self.error.is_none(), |el| {
-                el.child(
-                    h_flex()
-                        .justify_center()
-                        .flex_1()
-                        .text_color(colors.text_secondary)
-                        .child("Connecting to Bluetooth..."),
-                )
-            })
-            // ── Device list ──
-            .when(initialized, |el| {
-                el.child(
+            // ── Subsystem status content area ──
+            .child(match &self.subsystem_status {
+                SubsystemStatus::Connecting => h_flex()
+                    .justify_center()
+                    .flex_1()
+                    .text_color(colors.text_secondary)
+                    .child("Connecting to Bluetooth...")
+                    .into_any_element(),
+                SubsystemStatus::Disconnected(msg) => h_flex()
+                    .justify_center()
+                    .flex_1()
+                    .text_color(colors.danger)
+                    .child(format!("Error: {msg}"))
+                    .into_any_element(),
+                SubsystemStatus::Reconnecting => h_flex()
+                    .justify_center()
+                    .flex_1()
+                    .text_color(colors.text_secondary)
+                    .child("Reconnecting to Bluetooth...")
+                    .into_any_element(),
+                SubsystemStatus::Connected => {
+                    // ── Device list ──
                     v_flex()
                         .gap_2()
                         .id("device-list")
@@ -219,8 +239,9 @@ impl Render for BluetoothPage {
                                     .child("No devices. Press \"scan\" to discover."),
                             )
                         })
-                        .children(self.rows.clone()),
-                )
+                        .children(self.rows.clone())
+                        .into_any_element()
+                }
             })
             // ── Action error banner (slides up from bottom) ──
             .when_some(banner_text, |el, text| {

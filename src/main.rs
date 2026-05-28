@@ -5,6 +5,7 @@
 mod app;
 mod audio;
 mod bluetooth;
+mod subsystem;
 mod ui;
 
 use std::sync::LazyLock;

@@ -14,6 +14,38 @@ from pathlib import Path
 PI_SESSIONS_DIR = Path.home() / ".pi" / "agent" / "sessions"
 CWD = Path.cwd()
 
+# ── CLI ─────────────────────────────────────────────────────────────
+
+def parse_args() -> tuple[date | None, date | None, str | None]:
+    """Parse CLI args: [--model MODEL] [DATE_FROM [DATE_TO]]"""
+    args = sys.argv[1:]
+    model: str | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+
+    # Extract --model flag
+    remaining: list[str] = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--model" and i + 1 < len(args):
+            model = args[i + 1]
+            i += 2
+        elif args[i].startswith("--model="):
+            model = args[i].split("=", 1)[1]
+            i += 1
+        else:
+            remaining.append(args[i])
+            i += 1
+
+    # Positional date args
+    if len(remaining) >= 1:
+        date_from = parse_date_arg(remaining[0])
+        date_to = date_from
+    if len(remaining) >= 2:
+        date_to = parse_date_arg(remaining[1])
+
+    return date_from, date_to, model
+
 
 def session_key(path: str) -> str:
     """Convert cwd to the directory name Pi uses under sessions/"""
@@ -47,6 +79,26 @@ def find_session_files(date_from: date | None = None, date_to: date | None = Non
         filtered.append(f)
     return filtered
 
+def file_uses_model(filepath: Path, model: str) -> bool:
+    """Check if any assistant message in the file uses the given model."""
+    try:
+        with open(filepath) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                entry = json.loads(line)
+                if entry.get("type") != "message":
+                    continue
+                msg = entry.get("message", {})
+                if msg.get("role") != "assistant":
+                    continue
+                if msg.get("model") == model:
+                    return True
+    except (json.JSONDecodeError, OSError):
+        pass
+    return False
+
 
 @dataclass
 class SessionStats:
@@ -61,10 +113,14 @@ class SessionStats:
     cost_cache_read: float = 0.0
     cost_cache_write: float = 0.0
     messages: int = 0
+    models: set[str] = field(default_factory=set)
 
 
-def parse_session(filepath: Path) -> SessionStats | None:
-    """Extract aggregated usage from a single session JSONL file."""
+def parse_session(filepath: Path, model_filter: str | None = None) -> SessionStats | None:
+    """Extract aggregated usage from a single session JSONL file.
+
+    If model_filter is set, only count messages from that model.
+    """
     stats = SessionStats()
     try:
         with open(filepath) as f:
@@ -78,6 +134,16 @@ def parse_session(filepath: Path) -> SessionStats | None:
                 msg = entry.get("message", {})
                 if msg.get("role") != "assistant":
                     continue
+
+                # Track model used
+                msg_model = msg.get("model", "")
+                if msg_model:
+                    stats.models.add(msg_model)
+
+                # If filtering by model, skip non-matching messages
+                if model_filter and msg_model != model_filter:
+                    continue
+
                 usage = msg.get("usage", {})
                 if not usage:
                     continue
@@ -98,7 +164,7 @@ def parse_session(filepath: Path) -> SessionStats | None:
     except (json.JSONDecodeError, OSError) as e:
         print(f"  ⚠  Skipping {filepath.name}: {e}", file=sys.stderr)
         return None
-    return stats
+    return stats if stats.messages > 0 else None
 
 
 def fmt_tokens(n: int) -> str:
@@ -135,14 +201,35 @@ def parse_date_arg(s: str) -> date:
 
 
 def main():
-    args = sys.argv[1:]
-    date_from: date | None = None
-    date_to: date | None = None
-    if len(args) == 1:
-        date_from = date_to = parse_date_arg(args[0])
-    elif len(args) >= 2:
-        date_from = parse_date_arg(args[0])
-        date_to = parse_date_arg(args[1])
+    date_from, date_to, model = parse_args()
+
+    # Show available models if requested
+    if model == "list":
+        files = find_session_files(date_from, date_to)
+        all_models: set[str] = set()
+        for f in files:
+            try:
+                with open(f) as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        entry = json.loads(line)
+                        if entry.get("type") != "message":
+                            continue
+                        msg = entry.get("message", {})
+                        if msg.get("role") != "assistant":
+                            continue
+                        m = msg.get("model", "")
+                        if m:
+                            all_models.add(m)
+            except (json.JSONDecodeError, OSError):
+                pass
+        if all_models:
+            print(f"\n  Models found: {', '.join(sorted(all_models))}\n")
+        else:
+            print("\n  No models found in sessions.\n")
+        sys.exit(0)
 
     files = find_session_files(date_from, date_to)
     if not files:
@@ -155,13 +242,14 @@ def main():
         date_desc = f" ({date_from})"
     elif date_from and date_to:
         date_desc = f" ({date_from} – {date_to})"
-    print(f"\n  Pi session usage for {CWD.name}/{date_desc}\n")
+    model_desc = f" · model={model}" if model else ""
+    print(f"\n  Pi session usage for {CWD.name}{date_desc}{model_desc}\n")
     print(f"  {'Session':<40} {'Msgs':>4}  {'Tokens':>8}  {'Cost':>10}")
     print(f"  {'─'*40}  {'─'*4}  {'─'*8}  {'─'*10}")
 
     all_stats: list[SessionStats] = []
     for f in files:
-        s = parse_session(f)
+        s = parse_session(f, model_filter=model)
         if s is None:
             continue
         all_stats.append(s)

@@ -2,6 +2,8 @@
 
 pub(crate) mod pulse;
 
+use crate::subsystem::SubsystemStatus;
+
 // ── Device kind ────────────────────────────────────────────────────────────
 
 /// Whether a device is an output (sink/speaker) or input (source/microphone).
@@ -14,14 +16,25 @@ pub(crate) enum DeviceKind {
 // ── Audio state ────────────────────────────────────────────────────────────
 
 /// Complete snapshot of the `PulseAudio` audio state.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(crate) struct AudioState {
     pub(crate) sinks: Vec<SinkInfo>,
     pub(crate) sources: Vec<SourceInfo>,
     /// Card info for the Configuration page and sink profile decoration.
     pub(crate) cards: Vec<CardInfo>,
-    pub(crate) connected: bool,
-    pub(crate) error: Option<String>,
+    /// Unified subsystem health status.
+    pub(crate) subsystem_status: SubsystemStatus,
+}
+
+impl Default for AudioState {
+    fn default() -> Self {
+        Self {
+            sinks: Vec::new(),
+            sources: Vec::new(),
+            cards: Vec::new(),
+            subsystem_status: SubsystemStatus::Connecting,
+        }
+    }
 }
 
 // ── Sink (output device) ──────────────────────────────────────────────────
