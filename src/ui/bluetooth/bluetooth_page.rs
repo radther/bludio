@@ -3,9 +3,12 @@
 //! Ownership chain:
 //!   `BludioApp` → Entity<BluetoothPage> → Vec<Entity<BluetoothDeviceRow>>
 
+use std::time::Duration;
+
 use crate::bluetooth::BluetoothState;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
+use crate::ui::components::error_banner::error_banner;
 use crate::ui::components::page_header::page_header;
 use crate::ui::icons;
 use crate::ui::{h_flex, v_flex};
@@ -21,6 +24,10 @@ pub(crate) struct BluetoothPage {
     error: Option<String>,
     initialized: bool,
     cmd_tx: UnboundedSender<BluetoothPageCommand>,
+    /// Error banner text — `None` when banner is hidden.
+    error_banner_text: Option<String>,
+    /// Generation counter for banner animation (incremented on each new error).
+    error_banner_generation: u64,
 }
 
 impl BluetoothPage {
@@ -35,6 +42,8 @@ impl BluetoothPage {
             error: None,
             initialized: false,
             cmd_tx,
+            error_banner_text: None,
+            error_banner_generation: 0,
         }
     }
 
@@ -79,6 +88,30 @@ impl BluetoothPage {
                 .any(|d| d.address == r.read(cx).address)
         });
     }
+
+    /// Show an error message in the banner. Increments generation to restart animation.
+    /// Spawns a timer to auto-dismiss after 5 seconds.
+    pub(crate) fn show_error(&mut self, msg: String, cx: &mut Context<Self>) {
+        self.error_banner_text = Some(msg);
+        self.error_banner_generation += 1;
+        cx.notify();
+
+        // Auto-dismiss after 5 seconds.
+        let entity = cx.entity().clone();
+        cx.spawn(async move |_, cx| {
+            cx.background_executor().timer(Duration::from_secs(5)).await;
+            entity.update(cx, |page, cx| {
+                page.clear_error(cx);
+            });
+        })
+        .detach();
+    }
+
+    /// Clear the error banner.
+    pub(crate) fn clear_error(&mut self, cx: &mut Context<Self>) {
+        self.error_banner_text = None;
+        cx.notify();
+    }
 }
 
 impl Render for BluetoothPage {
@@ -92,6 +125,10 @@ impl Render for BluetoothPage {
         let connected_count = self.rows.iter().filter(|r| r.read(cx).connected).count();
 
         let cmd_tx = self.cmd_tx.clone();
+
+        // Capture banner state for the render closure.
+        let banner_text = self.error_banner_text.clone();
+        let banner_generation = self.error_banner_generation;
 
         v_flex()
             .flex_1()
@@ -145,7 +182,7 @@ impl Render for BluetoothPage {
                             })
                     }),
             )
-            // ── Error banner ──
+            // ── Bluetooth initialization error ──
             .when_some(self.error.clone(), |el, err| {
                 el.child(
                     div()
@@ -184,6 +221,21 @@ impl Render for BluetoothPage {
                         })
                         .children(self.rows.clone()),
                 )
+            })
+            // ── Action error banner (slides up from bottom) ──
+            .when_some(banner_text, |el, text| {
+                let entity = cx.entity().clone();
+                el.child(error_banner(
+                    &text,
+                    banner_generation,
+                    colors,
+                    text_styles,
+                    move |_, _window, cx| {
+                        entity.update(cx, |page, cx| {
+                            page.clear_error(cx);
+                        });
+                    },
+                ))
             })
     }
 }

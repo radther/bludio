@@ -7,7 +7,8 @@ use crate::audio::AudioState;
 use crate::audio::DeviceKind;
 use crate::bluetooth::BluetoothState;
 use crate::bluetooth::device::{
-    DeviceRowAction, PairingStatus, devices_changed, execute_device_action, quick_device_status,
+    DeviceRowAction, PairingStatus, devices_changed, execute_device_action, format_device_error,
+    quick_device_status,
 };
 use crate::ui::audio::audio_page::AudioPage;
 use crate::ui::audio::configuration_page::ConfigurationPage;
@@ -362,100 +363,113 @@ impl BludioApp {
         this: &gpui::WeakEntity<Self>,
         cx: &mut gpui::AsyncWindowContext,
     ) {
-        let mut push_status = |status: Option<PairingStatus>| {
+        let mut push_status = |status: Option<PairingStatus>, banner_msg: Option<String>| {
             let _ = this.update_in(cx, |this, _window, cx| {
                 if let Some(existing) = this.bt_state.devices.iter_mut().find(|d| d.address == addr)
                 {
                     existing.pairing_status = status;
                 }
-                this.bluetooth_page
-                    .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                this.bluetooth_page.update(cx, |page, cx| {
+                    page.sync_state(&this.bt_state, cx);
+                    if let Some(msg) = banner_msg {
+                        page.show_error(msg, cx);
+                    }
+                });
                 cx.notify();
             });
         };
 
-        // ── Step-by-step chain with proper double-Result flattening ──
-        // tokio_task wraps in oneshot: Result<Result<T,E>, Canceled>
-        // We must match both layers to catch D-Bus errors.
-        let mut ok = true;
+        // ── Step-by-step chain ──
+        // Helper: map a tokio_task double-Result to (ok, status, banner_msg).
+        let map_result =
+            |action_name: &str,
+             failure_label: &str,
+             result: Result<Result<(), bluer::Error>, futures::channel::oneshot::Canceled>|
+             -> (bool, Option<PairingStatus>, Option<String>) {
+                match result {
+                    Ok(Ok(())) => (true, None, None),
+                    Ok(Err(e)) => {
+                        let err_msg = format_device_error(action_name, addr, &e);
+                        eprintln!("[bluetooth] Pairing failed for {addr}: {err_msg}");
+                        (
+                            false,
+                            Some(PairingStatus::Failed(failure_label.into())),
+                            Some(err_msg),
+                        )
+                    }
+                    Err(_) => {
+                        eprintln!(
+                            "[bluetooth] Pairing failed for {addr}: {action_name} task cancelled"
+                        );
+                        (
+                            false,
+                            Some(PairingStatus::Failed("internal error".into())),
+                            None,
+                        )
+                    }
+                }
+            };
 
         // 1. Connect
-        if ok {
-            let a2 = adapter.clone();
-            ok = match crate::tokio_task(async move {
+        let a2 = adapter.clone();
+        let (ok, status, banner) = map_result(
+            "connect",
+            "connection failed",
+            crate::tokio_task(async move {
                 let device = a2.device(addr)?;
                 device.connect().await
             })
-            .await
-            {
-                Ok(Ok(())) => true,
-                Ok(Err(e)) => {
-                    eprintln!("[bluetooth] Pairing failed for {addr}: connect error: {e}");
-                    push_status(Some(PairingStatus::Failed("connection failed".into())));
-                    false
-                }
-                Err(_) => {
-                    eprintln!("[bluetooth] Pairing failed for {addr}: connect task cancelled");
-                    push_status(Some(PairingStatus::Failed("internal error".into())));
-                    false
-                }
-            };
+            .await,
+        );
+        if let Some(s) = status {
+            push_status(Some(s), banner);
         }
 
         // 2. Pair
-        if ok {
-            push_status(Some(PairingStatus::Pairing));
+        let ok = if ok {
+            push_status(Some(PairingStatus::Pairing), None);
             let a2 = adapter.clone();
-            ok = match crate::tokio_task(async move {
-                let device = a2.device(addr)?;
-                device.pair().await
-            })
-            .await
-            {
-                Ok(Ok(())) => true,
-                Ok(Err(e)) => {
-                    eprintln!("[bluetooth] Pairing failed for {addr}: pair error: {e}");
-                    push_status(Some(PairingStatus::Failed("pairing failed".into())));
-                    false
-                }
-                Err(_) => {
-                    eprintln!("[bluetooth] Pairing failed for {addr}: pair task cancelled");
-                    push_status(Some(PairingStatus::Failed("internal error".into())));
-                    false
-                }
-            };
-        }
+            let (ok, status, banner) = map_result(
+                "pair",
+                "pairing failed",
+                crate::tokio_task(async move {
+                    let device = a2.device(addr)?;
+                    device.pair().await
+                })
+                .await,
+            );
+            if let Some(s) = status {
+                push_status(Some(s), banner);
+            }
+            ok
+        } else {
+            false
+        };
 
         // 3. Trust + reconnect
-        if ok {
-            push_status(Some(PairingStatus::Trusting));
+        let ok = if ok {
+            push_status(Some(PairingStatus::Trusting), None);
             let a2 = adapter.clone();
-            ok = match crate::tokio_task(async move {
-                let device = a2.device(addr)?;
-                device.set_trusted(true).await?;
-                device.connect().await
-            })
-            .await
-            {
-                Ok(Ok(())) => true,
-                Ok(Err(e)) => {
-                    eprintln!(
-                        "[bluetooth] Pairing partially succeeded for {addr}: trust/connect error: {e}"
-                    );
-                    push_status(Some(PairingStatus::Failed("trust failed".into())));
-                    false
-                }
-                Err(_) => {
-                    eprintln!("[bluetooth] Pairing failed for {addr}: trust task cancelled");
-                    push_status(Some(PairingStatus::Failed("internal error".into())));
-                    false
-                }
-            };
-        }
+            let (ok, status, banner) = map_result(
+                "trust",
+                "trust failed",
+                crate::tokio_task(async move {
+                    let device = a2.device(addr)?;
+                    device.set_trusted(true).await?;
+                    device.connect().await
+                })
+                .await,
+            );
+            if let Some(s) = status {
+                push_status(Some(s), banner);
+            }
+            ok
+        } else {
+            false
+        };
 
         if ok {
-            eprintln!("[bluetooth] PairAndTrust succeeded for {addr}");
-            push_status(None);
+            push_status(None, None);
         }
 
         // Refresh device state (regardless of success/failure).
@@ -537,20 +551,29 @@ impl BludioApp {
                                 })
                                 .detach();
                             } else {
-                                eprintln!(
-                                    "[bluetooth] dispatching {action:?} for {addr}"
-                                );
                                 // Spawn simple action + post-action refresh.
                                 let a2 = a.clone();
                                 cx.spawn_in(window, async move |this, cx| {
                                     let a3 = a2.clone();
                                     let action_result = crate::tokio_task(async move {
-                                        execute_device_action(&a3, addr, action).await;
+                                        execute_device_action(&a3, addr, action).await
                                     })
                                     .await;
 
                                     match action_result {
-                                        Ok(()) => {}
+                                        Ok(Ok(())) => {
+                                            // Success — no banner needed.
+                                        }
+                                        Ok(Err(e)) => {
+                                            eprintln!(
+                                                "[bluetooth] {action:?} for {addr}: {e}"
+                                            );
+                                            let _ = this.update_in(cx, |this, _window, cx| {
+                                                this.bluetooth_page.update(cx, |page, cx| {
+                                                    page.show_error(e, cx);
+                                                });
+                                            });
+                                        }
                                         Err(_) => {
                                             eprintln!(
                                                 "[bluetooth] {action:?} for {addr}: tokio task cancelled"

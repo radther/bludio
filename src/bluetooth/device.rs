@@ -107,40 +107,85 @@ pub(crate) fn devices_changed(old: &[BluetoothDevice], new: &[BluetoothDevice]) 
     false
 }
 
+// ── Error formatting ─────────────────────────────────────────────────────
+
+/// Map BlueZ D-Bus errors to human-readable messages.
+pub(crate) fn format_device_error(
+    action: &str,
+    addr: bluer::Address,
+    error: &bluer::Error,
+) -> String {
+    let raw = error.to_string();
+    let friendly = if raw.contains("NotAvailable") {
+        "Device is out of range or not responding"
+    } else if raw.contains("NotReady") {
+        "Bluetooth adapter is not ready"
+    } else if raw.contains("AlreadyConnected") {
+        "Device is already connected"
+    } else if raw.contains("NotConnected") {
+        "Device is not connected"
+    } else if raw.contains("InProgress") {
+        "Another operation is in progress"
+    } else if raw.contains("AuthenticationTimeout") {
+        "Pairing timed out — try again"
+    } else if raw.contains("AuthenticationRejected") {
+        "Pairing was rejected by the device"
+    } else if raw.contains("AuthenticationCanceled") {
+        "Pairing was canceled"
+    } else if raw.contains("ConnectionAttemptFailed") {
+        "Connection attempt failed — device may be busy"
+    } else {
+        "Operation failed"
+    };
+    format!("{friendly} ({action} {addr}): {raw}")
+}
+
+// ── Device actions ────────────────────────────────────────────────────────
+
 /// Execute a device action (connect / disconnect / forget / pair+trust)
 /// on the current async runtime.
-// TODO: return Result<(), String> so callers can surface errors in the UI.
-// Currently errors are only logged to stderr — the user sees no feedback.
+///
+/// Returns `Ok(())` on success, or `Err(String)` with a human-readable
+/// error message on failure.
 pub(crate) async fn execute_device_action(
     adapter: &bluer::Adapter,
     addr: bluer::Address,
     action: DeviceRowAction,
-) {
+) -> Result<(), String> {
     match action {
         DeviceRowAction::Connect => {
-            if let Ok(device) = adapter.device(addr)
-                && let Err(e) = device.connect().await
-            {
-                eprintln!("[bluetooth] Connect failed for {addr}: {e}");
-            }
+            let device = adapter
+                .device(addr)
+                .map_err(|e| format_device_error("connect", addr, &e))?;
+            device
+                .connect()
+                .await
+                .map_err(|e| format_device_error("connect", addr, &e))?;
+            Ok(())
         }
         DeviceRowAction::Disconnect => {
-            if let Ok(device) = adapter.device(addr)
-                && let Err(e) = device.disconnect().await
-            {
-                eprintln!("[bluetooth] Disconnect failed for {addr}: {e}");
-            }
+            let device = adapter
+                .device(addr)
+                .map_err(|e| format_device_error("disconnect", addr, &e))?;
+            device
+                .disconnect()
+                .await
+                .map_err(|e| format_device_error("disconnect", addr, &e))?;
+            Ok(())
         }
         DeviceRowAction::Forget => {
-            if let Err(e) = adapter.remove_device(addr).await {
-                eprintln!("[bluetooth] Forget failed for {addr}: {e}");
-            }
+            adapter
+                .remove_device(addr)
+                .await
+                .map_err(|e| format_device_error("forget", addr, &e))?;
+            Ok(())
         }
         // PairAndTrust is handled stepwise in the command handler
         // (app.rs) with per-step UI status updates.
         DeviceRowAction::PairAndTrust => {
             // Unreachable — see command handler in app.rs.
             // Kept to satisfy exhaustive match.
+            Ok(())
         }
     }
 }
