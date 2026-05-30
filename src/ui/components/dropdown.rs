@@ -11,10 +11,11 @@ use crate::ui::StyledExt;
 use gpui::{
     AbsoluteLength, Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity, EventEmitter,
     FocusHandle, Focusable, FontWeight, Hsla, IntoElement, KeyDownEvent, MouseUpEvent, Pixels,
-    Render, RenderOnce, SharedString, Window, anchored, canvas, deferred, div, prelude::*, px,
+    Render, RenderOnce, SharedString, Window, anchored, canvas, deferred, div, point, prelude::*,
+    px,
 };
 
-use crate::ui::v_flex;
+use crate::ui::{h_flex, v_flex};
 
 // ── Events ─────────────────────────────────────────────────────────────────
 
@@ -112,6 +113,7 @@ struct DropdownComponent {
     menu_bg: Hsla,
     menu_border: Hsla,
     caption: (AbsoluteLength, FontWeight),
+    icon_color: Hsla,
 }
 
 impl DropdownComponent {
@@ -126,6 +128,7 @@ impl DropdownComponent {
             menu_bg: colors.background,
             menu_border: colors.menu_border,
             caption: text_styles.caption,
+            icon_color: colors.icon,
         }
     }
 }
@@ -145,7 +148,12 @@ impl RenderOnce for DropdownComponent {
                 d.trigger_bounds.map(|b| b.origin),
             )
         };
-        // Register click-outside-to-close when open (must happen during paint, not render).
+        // Register click-outside-to-close when open. This canvas is placed FIRST
+        // in the DOM so its handler registers before the trigger's on_click.
+        // During the bubble phase listeners fire in reverse registration order,
+        // so the trigger's on_click fires first (toggles is_open) and this
+        // handler fires second (sees the updated state and does nothing when
+        // the click was on the trigger).
         let click_outside = if is_open {
             let e = entity.clone();
             Some(
@@ -168,8 +176,7 @@ impl RenderOnce for DropdownComponent {
                         });
                     },
                 )
-                .absolute()
-                .size_full(),
+                .absolute(),
             )
         } else {
             None
@@ -181,7 +188,7 @@ impl RenderOnce for DropdownComponent {
                 .anchor(Anchor::TopLeft)
                 .snap_to_window_with_margin(px(8.));
             if let Some(pos) = trigger_pos {
-                anchored_menu = anchored_menu.position(pos);
+                anchored_menu = anchored_menu.position(point(pos.x, pos.y + px(4.)));
             }
             Some(
                 deferred(
@@ -266,6 +273,7 @@ impl RenderOnce for DropdownComponent {
                     }
                 },
             ))
+            .when_some(click_outside, gpui::ParentElement::child)
             .child(
                 // ── Trigger button ──
                 div()
@@ -277,7 +285,14 @@ impl RenderOnce for DropdownComponent {
                     .bg(self.bg)
                     .cursor(CursorStyle::PointingHand)
                     .hover(move |el| el.bg(self.hover))
-                    .child(selected.clone())
+                    .child(
+                        h_flex().gap_1().child(selected.clone()).child(
+                            crate::ui::icons::chevron_down()
+                                .w(px(12.))
+                                .h(px(12.))
+                                .text_color(self.icon_color),
+                        ),
+                    )
                     .on_click(window.listener_for(
                         &entity_for_trigger,
                         |this: &mut Dropdown, _, _, cx| {
@@ -287,9 +302,9 @@ impl RenderOnce for DropdownComponent {
                     )),
             )
             .when_some(menu, gpui::ParentElement::child)
-            .when_some(click_outside, gpui::ParentElement::child)
             .child(
-                // ── Canvas for trigger bounds capture ──
+                // Bounds-capturing canvas fills the outer div so it captures
+                // stable bounds for menu positioning after all siblings are laid out.
                 canvas(
                     move |bounds, _window, cx| {
                         entity_for_bounds.update(cx, |d, _| {

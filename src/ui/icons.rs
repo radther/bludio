@@ -39,3 +39,7 @@ pub fn text_field_test() -> gpui::Svg {
 pub fn refresh_ccw() -> gpui::Svg {
     icon("refresh-ccw")
 }
+
+pub fn chevron_down() -> gpui::Svg {
+    icon("chevron-down")
+}
