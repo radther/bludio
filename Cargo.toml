@@ -12,7 +12,7 @@ path = "src/main.rs"
 gpui-unofficial = "1.2.7"
 gpui-platform-gpui-unofficial = { version = "1.2.7", features = ["font-kit", "x11", "wayland"] }
 bluer = { version = "0.17", features = ["bluetoothd"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "process"] }
 futures = "0.3"
 libpulse-binding = "2.30"
 libpulse-sys = "1.23"

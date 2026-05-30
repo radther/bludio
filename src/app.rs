@@ -51,7 +51,7 @@ use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::bluetooth_page::BluetoothPage;
 use crate::ui::dev_test_page::DevTestPage;
 use crate::ui::icons;
-use crate::ui::tab_bar::{Tab, TabBar, TabBarEvent};
+use crate::ui::tab_bar::{Tab, TabAction, TabBar, TabBarEvent};
 use crate::ui::{h_flex, v_flex};
 use futures::{FutureExt, StreamExt};
 use gpui::{
@@ -69,6 +69,30 @@ pub(crate) enum Page {
     AudioInputs,
     Configuration,
     DevTest,
+}
+
+/// Errors that can occur when running a command via `pkexec`.
+#[derive(Debug, PartialEq)]
+pub(crate) enum PkexecError {
+    NotFound,
+    AuthCancelled,
+    NotAuthorized,
+    Failed(i32, String),
+}
+
+impl std::fmt::Display for PkexecError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotFound => write!(f, "pkexec not found — PolicyKit is required"),
+            Self::AuthCancelled => write!(f, "Authentication cancelled"),
+            Self::NotAuthorized => {
+                write!(f, "Not authorized — is the policy file installed?")
+            }
+            Self::Failed(code, stderr) => {
+                write!(f, "pkexec failed with code {code}: {stderr}")
+            }
+        }
+    }
 }
 
 // ── App state ──────────────────────────────────────────────────────────────
@@ -144,12 +168,25 @@ impl BludioApp {
                 tooltip: "Text Field Test",
             },
         ];
-        let tab_bar = cx.new(|cx| TabBar::new(tabs, 0, cx));
+        let actions = vec![TabAction {
+            icon: icons::bluetooth,
+            tooltip: "Restart Bluetooth service",
+            action_id: "restart-bluetooth",
+        }];
+        let tab_bar = cx.new(|cx| TabBar::new(tabs, actions, 0, cx));
         let tab_bar_sub = cx.subscribe(&tab_bar, {
             move |this, _tb, event: &TabBarEvent, cx| match event {
                 TabBarEvent::TabClicked(idx) => {
                     Self::switch_to_tab(this, *idx, cx);
                 }
+                TabBarEvent::ActionButtonClicked(action_id) => match action_id.as_str() {
+                    "restart-bluetooth" => {
+                        Self::handle_restart_bluetooth(this, cx);
+                    }
+                    _ => {
+                        eprintln!("[app] Unknown tab bar action: {action_id}");
+                    }
+                },
             }
         });
 
@@ -759,6 +796,71 @@ impl BludioApp {
             this.tab_bar
                 .update(cx, |tab_bar, cx| tab_bar.set_active_index(idx, cx));
             cx.notify();
+        }
+    }
+
+    // ── Bluetooth restart via pkexec ───────────────────────────────────
+
+    /// Handle the restart-bluetooth action: spawn pkexec and surface errors.
+    fn handle_restart_bluetooth(_this: &mut Self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            let rx = crate::tokio_task(async {
+                Self::run_pkexec(&["/usr/bin/systemctl", "restart", "bluetooth"]).await
+            });
+            let result = rx.await.unwrap_or(Err(PkexecError::Failed(
+                -1,
+                "Restart task cancelled".into(),
+            )));
+
+            let _ = this.update(cx, |this, cx| {
+                match result {
+                    Ok(()) => {}
+                    Err(msg) => {
+                        this.bluetooth_page.update(cx, |page, cx| {
+                            page.show_error(msg.to_string(), cx);
+                        });
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Execute a command via pkexec and return Ok(()) or a typed error.
+    async fn run_pkexec(command: &[&str]) -> Result<(), PkexecError> {
+        let output = tokio::process::Command::new("pkexec")
+            .args(command)
+            .output()
+            .await;
+
+        match output {
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    Err(PkexecError::NotFound)
+                } else {
+                    Err(PkexecError::Failed(
+                        -1,
+                        format!("Failed to run pkexec: {e}"),
+                    ))
+                }
+            }
+            Ok(output) => match output.status.code() {
+                Some(0) => Ok(()),
+                Some(126) => Err(PkexecError::AuthCancelled),
+                Some(127) => Err(PkexecError::NotAuthorized),
+                code => {
+                    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                    if stderr.is_empty() {
+                        Err(PkexecError::Failed(
+                            code.unwrap_or(-1),
+                            "pkexec exited with non-zero status".into(),
+                        ))
+                    } else {
+                        Err(PkexecError::Failed(code.unwrap_or(-1), stderr))
+                    }
+                }
+            },
         }
     }
 

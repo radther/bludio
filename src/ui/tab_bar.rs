@@ -36,11 +36,23 @@ const ANIMATION_DURATION: Duration = Duration::from_millis(250);
 // ── Tab configuration ──────────────────────────────────────────────────────
 
 /// Configuration for a single tab.
+#[derive(Debug)]
 pub struct Tab {
     /// Function that returns the icon element for this tab.
     pub icon: fn() -> gpui::Svg,
     /// Tooltip text shown on hover.
     pub tooltip: &'static str,
+}
+
+/// Configuration for a bottom-anchored action button.
+#[derive(Clone, Copy, Debug)]
+pub struct TabAction {
+    /// Function that returns the icon element for this action.
+    pub icon: fn() -> gpui::Svg,
+    /// Tooltip text shown on hover.
+    pub tooltip: &'static str,
+    /// Unique identifier for this action (matches what the parent handles).
+    pub action_id: &'static str,
 }
 
 // ── Events ─────────────────────────────────────────────────────────────────
@@ -50,6 +62,8 @@ pub struct Tab {
 pub(crate) enum TabBarEvent {
     /// User clicked a tab. Contains the tab index.
     TabClicked(usize),
+    /// User clicked a bottom-anchored action button. Contains the action_id.
+    ActionButtonClicked(String),
 }
 
 // ── Entity ─────────────────────────────────────────────────────────────────
@@ -64,6 +78,8 @@ pub(crate) enum TabBarEvent {
 ///   `BludioApp` → Entity<TabBar>
 pub(crate) struct TabBar {
     tabs: Vec<Tab>,
+    /// Bottom-anchored action buttons (e.g., restart bluetooth).
+    actions: Vec<TabAction>,
     /// The currently active tab index (set by parent via `set_active_index`).
     active_index: usize,
     /// Visual Y-position of the selection indicator (smoothly interpolated).
@@ -76,11 +92,17 @@ pub(crate) struct TabBar {
 
 impl TabBar {
     /// Create a new tab bar entity.
-    pub(crate) fn new(tabs: Vec<Tab>, active_index: usize, cx: &mut Context<Self>) -> Self {
+    pub(crate) fn new(
+        tabs: Vec<Tab>,
+        actions: Vec<TabAction>,
+        active_index: usize,
+        cx: &mut Context<Self>,
+    ) -> Self {
         Self {
             indicator_offset: active_index as f32 * TAB_HEIGHT + 28.0,
             active_index,
             tabs,
+            actions,
             animation_generation: 0,
             focus_handle: cx.focus_handle(),
         }
@@ -192,6 +214,39 @@ impl Render for TabBar {
             .relative()
             // ── Animated selection indicator ──
             .children(tab_buttons)
+            // ── Spacer pushes actions to bottom ──
+            .child(div().flex_1())
+            // ── Bottom-anchored action buttons ──
+            .children({
+                let entity = cx.entity().clone();
+                let actions = self.actions.clone();
+                actions.into_iter().map(move |action| {
+                    let entity = entity.clone();
+                    let action_id = action.action_id;
+                    h_flex()
+                        .id(SharedString::from(action.action_id))
+                        .justify_center()
+                        .w(px(TAB_BAR_WIDTH - 16.0))
+                        .mx_2()
+                        .mb_2()
+                        .h(px(TAB_HEIGHT))
+                        .rounded_lg()
+                        .cursor(CursorStyle::PointingHand)
+                        .tooltip(tooltip::tooltip_text(action.tooltip))
+                        .hover(move |el| el.bg(colors.element_hover))
+                        .on_click({
+                            let entity = entity.clone();
+                            move |_: &ClickEvent, _window, app_cx: &mut App| {
+                                entity.update(app_cx, |_this, entity_cx| {
+                                    entity_cx.emit(TabBarEvent::ActionButtonClicked(
+                                        action_id.to_string(),
+                                    ));
+                                });
+                            }
+                        })
+                        .child((action.icon)().text_color(colors.text_secondary))
+                })
+            })
             .child(
                 div()
                     .absolute()
