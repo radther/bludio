@@ -55,5 +55,5 @@
 - [x] 9.1 Verify all pages render correctly via `match` on `SubsystemStatus` for all four variants
 - [x] 9.2 Verify all pages transition correctly through: `Connecting` → `Connected` → `Disconnected` → `Reconnecting` → `Connected`
 - [x] 9.3 Verify no residual `connected: bool`, `error: Option<String>`, or `initialized: bool` fields remain in state or page structs
-- [ ] 9.4 Test with `systemctl --user restart wireplumber pipewire pipewire-pulse`, `sudo systemctl restart bluetooth`, and `rfkill unblock bluetooth`
+- [x] 9.4 Test with `systemctl --user restart wireplumber pipewire pipewire-pulse`, `sudo systemctl restart bluetooth`, and `rfkill unblock bluetooth`
 - [x] 9.5 Run `cargo clippy` and `cargo fmt` — fix any warnings

@@ -8,7 +8,7 @@ Display and manage PulseAudio audio devices (sinks and sources), including devic
 
 ### Requirement: Output devices are listed with properties
 
-The system SHALL display all PulseAudio output devices (sinks) in a scrollable list within the "Output Devices" page. Each device row SHALL show the device name, a volume slider with inline text field for numeric entry, mute state, a "Default" button, and a profile dropdown for output devices with an associated card. The default sink SHALL be visually distinguished by a status strip colored with the audio accent and a "Default" text badge.
+The system SHALL display all PulseAudio output devices (sinks) in a scrollable list within the "Output Devices" page. Each device row SHALL show the device name, a volume slider with inline text field for numeric entry, mute state, a "Default" button, and a profile dropdown for output devices with an associated card. The default sink SHALL be visually distinguished by a status strip colored with the audio accent and a "Default" text badge. When the Audio subsystem is disconnected or reconnecting, the page SHALL display the corresponding status state instead of the device list.
 
 #### Scenario: Output devices page shows all sinks
 
@@ -29,12 +29,31 @@ The system SHALL display all PulseAudio output devices (sinks) in a scrollable l
 #### Scenario: Connection state while PulseAudio is initializing
 
 - **WHEN** PulseAudio is not yet connected
-- **THEN** the output devices page SHALL display a "Connecting to PulseAudio..." message
+- **THEN** the Audio subsystem status SHALL be `Connecting`
+- **THEN** the output devices page SHALL display a "Connecting to PulseAudio..." message in the content area via a `match` on `SubsystemStatus::Connecting`
 - **THEN** the device list SHALL not be displayed
+
+#### Scenario: PulseAudio disconnected after runtime failure
+
+- **WHEN** the Audio subsystem status transitions to `Disconnected` after initial connection
+- **THEN** the output devices page SHALL display the error message
+- **THEN** the device list, volume sliders, and action buttons SHALL NOT be rendered
+
+#### Scenario: PulseAudio reconnecting
+
+- **WHEN** the Audio subsystem status is `Reconnecting`
+- **THEN** the output devices page SHALL display "Reconnecting to PulseAudio..."
+- **THEN** the device list SHALL NOT be rendered
+
+#### Scenario: PulseAudio reconnected successfully
+
+- **WHEN** the Audio subsystem status transitions back to `Connected`
+- **THEN** the output devices page SHALL resume displaying the device list with fresh data
+- **THEN** volume sliders and action buttons SHALL become interactive
 
 ### Requirement: Input devices are listed with properties
 
-The system SHALL display all PulseAudio input devices (sources, excluding monitor sources) in a scrollable list within the "Input Devices" page. Each device row SHALL show the device name, a volume slider with inline text field, mute state, and a "Default" button. Input device rows SHALL NOT show a profile dropdown.
+The system SHALL display all PulseAudio input devices (sources, excluding monitor sources) in a scrollable list within the "Input Devices" page. Each device row SHALL show the device name, a volume slider with inline text field, mute state, and a "Default" button. Input device rows SHALL NOT show a profile dropdown. When the Audio subsystem is disconnected or reconnecting, the page SHALL display the corresponding status state instead of the device list.
 
 #### Scenario: Input devices page shows all sources
 
@@ -55,6 +74,23 @@ The system SHALL display all PulseAudio input devices (sources, excluding monito
 
 - **WHEN** PulseAudio reports zero hardware sources
 - **THEN** the input devices page SHALL display a "No input devices found" message
+
+#### Scenario: PulseAudio disconnected after runtime failure
+
+- **WHEN** the Audio subsystem status transitions to `Disconnected` after initial connection
+- **THEN** the input devices page SHALL display the error message
+- **THEN** the device list, volume sliders, and action buttons SHALL NOT be rendered
+
+#### Scenario: PulseAudio reconnecting
+
+- **WHEN** the Audio subsystem status is `Reconnecting`
+- **THEN** the input devices page SHALL display "Reconnecting to PulseAudio..."
+- **THEN** the device list SHALL NOT be rendered
+
+#### Scenario: PulseAudio reconnected successfully
+
+- **WHEN** the Audio subsystem status transitions back to `Connected`
+- **THEN** the input devices page SHALL resume displaying the device list with fresh data
 
 ### Requirement: Card profiles are displayed and switchable via dropdown for output devices
 
@@ -100,7 +136,7 @@ The system SHALL allow the user to set any source as the system default input de
 
 ### Requirement: Device list reacts to external changes
 
-The system SHALL subscribe to PulseAudio events (sink, source, card, server) and SHALL refresh the displayed device list when any device property changes externally (e.g., volume changed via pactl, new device plugged in, profile switched by another app).
+The system SHALL subscribe to PulseAudio events (sink, source, card, server) and SHALL refresh the displayed device list when any device property changes externally (e.g., volume changed via pactl, new device plugged in, profile switched by another app). When the Audio subsystem disconnects, event processing SHALL halt and resume upon reconnection with a fresh event subscription.
 
 #### Scenario: External volume change is reflected
 
@@ -112,3 +148,15 @@ The system SHALL subscribe to PulseAudio events (sink, source, card, server) and
 
 - **WHEN** a new audio device is plugged in and registered with PulseAudio
 - **THEN** the appropriate device list (outputs or inputs) SHALL show the new device
+
+#### Scenario: PA event subscription halts on disconnect
+
+- **WHEN** the PulseAudio context enters a failed or terminated state
+- **THEN** the event subscription callback SHALL stop processing events
+- **THEN** the PA thread SHALL exit cleanly
+
+#### Scenario: PA event subscription resumes on reconnect
+
+- **WHEN** a new PA thread is created during reconnection
+- **THEN** a fresh event subscription SHALL be registered for Sink, Source, Card, and Server events
+- **THEN** external changes SHALL be detected and reflected in the UI as before
