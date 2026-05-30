@@ -169,9 +169,9 @@ impl BludioApp {
             },
         ];
         let actions = vec![TabAction {
-            icon: icons::bluetooth,
-            tooltip: "Restart Bluetooth service",
-            action_id: "restart-bluetooth",
+            icon: icons::refresh_ccw,
+            tooltip: "Restart Audio Stack",
+            action_id: "restart-audiostack",
         }];
         let tab_bar = cx.new(|cx| TabBar::new(tabs, actions, 0, cx));
         let tab_bar_sub = cx.subscribe(&tab_bar, {
@@ -180,8 +180,8 @@ impl BludioApp {
                     Self::switch_to_tab(this, *idx, cx);
                 }
                 TabBarEvent::ActionButtonClicked(action_id) => match action_id.as_str() {
-                    "restart-bluetooth" => {
-                        Self::handle_restart_bluetooth(this, cx);
+                    "restart-audiostack" => {
+                        Self::handle_restart_audiostack(this, cx);
                     }
                     _ => {
                         eprintln!("[app] Unknown tab bar action: {action_id}");
@@ -799,32 +799,87 @@ impl BludioApp {
         }
     }
 
-    // ── Bluetooth restart via pkexec ───────────────────────────────────
+    // ── Audio stack restart ────────────────────────────────────────────
 
-    /// Handle the restart-bluetooth action: spawn pkexec and surface errors.
-    fn handle_restart_bluetooth(_this: &mut Self, cx: &mut Context<Self>) {
+    /// Handle the restart-audiostack action: run the full recovery sequence
+    /// and surface per-step errors in the Bluetooth page banner.
+    fn handle_restart_audiostack(_this: &mut Self, cx: &mut Context<Self>) {
         cx.spawn(async move |this, cx| {
-            let rx = crate::tokio_task(async {
-                Self::run_pkexec(&["/usr/bin/systemctl", "restart", "bluetooth"]).await
-            });
-            let result = rx.await.unwrap_or(Err(PkexecError::Failed(
-                -1,
-                "Restart task cancelled".into(),
-            )));
+            let results = vec![
+                crate::tokio_task(async {
+                    Self::run_command(&[
+                        "systemctl",
+                        "--user",
+                        "restart",
+                        "wireplumber",
+                        "pipewire",
+                        "pipewire-pulse",
+                    ])
+                    .await
+                }),
+                crate::tokio_task(async {
+                    Self::run_pkexec(&["systemctl", "restart", "bluetooth"]).await
+                }),
+                crate::tokio_task(async {
+                    Self::run_command(&["rfkill", "unblock", "bluetooth"]).await
+                }),
+            ];
+
+            let mut errors = Vec::new();
+            for rx in results {
+                match rx.await {
+                    Ok(Ok(())) => {}
+                    Ok(Err(e)) => errors.push(e.to_string()),
+                    Err(_) => errors.push("Restart task cancelled".into()),
+                }
+            }
 
             let _ = this.update(cx, |this, cx| {
-                match result {
-                    Ok(()) => {}
-                    Err(msg) => {
-                        this.bluetooth_page.update(cx, |page, cx| {
-                            page.show_error(msg.to_string(), cx);
-                        });
-                    }
+                if !errors.is_empty() {
+                    let msg = errors.join("; ");
+                    this.bluetooth_page.update(cx, |page, cx| {
+                        page.show_error(msg, cx);
+                    });
                 }
                 cx.notify();
             });
         })
         .detach();
+    }
+
+    /// Execute a non-privileged command and return Ok(()) or a typed error.
+    async fn run_command(command: &[&str]) -> Result<(), PkexecError> {
+        let output = tokio::process::Command::new(command[0])
+            .args(&command[1..])
+            .output()
+            .await;
+
+        match output {
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    Err(PkexecError::NotFound)
+                } else {
+                    Err(PkexecError::Failed(
+                        -1,
+                        format!("Failed to run {}: {e}", command[0]),
+                    ))
+                }
+            }
+            Ok(output) => match output.status.code() {
+                Some(0) => Ok(()),
+                code => {
+                    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                    if stderr.is_empty() {
+                        Err(PkexecError::Failed(
+                            code.unwrap_or(-1),
+                            format!("{} exited with non-zero status", command[0]),
+                        ))
+                    } else {
+                        Err(PkexecError::Failed(code.unwrap_or(-1), stderr))
+                    }
+                }
+            },
+        }
     }
 
     /// Execute a command via pkexec and return Ok(()) or a typed error.

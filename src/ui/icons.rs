@@ -35,3 +35,7 @@ pub fn audio_card() -> gpui::Svg {
 pub fn text_field_test() -> gpui::Svg {
     icon("test-tube-diagonal")
 }
+
+pub fn refresh_ccw() -> gpui::Svg {
+    icon("refresh-ccw")
+}
