@@ -4,18 +4,16 @@
 //!   `BludioApp` → Entity<SettingsPage> → Entity<Dropdown> × 2
 
 use gpui::{
-    App, ClickEvent, Context, CursorStyle, Entity, EventEmitter, FocusHandle, Focusable, Render,
-    SharedString, Subscription, Window, div, prelude::*,
+    App, Context, CursorStyle, Entity, EventEmitter, FocusHandle, Focusable, Render, Subscription,
+    Window, div, prelude::*,
 };
 
-use crate::ui::theme::ThemeMode;
-
-use crate::settings::{settings, update_settings};
+use crate::settings::settings;
 use crate::ui::animation::FadeInAnimationExt;
 use crate::ui::components::dropdown::{Dropdown, DropdownEvent};
 use crate::ui::components::page_header::page_header;
 use crate::ui::ext::StyledExt;
-use crate::ui::theme::{dark_theme_ids, light_theme_ids};
+use crate::ui::theme::{ThemeMode, dark_theme_ids, light_theme_ids};
 use crate::ui::{h_flex, v_flex};
 
 // ── Events ───────────────────────────────────────────────────────────────────
@@ -24,7 +22,6 @@ use crate::ui::{h_flex, v_flex};
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug)]
 pub(crate) enum SettingsEvent {
-    #[allow(dead_code)]
     ModeChanged(ThemeMode),
     LightThemeChanged(String),
     DarkThemeChanged(String),
@@ -92,6 +89,22 @@ impl SettingsPage {
             _dark_dropdown_sub,
         }
     }
+
+    /// Sync dropdown selected indices with the current global settings.
+    /// Call this after an external settings change (e.g. from another page
+    /// via `update_settings`) to keep the dropdowns consistent.
+    pub(crate) fn sync_dropdowns(&mut self, cx: &mut Context<Self>) {
+        let current = settings(cx);
+        let light_idx = index_for_id(light_theme_ids(), &current.light_theme_id);
+        let dark_idx = index_for_id(dark_theme_ids(), &current.dark_theme_id);
+
+        self.light_theme_dropdown.update(cx, |d, cx| {
+            d.set_selected_index(light_idx, cx);
+        });
+        self.dark_theme_dropdown.update(cx, |d, cx| {
+            d.set_selected_index(dark_idx, cx);
+        });
+    }
 }
 
 impl EventEmitter<SettingsEvent> for SettingsPage {}
@@ -103,32 +116,12 @@ impl Focusable for SettingsPage {
 }
 
 impl Render for SettingsPage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Read settings values up front so we can drop the immutable borrow
-        // of `cx` before any mutable borrows (dropdown updates).
-        let (theme_mode, light_theme_id, dark_theme_id) = {
-            let s = settings(cx);
-            (
-                s.theme_mode,
-                s.light_theme_id.clone(),
-                s.dark_theme_id.clone(),
-            )
-        };
-
-        let light_idx = index_for_id(light_theme_ids(), &light_theme_id);
-        let dark_idx = index_for_id(dark_theme_ids(), &dark_theme_id);
-
-        self.light_theme_dropdown.update(cx, |d, cx| {
-            d.set_selected_index(light_idx, cx);
-        });
-        self.dark_theme_dropdown.update(cx, |d, cx| {
-            d.set_selected_index(dark_idx, cx);
-        });
-
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
         let text_styles = &theme.text_styles;
-        let is_light = theme_mode == ThemeMode::Light;
+        let is_light = settings(cx).theme_mode == ThemeMode::Light;
+        let entity = cx.entity().clone();
 
         v_flex()
             .flex_1()
@@ -165,21 +158,18 @@ impl Render for SettingsPage {
                                         is_light,
                                         colors,
                                         text_styles,
-                                        |_, _, cx| {
-                                            update_settings(
-                                                |s| s.theme_mode = ThemeMode::Light,
-                                                cx,
-                                            );
-                                        },
+                                        window,
+                                        &entity,
+                                        ThemeMode::Light,
                                     ))
                                     .child(mode_button(
                                         "Dark",
                                         !is_light,
                                         colors,
                                         text_styles,
-                                        |_, _, cx| {
-                                            update_settings(|s| s.theme_mode = ThemeMode::Dark, cx);
-                                        },
+                                        window,
+                                        &entity,
+                                        ThemeMode::Dark,
                                     )),
                             ),
                     )
@@ -210,10 +200,18 @@ fn mode_button(
     active: bool,
     colors: &crate::ui::theme::ThemeColors,
     text_styles: &crate::ui::theme::TextStyleSet,
-    on_click: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    window: &mut Window,
+    entity: &Entity<SettingsPage>,
+    mode: ThemeMode,
 ) -> gpui::Stateful<gpui::Div> {
+    let id = match label {
+        "Light" => "mode-btn-light",
+        "Dark" => "mode-btn-dark",
+        _ => "mode-btn-unknown",
+    };
+
     div()
-        .id(SharedString::from(format!("mode-btn-{label}")))
+        .id(id)
         .px_3()
         .py_1()
         .rounded_sm()
@@ -237,7 +235,11 @@ fn mode_button(
             })
         })
         .child(label)
-        .on_click(on_click)
+        .on_click(
+            window.listener_for(entity, move |_this: &mut SettingsPage, _, _, cx| {
+                cx.emit(SettingsEvent::ModeChanged(mode));
+            }),
+        )
 }
 
 /// Human-friendly display name for a theme ID.

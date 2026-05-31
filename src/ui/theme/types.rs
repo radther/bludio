@@ -7,14 +7,16 @@
 //!
 //! ```text
 //! Theme
+//! ├── id: &'static str (stable identifier for registry lookups)
 //! ├── appearance: Appearance (Light | Dark)
 //! ├── font_family: SharedString ("Noto Sans")
 //! ├── colors: ThemeColors (semantic color tokens)
 //! └── text_styles: TextStyleSet (size + weight per role)
 //! ```
 //!
-//! The active theme is stored as a GPUI global (`GlobalTheme`) and accessed
-//! via the free functions `theme(cx)` and `set_theme(theme, cx)`.
+//! The active theme is stored in `GlobalSettings` (see `src/settings.rs`) and
+//! accessed via `crate::settings::theme(cx)`. Runtime changes go through
+//! `crate::settings::update_settings()`.
 
 use gpui::{FontWeight, Hsla, SharedString};
 
@@ -136,6 +138,8 @@ impl Default for TextStyleSet {
 /// The full theme definition: appearance, colors, font family, and text styles.
 #[derive(Clone, Debug)]
 pub(crate) struct Theme {
+    /// Stable ID set at construction time. Reserved for round-trip use
+    /// (e.g. determining the ID of a theme retrieved from the registry).
     #[allow(dead_code)]
     pub id: &'static str,
     pub appearance: Appearance,
@@ -146,6 +150,8 @@ pub(crate) struct Theme {
 
 impl Theme {
     /// Stable string identifier for this theme variant.
+    /// Reserved for round-trip lookups; not yet read by any consumer but
+    /// kept for future settings UI that shows the current theme name.
     #[allow(dead_code)]
     pub(crate) fn id(&self) -> &'static str {
         self.id

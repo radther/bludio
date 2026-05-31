@@ -162,16 +162,20 @@ impl BludioApp {
         let dev_test_page = cx.new(DevTestPage::new);
         let settings_page = cx.new(SettingsPage::new);
         let settings_page_sub = cx.subscribe(&settings_page, {
-            move |_this, _, event: &SettingsEvent, cx| match event {
-                SettingsEvent::ModeChanged(mode) => {
-                    update_settings(|s| s.theme_mode = *mode, cx);
+            move |this, _, event: &SettingsEvent, cx| {
+                match event {
+                    SettingsEvent::ModeChanged(mode) => {
+                        update_settings(|s| s.theme_mode = *mode, cx);
+                    }
+                    SettingsEvent::LightThemeChanged(id) => {
+                        update_settings(|s| s.light_theme_id = id.clone(), cx);
+                    }
+                    SettingsEvent::DarkThemeChanged(id) => {
+                        update_settings(|s| s.dark_theme_id = id.clone(), cx);
+                    }
                 }
-                SettingsEvent::LightThemeChanged(id) => {
-                    update_settings(|s| s.light_theme_id = id.clone(), cx);
-                }
-                SettingsEvent::DarkThemeChanged(id) => {
-                    update_settings(|s| s.dark_theme_id = id.clone(), cx);
-                }
+                this.settings_page
+                    .update(cx, |page, cx| page.sync_dropdowns(cx));
             }
         });
 
