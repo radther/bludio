@@ -80,7 +80,7 @@ impl Render for DevTestPage {
                         dark_theme_btn(is_dark, colors, text_styles),
                         light_theme_btn(is_dark, colors, text_styles),
                     ]))
-                    .with_fade_in_up("dev-test-header", 1000, 1),
+                    .with_fade_in_up("dev-test-header", 1),
             )
             .child(
                 // Input area
@@ -123,7 +123,7 @@ impl Render for DevTestPage {
                                 .child("Click to focus input"),
                         ),
                     )
-                    .with_fade_in_up("dev-test-header", 1000, 2),
+                    .with_fade_in_up("dev-test-header", 2),
             )
             .child(
                 // Confirmed items list
@@ -159,7 +159,7 @@ impl Render for DevTestPage {
                                     .child(format!("#{}:", i + 1)),
                             )
                             .child(div().child(SharedString::from(text.as_str())))
-                            .with_fade_in_up(format!("dev-test-item-{i}"), 1000, i + 1)
+                            .with_fade_in_up(format!("dev-test-item-{i}"), i + 1)
                             .into_any_element()
                     }))
                     .when(self.confirmed_texts.is_empty(), |el| {
@@ -172,7 +172,7 @@ impl Render for DevTestPage {
                                 .child("No entries yet. Type something and press Enter."),
                         )
                     })
-                    .with_fade_in_up("dev-test-header", 1000, 3),
+                    .with_fade_in_up("dev-test-header", 3),
             )
             .child(loading_bar("dev-test-loading-bar", colors.dev_accent))
     }

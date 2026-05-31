@@ -7,6 +7,7 @@ use std::time::Duration;
 
 use crate::bluetooth::BluetoothState;
 use crate::subsystem::SubsystemStatus;
+use crate::ui::animation::FadeInAnimationExt;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
 use crate::ui::components::error_banner::error_banner;
@@ -204,8 +205,10 @@ impl Render for BluetoothPage {
                                     }
                                 })
                             })
-                    }),
+                    })
+                    .with_fade_in_up("bt-header", 1),
             )
+            // ── Scanning loading bar ──
             .child(div().h_1().when(self.discovering, |el| {
                 el.child(loading_bar(
                     "bluetooth-scan-loading-bar",
@@ -219,18 +222,21 @@ impl Render for BluetoothPage {
                     .flex_1()
                     .text_color(colors.text_secondary)
                     .child("Connecting to Bluetooth...")
+                    .with_fade_in_up("bt-connecting", 2)
                     .into_any_element(),
                 SubsystemStatus::Disconnected(msg) => h_flex()
                     .justify_center()
                     .flex_1()
                     .text_color(colors.danger)
                     .child(format!("Error: {msg}"))
+                    .with_fade_in_up("bt-disconnected", 2)
                     .into_any_element(),
                 SubsystemStatus::Reconnecting => h_flex()
                     .justify_center()
                     .flex_1()
                     .text_color(colors.text_secondary)
                     .child("Reconnecting to Bluetooth...")
+                    .with_fade_in_up("bt-reconnecting", 2)
                     .into_any_element(),
                 SubsystemStatus::Connected => {
                     // ── Device list ──
@@ -245,10 +251,16 @@ impl Render for BluetoothPage {
                                 h_flex()
                                     .justify_center()
                                     .text_color(colors.text_secondary)
-                                    .child("No devices. Press \"scan\" to discover."),
+                                    .child("No devices. Press \"scan\" to discover.")
+                                    .with_fade_in_up("bt-empty", 2),
                             )
                         })
-                        .children(self.rows.clone())
+                        .children(self.rows.iter().enumerate().map(|(i, row)| {
+                            div()
+                                .child(row.clone())
+                                .with_fade_in_up(format!("bt-row-{i}"), i + 2)
+                                .into_any_element()
+                        }))
                         .into_any_element()
                 }
             })

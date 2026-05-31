@@ -12,33 +12,18 @@ use gpui::{
 
 /// Extension trait for fade-in animations on any styled element.
 pub trait FadeInAnimationExt: Styled + Sized + IntoElement + 'static {
-    /// Animate this element's opacity from 0% to 100% over `duration_ms`.
-    /// Uses an ease-out-quint curve for a fast-in feel.
-    fn with_fade_in(self, id: impl Into<ElementId>, duration_ms: u64) -> AnimationElement<Self> {
-        self.with_animation(
-            id,
-            Animation::new(Duration::from_millis(duration_ms)).with_easing(ease_out_quint()),
-            |this, delta| this.opacity(delta),
-        )
-    }
-
     /// Animate this element upward while fading in.
     ///
     /// The element starts `40 * count` pixels below its final position and
     /// animates up while opacity goes from 0% to 100%. Increase `count`
     /// for each successive item (e.g. header = 0, first list item = 1,
     /// second = 2, …) so each element has a larger staggered entrance.
-    fn with_fade_in_up(
-        self,
-        id: impl Into<ElementId>,
-        duration_ms: u64,
-        count: usize,
-    ) -> AnimationElement<Self> {
+    fn with_fade_in_up(self, id: impl Into<ElementId>, count: usize) -> AnimationElement<Self> {
         self.with_animation(
             id,
-            Animation::new(Duration::from_millis(duration_ms)).with_easing(ease_out_quint()),
+            Animation::new(Duration::from_millis(400)).with_easing(ease_out_quint()),
             move |this, delta| {
-                let offset = 40.0 * count as f32;
+                let offset = 20.0 * count as f32;
                 this.relative()
                     .top(px((1.0 - delta) * offset))
                     .opacity(delta)
