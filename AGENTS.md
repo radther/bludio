@@ -145,5 +145,10 @@ The display name resolution and filtering logic matches [blueman](https://github
 
 When working in this codebase, **keep this file in mind** — it documents the conventions and patterns discovered so far. After completing and archiving an OpenSpec change (i.e., when the implementation has settled), review this file and suggest additions if you noticed new conventions, patterns, or important context that should be captured here. Do not propose updates mid-implementation; wait until the code is stable and the change is archived.
 
+### Commit practices
+
+- DO NOT commit code without user permission. Being asked to commit once doesn't mean you should commit automatically from that point on. ALWAYS ask first before committing.
+- If you see changes that you didn't make before you are about to commit, don't change them — ask first as it's likely they are user changes that they made after yours. Ask for clarification before reverting them.
+
 ### On diverging from the plan
 OpenSpec artifacts (design.md, tasks.md) are a starting point — they describe intent, not ground truth. When implementation reveals that the plan was wrong about a specific detail (e.g., gpui's actual return types don't match what the design assumed), accept the correction and move forward. Don't loop trying to make reality fit a mistaken assumption. Minor deviations like concrete type changes (`Div` vs `Stateful<Div>`) are expected and don't require design updates unless the divergence is significant. When in doubt, correct the code, note the deviation, and update the design doc after the fact.

@@ -14,8 +14,8 @@ use gpui::{
 pub trait FadeInAnimationExt: Styled + Sized + IntoElement + 'static {
     /// Animate this element upward while fading in.
     ///
-    /// The element starts `40 * count` pixels below its final position and
-    /// animates up while opacity goes from 0% to 100%. Increase `count`
+    /// The element starts `20 * count` pixels below its final position and
+    /// animates up while opacity goes from 30% to 100%. Increase `count`
     /// for each successive item (e.g. header = 0, first list item = 1,
     /// second = 2, …) so each element has a larger staggered entrance.
     fn with_fade_in_up(self, id: impl Into<ElementId>, count: usize) -> AnimationElement<Self> {
@@ -26,7 +26,7 @@ pub trait FadeInAnimationExt: Styled + Sized + IntoElement + 'static {
                 let offset = 20.0 * count as f32;
                 this.relative()
                     .top(px((1.0 - delta) * offset))
-                    .opacity(delta)
+                    .opacity(0.3 + delta * 0.5)
             },
         )
     }
