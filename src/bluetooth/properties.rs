@@ -45,45 +45,59 @@ pub(crate) struct DeviceProperties {
     pub rssi: Option<i16>,
 }
 
-/// Fetch all device properties with per-category timeouts.
+/// Fetch all device properties concurrently with per-category timeouts.
+///
+/// All six D-Bus calls are independent and run simultaneously via
+/// `tokio::join!`, so a single slow property (e.g. cold SDP lookup for
+/// `Name`, or RSSI measurement) doesn't block the rest. The total wait
+/// time is the max of each call, not their sum.
 pub(crate) async fn fetch_properties(
     device: &Device,
     timeouts: PropertyTimeouts,
 ) -> DeviceProperties {
-    let alias = tokio::time::timeout(timeouts.name_resolution, device.alias())
-        .await
-        .ok()
-        .and_then(std::result::Result::ok);
-
-    let name = tokio::time::timeout(timeouts.name_resolution, device.name())
-        .await
-        .ok()
-        .and_then(std::result::Result::ok)
-        .flatten();
-
-    let paired = tokio::time::timeout(timeouts.status, device.is_paired())
-        .await
-        .ok()
-        .and_then(std::result::Result::ok)
-        .unwrap_or(false);
-
-    let connected = tokio::time::timeout(timeouts.status, device.is_connected())
-        .await
-        .ok()
-        .and_then(std::result::Result::ok)
-        .unwrap_or(false);
-
-    let trusted = tokio::time::timeout(timeouts.status, device.is_trusted())
-        .await
-        .ok()
-        .and_then(std::result::Result::ok)
-        .unwrap_or(false);
-
-    let rssi = tokio::time::timeout(timeouts.rssi, device.rssi())
-        .await
-        .ok()
-        .and_then(std::result::Result::ok)
-        .flatten();
+    let (alias, name, paired, connected, trusted, rssi) = tokio::join!(
+        async {
+            tokio::time::timeout(timeouts.name_resolution, device.alias())
+                .await
+                .ok()
+                .and_then(std::result::Result::ok)
+        },
+        async {
+            tokio::time::timeout(timeouts.name_resolution, device.name())
+                .await
+                .ok()
+                .and_then(std::result::Result::ok)
+                .flatten()
+        },
+        async {
+            tokio::time::timeout(timeouts.status, device.is_paired())
+                .await
+                .ok()
+                .and_then(std::result::Result::ok)
+                .unwrap_or(false)
+        },
+        async {
+            tokio::time::timeout(timeouts.status, device.is_connected())
+                .await
+                .ok()
+                .and_then(std::result::Result::ok)
+                .unwrap_or(false)
+        },
+        async {
+            tokio::time::timeout(timeouts.status, device.is_trusted())
+                .await
+                .ok()
+                .and_then(std::result::Result::ok)
+                .unwrap_or(false)
+        },
+        async {
+            tokio::time::timeout(timeouts.rssi, device.rssi())
+                .await
+                .ok()
+                .and_then(std::result::Result::ok)
+                .flatten()
+        },
+    );
 
     DeviceProperties {
         alias,

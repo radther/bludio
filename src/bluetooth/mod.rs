@@ -73,6 +73,11 @@ impl BluetoothState {
     }
 
     /// Re-enumerate all known devices from the adapter.
+    ///
+    /// Fetches properties for all devices concurrently via `join_all`.
+    /// Since each device's D-Bus calls are also concurrent (`fetch_properties`
+    /// uses `tokio::join!`), the total wait time is bounded by the slowest
+    /// single property call across all devices rather than the sum of all.
     pub async fn list_devices(&mut self) -> Result<(), String> {
         let adapter = self
             .adapter
@@ -84,11 +89,19 @@ impl BluetoothState {
             .await
             .map_err(|e| format!("Failed to list devices: {e}"))?;
 
+        // Fire all device-info futures concurrently.
+        let results: Vec<Result<BluetoothDevice, String>> = futures::future::join_all(
+            addresses
+                .iter()
+                .map(|&addr| build_device_info(adapter, addr)),
+        )
+        .await;
+
         let mut devices = Vec::new();
-        for addr in addresses {
-            match build_device_info(adapter, addr).await {
+        for result in results {
+            match result {
                 Ok(d) => devices.push(d),
-                Err(e) => eprintln!("Skipping device {addr}: {e}"),
+                Err(e) => eprintln!("Skipping device: {e}"),
             }
         }
         device::sort_devices(&mut devices);

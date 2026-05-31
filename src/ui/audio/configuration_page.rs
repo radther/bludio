@@ -37,7 +37,7 @@ impl ConfigurationPage {
         }
     }
 
-    /// Swap the command sender (used after audio reconnect).
+    /// Swap the command sender and wakeup (used after audio reconnect).
     pub(crate) fn update_cmd_tx(
         &mut self,
         cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
@@ -45,6 +45,11 @@ impl ConfigurationPage {
     ) {
         self.cmd_tx = cmd_tx;
         self.wakeup = wakeup;
+    }
+
+    /// Set the wakeup handle after construction (async arrival).
+    pub(crate) fn set_wakeup(&mut self, wakeup: PaWakeup) {
+        self.wakeup = Some(wakeup);
     }
 
     /// Sync rows with the latest audio state cards.

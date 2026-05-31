@@ -101,6 +101,8 @@ pub(crate) struct BludioApp {
     pub(crate) bt_state: BluetoothState,
     pub(crate) bt_agent: Option<crate::bluetooth::agent::AgentHandle>,
     pub(crate) audio_state: AudioState,
+    /// PA mainloop wakeup handle — `None` until the PA thread connects.
+    pa_wakeup: Option<PaWakeup>,
     /// Self-contained page entities.
     audio_output_page: Entity<AudioPage>,
     audio_input_page: Entity<AudioPage>,
@@ -121,15 +123,23 @@ impl BludioApp {
     pub(crate) fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // ── Audio init: spawn PA thread ──
         let conn = AudioConnection::spawn();
-        let pa_wakeup = conn.wakeup_rx.recv().ok();
+        // Non-blocking: if PA is already running the wakeup is ready
+        // immediately; if not, the state loop will wait for it async.
+        let pa_wakeup = conn.wakeup_rx.try_recv().ok();
         let audio_cmd_tx = conn.cmd_tx;
         let audio_state_rx = conn.state_rx;
-        let pa_init_error = pa_wakeup
-            .is_none()
-            .then(|| "PulseAudio failed to initialize".to_string());
+
+        // If the wakeup wasn't immediately available, hand the receiver
+        // to the state loop so it can wait asynchronously (no main-thread
+        // block).
+        let wakeup_rx_for_loop = if pa_wakeup.is_none() {
+            Some(conn.wakeup_rx)
+        } else {
+            None
+        };
 
         // ── Wire background subsystems ──
-        Self::spawn_audio_state_loop(audio_state_rx, window, cx);
+        Self::spawn_audio_state_loop(audio_state_rx, wakeup_rx_for_loop, window, cx);
         Self::spawn_bluetooth_init(window, cx);
 
         // ── Bluetooth command channel ──
@@ -210,15 +220,11 @@ impl BludioApp {
 
         Self::spawn_bluetooth_command_handler(bt_cmd_rx, window, cx);
 
-        let mut audio_state = AudioState::default();
-        if let Some(err) = pa_init_error {
-            audio_state.subsystem_status = SubsystemStatus::Disconnected(err);
-        }
-
         Self {
             bt_state: BluetoothState::default(),
             bt_agent: None,
-            audio_state,
+            audio_state: AudioState::default(),
+            pa_wakeup,
             audio_output_page,
             audio_input_page,
             configuration_page,
@@ -236,11 +242,43 @@ impl BludioApp {
 
     fn spawn_audio_state_loop(
         audio_state_rx: tokio::sync::mpsc::UnboundedReceiver<AudioState>,
+        wakeup_rx: Option<std::sync::mpsc::Receiver<PaWakeup>>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         cx.spawn_in(window, async move |this, cx| {
             let _tokio_guard = crate::TOKIO.enter();
+
+            // ── Phase 0: wait for PA wakeup handle (async, no UI block) ──
+            if let Some(wakeup_rx) = wakeup_rx {
+                // Offload the blocking std::sync::mpsc::recv() to a
+                // worker thread so we don't stall the background executor.
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                std::thread::spawn(move || {
+                    let _ = tx.send(wakeup_rx.recv().ok());
+                });
+                // Wait for the wakeup (or channel close if PA thread died).
+                if let Ok(Some(wakeup)) = rx.await {
+                    let _ = this.update_in(cx, |this, window, cx| {
+                        this.pa_wakeup = Some(wakeup);
+                        this.audio_output_page.update(cx, |page, cx| {
+                            page.set_wakeup(wakeup);
+                            page.sync_rows(&this.audio_state, window, cx);
+                        });
+                        this.audio_input_page.update(cx, |page, cx| {
+                            page.set_wakeup(wakeup);
+                            page.sync_rows(&this.audio_state, window, cx);
+                        });
+                        this.configuration_page.update(cx, |page, cx| {
+                            page.set_wakeup(wakeup);
+                            page.sync_cards(&this.audio_state, cx);
+                        });
+                        cx.notify();
+                    });
+                }
+            }
+
+            // ── Phase 1: process audio state updates ──
             let mut rx = audio_state_rx;
             while let Some(state) = rx.recv().await {
                 let is_disconnected =
@@ -347,6 +385,7 @@ impl BludioApp {
                     let audio_cmd_tx = conn.cmd_tx;
                     let audio_state_rx = conn.state_rx;
                     let _ = this.update_in(cx, |this, window, cx| {
+                        this.pa_wakeup = pa_wakeup;
                         this.audio_output_page.update(cx, |page, _cx| {
                             page.update_cmd_tx(audio_cmd_tx.clone(), pa_wakeup);
                         });
@@ -358,7 +397,8 @@ impl BludioApp {
                         });
 
                         // Spawn new state loop with the new receiver.
-                        Self::spawn_audio_state_loop(audio_state_rx, window, cx);
+                        // No wakeup_rx needed — wakeup is already available.
+                        Self::spawn_audio_state_loop(audio_state_rx, None, window, cx);
                     });
                     return;
                 }
