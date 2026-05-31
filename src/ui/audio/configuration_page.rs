@@ -7,6 +7,7 @@
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, AudioState};
 use crate::subsystem::SubsystemStatus;
+use crate::ui::animation::FadeInAnimationExt;
 use crate::ui::audio::card_row::CardRow;
 use crate::ui::components::page_header::page_header;
 use crate::ui::{h_flex, v_flex};
@@ -94,19 +95,26 @@ impl Render for ConfigurationPage {
 
         v_flex()
             .flex_1()
-            .child(h_flex().justify_between().px_4().py_2().child(page_header(
-                "Configuration",
-                match &self.subsystem_status {
-                    SubsystemStatus::Connected => format!(
-                        "{} card{}",
-                        self.rows.len(),
-                        if self.rows.len() == 1 { "" } else { "s" }
-                    ),
-                    _ => String::new(),
-                },
-                colors,
-                text_styles,
-            )))
+            .child(
+                h_flex()
+                    .justify_between()
+                    .px_4()
+                    .py_2()
+                    .child(page_header(
+                        "Configuration",
+                        match &self.subsystem_status {
+                            SubsystemStatus::Connected => format!(
+                                "{} card{}",
+                                self.rows.len(),
+                                if self.rows.len() == 1 { "" } else { "s" }
+                            ),
+                            _ => String::new(),
+                        },
+                        colors,
+                        text_styles,
+                    ))
+                    .with_fade_in_up("config-header", 1),
+            )
             .child(match &self.subsystem_status {
                 SubsystemStatus::Connecting => h_flex()
                     .justify_center()
@@ -139,7 +147,12 @@ impl Render for ConfigurationPage {
                             .id("audio-card-list")
                             .flex_1()
                             .overflow_y_scroll()
-                            .children(self.rows.clone())
+                            .children(self.rows.iter().enumerate().map(|(i, row)| {
+                                div()
+                                    .child(row.clone())
+                                    .with_fade_in_up(format!("config-row-{i}"), i + 2)
+                                    .into_any_element()
+                            }))
                             .into_any_element()
                     }
                 }

@@ -7,10 +7,11 @@
 use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, AudioState, DeviceKind};
 use crate::subsystem::SubsystemStatus;
+use crate::ui::animation::FadeInAnimationExt;
 use crate::ui::audio::device_row::AudioDeviceRow;
 use crate::ui::components::page_header::page_header;
 use crate::ui::{h_flex, v_flex};
-use gpui::{Context, Entity, Render, Window, prelude::*, px};
+use gpui::{Context, Entity, Render, Window, div, prelude::*, px};
 
 // ── Audio page entity ──────────────────────────────────────────────────────
 
@@ -168,12 +169,14 @@ impl Render for AudioPage {
 
         v_flex()
             .flex_1()
-            .child(h_flex().justify_between().px_4().py_2().child(page_header(
-                title,
-                caption,
-                colors,
-                text_styles,
-            )))
+            .child(
+                h_flex()
+                    .justify_between()
+                    .px_4()
+                    .py_2()
+                    .child(page_header(title, caption, colors, text_styles))
+                    .with_fade_in_up("audio-header", 1),
+            )
             .child(match &self.subsystem_status {
                 SubsystemStatus::Connecting => h_flex()
                     .justify_center()
@@ -210,7 +213,12 @@ impl Render for AudioPage {
                             .id("audio-device-list")
                             .flex_1()
                             .overflow_y_scroll()
-                            .children(self.rows.clone())
+                            .children(self.rows.iter().enumerate().map(|(i, row)| {
+                                div()
+                                    .child(row.clone())
+                                    .with_fade_in_up(format!("audio-row-{i}"), i + 2)
+                                    .into_any_element()
+                            }))
                             .into_any_element()
                     }
                 }

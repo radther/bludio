@@ -9,6 +9,7 @@ use gpui::{
     Subscription, Window, div, prelude::*, px,
 };
 
+use crate::ui::animation::FadeInAnimationExt;
 use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
@@ -78,7 +79,8 @@ impl Render for DevTestPage {
                     .child(h_flex().gap_2().children(vec![
                         dark_theme_btn(is_dark, colors, text_styles),
                         light_theme_btn(is_dark, colors, text_styles),
-                    ])),
+                    ]))
+                    .with_fade_in_up("dev-test-header", 1),
             )
             .child(
                 // Input area
@@ -120,7 +122,8 @@ impl Render for DevTestPage {
                                 })
                                 .child("Click to focus input"),
                         ),
-                    ),
+                    )
+                    .with_fade_in_up("dev-test-header", 2),
             )
             .child(
                 // Confirmed items list
@@ -156,6 +159,7 @@ impl Render for DevTestPage {
                                     .child(format!("#{}:", i + 1)),
                             )
                             .child(div().child(SharedString::from(text.as_str())))
+                            .with_fade_in_up(format!("dev-test-item-{i}"), i + 1)
                             .into_any_element()
                     }))
                     .when(self.confirmed_texts.is_empty(), |el| {
@@ -167,7 +171,8 @@ impl Render for DevTestPage {
                                 .styled(text_styles.body)
                                 .child("No entries yet. Type something and press Enter."),
                         )
-                    }),
+                    })
+                    .with_fade_in_up("dev-test-header", 3),
             )
             .child(loading_bar("dev-test-loading-bar", colors.dev_accent))
     }

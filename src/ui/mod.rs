@@ -3,6 +3,7 @@
 //! Re-exports the `h_flex`/`v_flex` free functions, the `StyledExt` trait,
 //! and all UI component modules.
 
+pub mod animation;
 pub mod audio;
 pub mod bluetooth;
 pub mod components;
