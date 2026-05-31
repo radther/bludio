@@ -1016,6 +1016,24 @@ impl BludioApp {
                                 })
                                 .detach();
                             } else {
+                                // For Connect, show a transient loading state
+                                // on the row while the D-Bus call is in flight.
+                                if action == DeviceRowAction::Connect {
+                                    if let Some(existing) = this
+                                        .bt_state
+                                        .devices
+                                        .iter_mut()
+                                        .find(|d| d.address == addr)
+                                    {
+                                        existing.pairing_status =
+                                            Some(PairingStatus::Connecting);
+                                    }
+                                    this.bluetooth_page.update(cx, |page, cx| {
+                                        page.sync_state(&this.bt_state, cx);
+                                    });
+                                    cx.notify();
+                                }
+
                                 // Spawn simple action + post-action refresh.
                                 let a2 = a.clone();
                                 cx.spawn_in(window, async move |this, cx| {

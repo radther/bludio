@@ -144,7 +144,7 @@ impl Render for BluetoothDeviceRow {
                             .child(
                                 // ── Action buttons ──
                                 h_flex().gap_1().map(move |mut btn_row| {
-                                    if paired && !connected {
+                                    if paired && !connected && !is_connecting {
                                         btn_row = btn_row.child(action_btn(
                                             format!("btn-{addr}-Connect"),
                                             "Connect",
@@ -186,7 +186,7 @@ impl Render for BluetoothDeviceRow {
                                             text_styles,
                                         ));
                                     }
-                                    if paired {
+                                    if paired && !is_connecting {
                                         btn_row = btn_row.child(action_btn(
                                             format!("btn-{addr}-Forget"),
                                             "Forget",
