@@ -496,16 +496,6 @@ impl BludioApp {
                     continue;
                 }
 
-                let discovering = this
-                    .read_with(cx, |app, _| app.bt_state.discovering)
-                    .unwrap_or(false);
-                if discovering {
-                    cx.background_executor()
-                        .timer(std::time::Duration::from_secs(1))
-                        .await;
-                    continue;
-                }
-
                 // Wait for a monitor event or a 10s fallback timer.
                 let event: Option<MonitorEvent> = futures::select! {
                     evt = monitor_rx.next().fuse() => evt,
