@@ -9,6 +9,7 @@ use gpui::{
     Subscription, Window, div, prelude::*, px,
 };
 
+use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use crate::ui::theme;
@@ -168,6 +169,7 @@ impl Render for DevTestPage {
                         )
                     }),
             )
+            .child(loading_bar(colors.dev_accent))
     }
 }
 
