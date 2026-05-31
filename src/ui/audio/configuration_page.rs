@@ -143,8 +143,9 @@ impl Render for ConfigurationPage {
                             .child("No audio cards found")
                             .into_any_element()
                     } else {
-                        div()
+                        v_flex()
                             .id("audio-card-list")
+                            .gap_4()
                             .flex_1()
                             .overflow_y_scroll()
                             .children(self.rows.iter().enumerate().map(|(i, row)| {

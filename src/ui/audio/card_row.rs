@@ -8,7 +8,7 @@ use crate::audio::pulse::PaWakeup;
 use crate::audio::{AudioCommand, CardInfo};
 use crate::ui::StyledExt;
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
-use crate::ui::h_flex;
+use crate::ui::v_flex;
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, Render, SharedString, Subscription, Window, div,
     prelude::*,
@@ -102,25 +102,20 @@ impl Render for CardRow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = &crate::ui::theme::theme(cx).colors;
         let text_styles = &crate::ui::theme::theme(cx).text_styles;
-        h_flex()
-            .justify_between()
+        v_flex()
             .id(SharedString::from(format!("card-{}", self.card_index)))
-            .px_4()
-            .border_b_1()
-            .border_color(colors.border_subtle)
+            .px_8()
             .hover(|el| el.bg(colors.hover_overlay))
+            .gap_2()
+            .items_start()
+            .w_full()
             .child(
-                h_flex()
-                    .gap_2()
-                    .w_full()
-                    .child(
-                        div()
-                            .styled(text_styles.body)
-                            .child(SharedString::from(self.display_name.clone())),
-                    )
-                    .when(self.profile_dropdown.read(cx).has_items(), |el| {
-                        el.child(self.profile_dropdown.clone())
-                    }),
+                div()
+                    .styled(text_styles.body)
+                    .child(SharedString::from(self.display_name.clone())),
             )
+            .when(self.profile_dropdown.read(cx).has_items(), |el| {
+                el.child(self.profile_dropdown.clone())
+            })
     }
 }
