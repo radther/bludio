@@ -51,6 +51,7 @@ const HIGHLIGHT_HIGH: Hsla = hsl!(248.0, 0.13, 0.36);
 /// color tokens.
 pub(crate) fn rose_pine() -> Theme {
     Theme {
+        id: "rose-pine",
         appearance: Appearance::Dark,
         font_family: "Noto Sans".into(),
         text_styles: Default::default(),

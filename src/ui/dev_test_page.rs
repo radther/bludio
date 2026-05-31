@@ -206,7 +206,7 @@ fn dark_theme_btn(
         })
         .child("Dark")
         .on_click(|_: &ClickEvent, _, cx| {
-            theme::set_theme(theme::rose_pine(), cx);
+            theme::update_settings(|s| s.theme_mode = theme::ThemeMode::Dark, cx);
         })
 }
 
@@ -232,6 +232,6 @@ fn light_theme_btn(
         })
         .child("Light")
         .on_click(|_: &ClickEvent, _, cx| {
-            theme::set_theme(theme::rose_pine_dawn(), cx);
+            theme::update_settings(|s| s.theme_mode = theme::ThemeMode::Light, cx);
         })
 }

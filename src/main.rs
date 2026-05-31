@@ -5,6 +5,7 @@
 mod app;
 mod audio;
 mod bluetooth;
+mod settings;
 mod subsystem;
 mod ui;
 
@@ -49,8 +50,9 @@ fn main() {
             .add_fonts(fonts)
             .expect("Failed to load bundled fonts");
 
-        // ── Init theme ───────────────────────────────────────────────
-        cx.set_global(ui::theme::GlobalTheme::new(ui::theme::rose_pine_dawn()));
+        // ── Init settings + theme ──────────────────────────────────
+        let settings = crate::settings::Settings::load();
+        cx.set_global(crate::settings::GlobalSettings::new(settings));
 
         let bounds = Bounds::centered(None, size(px(1100.0), px(700.0)), cx);
 
