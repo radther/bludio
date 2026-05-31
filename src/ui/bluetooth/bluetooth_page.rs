@@ -10,11 +10,12 @@ use crate::subsystem::SubsystemStatus;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::device_row::BluetoothDeviceRow;
 use crate::ui::components::error_banner::error_banner;
+use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::icons;
 use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
-use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Window, prelude::*, px};
+use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Window, div, prelude::*, px};
 
 // ── Page entity ────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ impl Render for BluetoothPage {
                     .justify_between()
                     .px_4()
                     .py_2()
+                    .pb(px(0.0))
                     .child(page_header(
                         "Bluetooth",
                         match &self.subsystem_status {
@@ -204,6 +206,9 @@ impl Render for BluetoothPage {
                             })
                     }),
             )
+            .child(div().h_1().when(self.discovering, |el| {
+                el.child(loading_bar(colors.bluetooth_accent))
+            }))
             // ── Subsystem status content area ──
             .child(match &self.subsystem_status {
                 SubsystemStatus::Connecting => h_flex()
@@ -228,6 +233,7 @@ impl Render for BluetoothPage {
                     // ── Device list ──
                     v_flex()
                         .gap_2()
+                        .mt(px(4.0))
                         .id("device-list")
                         .flex_1()
                         .overflow_y_scroll()
