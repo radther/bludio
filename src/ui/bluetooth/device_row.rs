@@ -13,6 +13,7 @@ use gpui::{Context, Render, SharedString, Window, div, prelude::*};
 use super::BluetoothPageCommand;
 use crate::bluetooth::device::{DeviceRowAction, PairingStatus};
 use crate::ui::components::button::action_btn;
+use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::status_strip::status_strip;
 use crate::ui::{h_flex, v_flex};
 
@@ -93,6 +94,13 @@ impl Render for BluetoothDeviceRow {
             colors.text_secondary
         };
 
+        let is_connecting = matches!(
+            pairing_status,
+            Some(PairingStatus::Connecting)
+                | Some(PairingStatus::Pairing)
+                | Some(PairingStatus::Trusting)
+        );
+
         let cmd_tx = self.cmd_tx.clone();
 
         h_flex()
@@ -101,126 +109,132 @@ impl Render for BluetoothDeviceRow {
             .hover(|el| el.bg(colors.hover_overlay))
             .child(status_strip(status_color))
             .child(
-                h_flex()
-                    .justify_between()
-                    .px_4()
+                v_flex()
                     .flex_1()
                     .child(
-                        // ── Device info ──
-                        v_flex()
-                            .child(div().styled(text_styles.caption).mt_0p5().child(
-                                if let Some(ref status) = pairing_status {
-                                    div().text_color(status_color).child(status.to_string())
-                                } else if connected {
-                                    div().text_color(status_color).child("connected")
-                                } else if paired {
-                                    div().text_color(status_color).child("paired")
-                                } else {
-                                    div().text_color(status_color).child("discovered")
-                                },
-                            ))
+                        h_flex()
+                            .justify_between()
+                            .px_4()
                             .child(
-                                div()
-                                    .styled(text_styles.body)
-                                    .child(SharedString::from(name)),
+                                // ── Device info ──
+                                v_flex()
+                                    .child(div().styled(text_styles.caption).mt_0p5().child(
+                                        if let Some(ref status) = pairing_status {
+                                            div().text_color(status_color).child(status.to_string())
+                                        } else if connected {
+                                            div().text_color(status_color).child("connected")
+                                        } else if paired {
+                                            div().text_color(status_color).child("paired")
+                                        } else {
+                                            div().text_color(status_color).child("discovered")
+                                        },
+                                    ))
+                                    .child(
+                                        div()
+                                            .styled(text_styles.body)
+                                            .child(SharedString::from(name)),
+                                    )
+                                    .child(
+                                        div()
+                                            .styled(text_styles.body2)
+                                            .text_color(colors.muted)
+                                            .child(SharedString::from(addr_str)),
+                                    ),
                             )
                             .child(
-                                div()
-                                    .styled(text_styles.body2)
-                                    .text_color(colors.muted)
-                                    .child(SharedString::from(addr_str)),
+                                // ── Action buttons ──
+                                h_flex().gap_1().map(move |mut btn_row| {
+                                    if paired && !connected {
+                                        btn_row = btn_row.child(action_btn(
+                                            format!("btn-{addr}-Connect"),
+                                            "Connect",
+                                            colors.bluetooth_accent,
+                                            colors.bluetooth_accent,
+                                            colors.text_colored_button,
+                                            {
+                                                let cmd_tx = cmd_tx.clone();
+                                                move || {
+                                                    let _ = cmd_tx.unbounded_send(
+                                                        BluetoothPageCommand::DeviceAction {
+                                                            addr,
+                                                            action: DeviceRowAction::Connect,
+                                                        },
+                                                    );
+                                                }
+                                            },
+                                            text_styles,
+                                        ));
+                                    }
+                                    if connected {
+                                        btn_row = btn_row.child(action_btn(
+                                            format!("btn-{addr}-Disconnect"),
+                                            "Disconnect",
+                                            colors.danger,
+                                            colors.danger,
+                                            colors.text_colored_button,
+                                            {
+                                                let cmd_tx = cmd_tx.clone();
+                                                move || {
+                                                    let _ = cmd_tx.unbounded_send(
+                                                        BluetoothPageCommand::DeviceAction {
+                                                            addr,
+                                                            action: DeviceRowAction::Disconnect,
+                                                        },
+                                                    );
+                                                }
+                                            },
+                                            text_styles,
+                                        ));
+                                    }
+                                    if paired {
+                                        btn_row = btn_row.child(action_btn(
+                                            format!("btn-{addr}-Forget"),
+                                            "Forget",
+                                            colors.danger,
+                                            colors.danger,
+                                            colors.text_colored_button,
+                                            {
+                                                let cmd_tx = cmd_tx.clone();
+                                                move || {
+                                                    let _ = cmd_tx.unbounded_send(
+                                                        BluetoothPageCommand::DeviceAction {
+                                                            addr,
+                                                            action: DeviceRowAction::Forget,
+                                                        },
+                                                    );
+                                                }
+                                            },
+                                            text_styles,
+                                        ));
+                                    }
+                                    if !paired && pairing_status.is_none() {
+                                        btn_row = btn_row.child(action_btn(
+                                            format!("btn-{addr}-PairAndTrust"),
+                                            "Pair & Trust",
+                                            colors.bluetooth_accent,
+                                            colors.bluetooth_accent,
+                                            colors.text_colored_button,
+                                            {
+                                                let cmd_tx = cmd_tx.clone();
+                                                move || {
+                                                    let _ = cmd_tx.unbounded_send(
+                                                        BluetoothPageCommand::DeviceAction {
+                                                            addr,
+                                                            action: DeviceRowAction::PairAndTrust,
+                                                        },
+                                                    );
+                                                }
+                                            },
+                                            text_styles,
+                                        ));
+                                    }
+                                    btn_row
+                                }),
                             ),
                     )
-                    .child(
-                        // ── Action buttons ──
-                        h_flex().gap_1().map(move |mut btn_row| {
-                            if paired && !connected {
-                                btn_row = btn_row.child(action_btn(
-                                    format!("btn-{addr}-Connect"),
-                                    "Connect",
-                                    colors.bluetooth_accent,
-                                    colors.bluetooth_accent,
-                                    colors.text_colored_button,
-                                    {
-                                        let cmd_tx = cmd_tx.clone();
-                                        move || {
-                                            let _ = cmd_tx.unbounded_send(
-                                                BluetoothPageCommand::DeviceAction {
-                                                    addr,
-                                                    action: DeviceRowAction::Connect,
-                                                },
-                                            );
-                                        }
-                                    },
-                                    text_styles,
-                                ));
-                            }
-                            if connected {
-                                btn_row = btn_row.child(action_btn(
-                                    format!("btn-{addr}-Disconnect"),
-                                    "Disconnect",
-                                    colors.danger,
-                                    colors.danger,
-                                    colors.text_colored_button,
-                                    {
-                                        let cmd_tx = cmd_tx.clone();
-                                        move || {
-                                            let _ = cmd_tx.unbounded_send(
-                                                BluetoothPageCommand::DeviceAction {
-                                                    addr,
-                                                    action: DeviceRowAction::Disconnect,
-                                                },
-                                            );
-                                        }
-                                    },
-                                    text_styles,
-                                ));
-                            }
-                            if paired {
-                                btn_row = btn_row.child(action_btn(
-                                    format!("btn-{addr}-Forget"),
-                                    "Forget",
-                                    colors.danger,
-                                    colors.danger,
-                                    colors.text_colored_button,
-                                    {
-                                        let cmd_tx = cmd_tx.clone();
-                                        move || {
-                                            let _ = cmd_tx.unbounded_send(
-                                                BluetoothPageCommand::DeviceAction {
-                                                    addr,
-                                                    action: DeviceRowAction::Forget,
-                                                },
-                                            );
-                                        }
-                                    },
-                                    text_styles,
-                                ));
-                            }
-                            if !paired && pairing_status.is_none() {
-                                btn_row = btn_row.child(action_btn(
-                                    format!("btn-{addr}-PairAndTrust"),
-                                    "Pair & Trust",
-                                    colors.bluetooth_accent,
-                                    colors.bluetooth_accent,
-                                    colors.text_colored_button,
-                                    {
-                                        let cmd_tx = cmd_tx.clone();
-                                        move || {
-                                            let _ = cmd_tx.unbounded_send(
-                                                BluetoothPageCommand::DeviceAction {
-                                                    addr,
-                                                    action: DeviceRowAction::PairAndTrust,
-                                                },
-                                            );
-                                        }
-                                    },
-                                    text_styles,
-                                ));
-                            }
-                            btn_row
-                        }),
-                    ),
+                    .child(div().h_1().when(is_connecting, |el| {
+                        el.child(loading_bar(format!("device-{addr}-loading"), status_color))
+                    })),
             )
     }
 }
