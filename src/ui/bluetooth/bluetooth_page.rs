@@ -144,7 +144,7 @@ impl Render for BluetoothPage {
                 h_flex()
                     .justify_between()
                     .px_4()
-                    .py_2()
+                    .pt_2()
                     .pb(px(0.0))
                     .child(page_header(
                         "Bluetooth",
@@ -207,7 +207,10 @@ impl Render for BluetoothPage {
                     }),
             )
             .child(div().h_1().when(self.discovering, |el| {
-                el.child(loading_bar(colors.bluetooth_accent))
+                el.child(loading_bar(
+                    "bluetooth-scan-loading-bar",
+                    colors.bluetooth_accent,
+                ))
             }))
             // ── Subsystem status content area ──
             .child(match &self.subsystem_status {

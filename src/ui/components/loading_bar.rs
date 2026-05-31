@@ -7,8 +7,8 @@
 use std::time::Duration;
 
 use gpui::{
-    Animation, AnimationExt as _, Hsla, IntoElement, div, ease_in_out, linear_color_stop,
-    linear_gradient, prelude::*, relative,
+    Animation, AnimationExt as _, Div, Hsla, div, ease_in_out, linear_color_stop, linear_gradient,
+    prelude::*, relative,
 };
 
 use crate::ui::h_flex;
@@ -57,7 +57,7 @@ fn cycle_position(delta: f32) -> f32 {
 /// 25 % of the container width and has transparent-to-solid gradients on
 /// both ends. It starts fully off-screen left, sweeps across to fully
 /// off-screen right, returns left, pauses 500 ms, then repeats.
-pub fn loading_bar(color: Hsla) -> impl IntoElement {
+pub(crate) fn loading_bar(id: impl Into<gpui::ElementId>, color: Hsla) -> Div {
     let fade_width = relative(FADE_FRAC);
     let transparent = color.opacity(0.0);
 
@@ -86,7 +86,7 @@ pub fn loading_bar(color: Hsla) -> impl IntoElement {
         .relative()
         .overflow_hidden()
         .child(inner_bar.with_animation(
-            "loading-bar",
+            id,
             Animation::new(Duration::from_millis(CYCLE_MS as u64)).repeat(),
             move |bar, delta| {
                 let position = cycle_position(delta);

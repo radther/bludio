@@ -169,7 +169,7 @@ impl Render for DevTestPage {
                         )
                     }),
             )
-            .child(loading_bar(colors.dev_accent))
+            .child(loading_bar("dev-test-loading-bar", colors.dev_accent))
     }
 }
 
