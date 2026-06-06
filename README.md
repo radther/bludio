@@ -5,14 +5,19 @@ A GPUI Bluetooth and audio device manager for Linux.
 ## Install
 
 ```bash
-cargo install --git https://github.com/radther/bludio --branch prepare-for-release
+cargo install --git https://github.com/radther/bludio
 ```
 
 Or, with `sudo` to also install the PolicyKit policy file for privileged Bluetooth operations (restarting bluetooth):
 
 ```bash
-sudo cargo install --git https://github.com/radther/bludio --branch prepare-for-release
+sudo cargo install --git https://github.com/radther/bludio
 ```
+
+> If `sudo cargo` fails with "command not found", your `cargo` is in your user PATH but not root's. Use this instead:
+> ```bash
+> sudo -E env "PATH=$PATH" cargo install --git https://github.com/radther/bludio
+> ```
 
 ## PolicyKit
 
@@ -25,7 +30,7 @@ sudo cp policy/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/
 Or re-run the install with `sudo`:
 
 ```bash
-sudo cargo install --git https://github.com/radther/bludio --branch prepare-for-release
+sudo cargo install --git https://github.com/radther/bludio
 ```
 
 ## Third-Party Notices
