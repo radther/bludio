@@ -33,6 +33,16 @@ Or re-run the install with `sudo`:
 sudo cargo install --git https://github.com/radther/bludio
 ```
 
+## System Requirements
+
+Bludio requires the following system services to be running. These are **not** installed by `cargo install`:
+
+- **BlueZ / `bluetoothd`** — D-Bus Bluetooth daemon (bluer talks to this)
+- **PulseAudio** — Audio backend for device management
+- **PolicyKit / Polkit** — Required for the privileged policy file to function
+- **GPU with Vulkan support** — gpui-unofficial is GPU-accelerated via Vulkan
+- **X11 or Wayland** — Display server (both are supported)
+
 ## Third-Party Notices
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and asset license information.
