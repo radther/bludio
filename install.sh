@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-REPO="toomosin/bludio"
+REPO="radther/bludio"
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
 
 # ── Detect architecture ──

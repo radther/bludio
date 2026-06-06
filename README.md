@@ -9,20 +9,20 @@ A GPUI Bluetooth and audio device manager for Linux.
 The fastest way to install Bludio — no Rust toolchain required.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/toomosin/bludio/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/radther/bludio/main/install.sh | bash
 ```
 
 For full functionality including privileged Bluetooth operations, run with `sudo`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/toomosin/bludio/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/radther/bludio/main/install.sh | sudo bash
 ```
 
 > The install script detects your architecture, downloads the latest release, and sets up the app. Without `sudo`, the PolicyKit policy won't be installed and the Bluetooth restart feature will be unavailable.
 
 ### Manual download
 
-If you prefer not to pipe to bash, download the latest release tarball for your architecture from [GitHub Releases](https://github.com/toomosin/bludio/releases), extract it, and copy the files to the appropriate locations:
+If you prefer not to pipe to bash, download the latest release tarball for your architecture from [GitHub Releases](https://github.com/radther/bludio/releases), extract it, and copy the files to the appropriate locations:
 
 ```bash
 # Example for v0.1.0 on x86_64
@@ -37,18 +37,18 @@ sudo cp bludio-v0.1.0-linux-x86_64/dev.toomosin.bludio.policy /usr/share/polkit-
 Requires the Rust toolchain:
 
 ```bash
-cargo install --git https://github.com/toomosin/bludio
+cargo install --git https://github.com/radther/bludio
 ```
 
 Or with `sudo` to also install the PolicyKit policy:
 
 ```bash
-sudo cargo install --git https://github.com/toomosin/bludio
+sudo cargo install --git https://github.com/radther/bludio
 ```
 
 > If `sudo cargo` fails with "command not found", your `cargo` is in your user PATH but not root's. Use this instead:
 > ```bash
-> sudo -E env "PATH=$PATH" cargo install --git https://github.com/toomosin/bludio
+> sudo -E env "PATH=$PATH" cargo install --git https://github.com/radther/bludio
 > ```
 
 ## Supported Systems
