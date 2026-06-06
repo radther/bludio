@@ -43,6 +43,10 @@ Bludio requires the following system services to be running. These are **not** i
 - **GPU with Vulkan support** — gpui-unofficial is GPU-accelerated via Vulkan
 - **X11 or Wayland** — Display server (both are supported)
 
+## Note on Pairing
+
+Pairing requests are automatically accepted without user confirmation. This works well with devices that don't require authentication — most headphones, keyboards, speakers, etc. Devices that require a PIN or passkey to pair are not currently supported.
+
 ## Third-Party Notices
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for dependency and asset license information.
