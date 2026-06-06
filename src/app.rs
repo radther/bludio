@@ -53,6 +53,7 @@ use crate::ui::pages::audio::audio_page::AudioPage;
 use crate::ui::pages::bluetooth::BluetoothPageCommand;
 use crate::ui::pages::bluetooth::bluetooth_page::BluetoothPage;
 use crate::ui::pages::configuration::configuration_page::ConfigurationPage;
+#[cfg(debug_assertions)]
 use crate::ui::pages::dev_test::dev_test_page::DevTestPage;
 use crate::ui::pages::settings::settings_page::{SettingsEvent, SettingsPage};
 use futures::{FutureExt, StreamExt};
@@ -70,8 +71,9 @@ pub(crate) enum Page {
     AudioOutputs,
     AudioInputs,
     Configuration,
-    DevTest,
     Settings,
+    #[cfg(debug_assertions)]
+    DevTest,
 }
 
 /// Errors that can occur when running a command via `pkexec`.
@@ -111,6 +113,7 @@ pub(crate) struct BludioApp {
     audio_input_page: Entity<AudioPage>,
     configuration_page: Entity<ConfigurationPage>,
     /// Developer test page: self-contained entity.
+    #[cfg(debug_assertions)]
     dev_test_page: Entity<DevTestPage>,
     /// Bluetooth device page: self-contained entity.
     pub(crate) bluetooth_page: Entity<BluetoothPage>,
@@ -159,6 +162,7 @@ impl BludioApp {
             cx.new(|cx| AudioPage::new(DeviceKind::Input, audio_cmd_tx.clone(), pa_wakeup, cx));
         let configuration_page =
             cx.new(|cx| ConfigurationPage::new(audio_cmd_tx.clone(), pa_wakeup, cx));
+        #[cfg(debug_assertions)]
         let dev_test_page = cx.new(DevTestPage::new);
         let settings_page = cx.new(SettingsPage::new);
         let settings_page_sub = cx.subscribe(&settings_page, {
@@ -205,12 +209,13 @@ impl BludioApp {
                 tooltip: "Configuration",
             },
             Tab {
-                icon: icons::text_field_test,
-                tooltip: "Text Field Test",
-            },
-            Tab {
                 icon: icons::bolt,
                 tooltip: "Settings",
+            },
+            #[cfg(debug_assertions)]
+            Tab {
+                icon: icons::text_field_test,
+                tooltip: "Text Field Test",
             },
         ];
         let actions = vec![TabAction {
@@ -245,6 +250,7 @@ impl BludioApp {
                         "3" => Some(2),
                         "4" => Some(3),
                         "5" => Some(4),
+                        #[cfg(debug_assertions)]
                         "6" => Some(5),
                         _ => None,
                     };
@@ -264,6 +270,7 @@ impl BludioApp {
             audio_output_page,
             audio_input_page,
             configuration_page,
+            #[cfg(debug_assertions)]
             dev_test_page,
             bluetooth_page,
             settings_page,
@@ -857,8 +864,10 @@ impl BludioApp {
             1 => Page::AudioOutputs,
             2 => Page::AudioInputs,
             3 => Page::Configuration,
-            4 => Page::DevTest,
-            _ => Page::Settings,
+            4 => Page::Settings,
+            #[cfg(debug_assertions)]
+            5 => Page::DevTest,
+            _ => return,
         };
         if this.active_page != new_page {
             this.active_page = new_page;
@@ -1136,8 +1145,9 @@ impl Render for BludioApp {
                         Page::AudioOutputs => self.audio_output_page.clone().into_any_element(),
                         Page::AudioInputs => self.audio_input_page.clone().into_any_element(),
                         Page::Configuration => self.configuration_page.clone().into_any_element(),
-                        Page::DevTest => self.dev_test_page.clone().into_any_element(),
                         Page::Settings => self.settings_page.clone().into_any_element(),
+                        #[cfg(debug_assertions)]
+                        Page::DevTest => self.dev_test_page.clone().into_any_element(),
                     })
                     .into_any_element(),
             )

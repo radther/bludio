@@ -14,7 +14,7 @@ mod rose_pine_dawn_theme;
 mod rose_pine_theme;
 mod types;
 
-pub(crate) use crate::backend::settings::{ThemeMode, theme, update_settings};
+pub(crate) use crate::backend::settings::{ThemeMode, theme};
 pub(crate) use high_contrast_dark_theme::high_contrast_dark;
 pub(crate) use high_contrast_light_theme::high_contrast_light;
 pub(crate) use registry::{dark_theme_ids, light_theme_ids, theme_for_id};

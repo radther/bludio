@@ -143,6 +143,8 @@ pub(crate) struct Theme {
     /// Stable ID set at construction time. Backing store for the [`Theme::id()`]
     /// accessor; read via the method rather than directly.
     pub id: &'static str,
+    /// Only read by the dev test page (debug builds); kept for parity.
+    #[allow(dead_code)]
     pub appearance: Appearance,
     pub font_family: SharedString,
     pub colors: ThemeColors,

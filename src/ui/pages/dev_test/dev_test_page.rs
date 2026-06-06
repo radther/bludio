@@ -15,6 +15,7 @@ use crate::ui::{h_flex, v_flex};
 use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
+use crate::backend::settings::update_settings;
 use crate::ui::theme;
 
 // ── Test page entity ───────────────────────────────────────────────────────
@@ -207,7 +208,7 @@ fn dark_theme_btn(
         })
         .child("Dark")
         .on_click(|_: &ClickEvent, _, cx| {
-            theme::update_settings(|s| s.theme_mode = theme::ThemeMode::Dark, cx);
+            update_settings(|s| s.theme_mode = theme::ThemeMode::Dark, cx);
         })
 }
 
@@ -233,6 +234,6 @@ fn light_theme_btn(
         })
         .child("Light")
         .on_click(|_: &ClickEvent, _, cx| {
-            theme::update_settings(|s| s.theme_mode = theme::ThemeMode::Light, cx);
+            update_settings(|s| s.theme_mode = theme::ThemeMode::Light, cx);
         })
 }

@@ -32,6 +32,7 @@ pub fn audio_card() -> gpui::Svg {
     icon("form")
 }
 
+#[cfg(debug_assertions)]
 pub fn text_field_test() -> gpui::Svg {
     icon("test-tube-diagonal")
 }
