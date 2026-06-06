@@ -31,6 +31,8 @@ pub(crate) struct AudioState {
     /// Card info for the Configuration page and sink profile decoration.
     pub(crate) cards: Vec<CardInfo>,
     /// Loaded modules (for combined sink discovery).
+    /// Populated by the PA thread but consumed indirectly via `SinkInfo` flags.
+    #[allow(dead_code)]
     pub(crate) modules: Vec<ModuleInfo>,
     /// Unified subsystem health status.
     pub(crate) subsystem_status: SubsystemStatus,

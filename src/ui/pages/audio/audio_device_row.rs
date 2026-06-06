@@ -414,25 +414,34 @@ impl AudioDeviceRow {
             .child(
                 h_flex()
                     .gap_2()
-                    .when(self.selection_mode && !self.is_combined_sink, |el| {
-                        el.child(
-                            checkbox(
-                                format!("cb-{}", self.index),
-                                self.is_selected,
-                                colors,
-                            )
-                            .on_click({
-                                let pa_name = self.pa_name.clone();
-                                let entity = cx.entity().clone();
-                                move |_, _, cx| {
-                                    entity.update(cx, |row, cx| {
-                                        row.is_selected = !row.is_selected;
-                                        cx.emit(AudioDeviceRowEvent::ToggleSelection(pa_name.clone()));
-                                    });
-                                }
+                    .flex_shrink_0()
+                    .child(
+                        div()
+                            .w(px(24.0))
+                            .h(px(32.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .when(self.selection_mode && !self.is_combined_sink, |el| {
+                                el.child(
+                                    checkbox(
+                                        format!("cb-{}", self.index),
+                                        self.is_selected,
+                                        colors,
+                                    )
+                                    .on_click({
+                                        let pa_name = self.pa_name.clone();
+                                        let entity = cx.entity().clone();
+                                        move |_, _, cx| {
+                                            entity.update(cx, |row, cx| {
+                                                row.is_selected = !row.is_selected;
+                                                cx.emit(AudioDeviceRowEvent::ToggleSelection(pa_name.clone()));
+                                            });
+                                        }
+                                    }),
+                                )
                             }),
-                        )
-                    })
+                    )
                     .when(!self.selection_mode, |el| {
                         el.child(action_btn(
                             format!("mute-btn-{}", self.index),
