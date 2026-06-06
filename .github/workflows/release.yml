@@ -45,7 +45,6 @@ jobs:
           cp target/release/bludio "bludio-${GITHUB_REF_NAME}-linux-x86_64/"
           cp policy/dev.toomosin.bludio.policy "bludio-${GITHUB_REF_NAME}-linux-x86_64/"
           cp bludio.desktop "bludio-${GITHUB_REF_NAME}-linux-x86_64/"
-          cp -r icons "bludio-${GITHUB_REF_NAME}-linux-x86_64/"
           strip "bludio-${GITHUB_REF_NAME}-linux-x86_64/bludio"
           tar czf "bludio-${GITHUB_REF_NAME}-linux-x86_64.tar.gz" "bludio-${GITHUB_REF_NAME}-linux-x86_64"
 
@@ -91,7 +90,6 @@ jobs:
           cp target/release/bludio "bludio-${GITHUB_REF_NAME}-linux-aarch64/"
           cp policy/dev.toomosin.bludio.policy "bludio-${GITHUB_REF_NAME}-linux-aarch64/"
           cp bludio.desktop "bludio-${GITHUB_REF_NAME}-linux-aarch64/"
-          cp -r icons "bludio-${GITHUB_REF_NAME}-linux-aarch64/"
           strip "bludio-${GITHUB_REF_NAME}-linux-aarch64/bludio"
           tar czf "bludio-${GITHUB_REF_NAME}-linux-aarch64.tar.gz" "bludio-${GITHUB_REF_NAME}-linux-aarch64"
 

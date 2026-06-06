@@ -3,6 +3,7 @@
 //! Entry point: Tokio bridge setup, font loading, theme init, window creation.
 
 mod app;
+mod assets;
 mod backend;
 mod ui;
 
@@ -37,19 +38,13 @@ where
 // ── Entry point ────────────────────────────────────────────────────────────
 
 fn main() {
-    application().run(|cx: &mut App| {
-        // ── Load bundled fonts ────────────────────────────────────────
-        let fonts: Vec<std::borrow::Cow<'static, [u8]>> = vec![
-            std::borrow::Cow::Borrowed(include_bytes!("../fonts/NotoSans.ttf")),
-            std::borrow::Cow::Borrowed(include_bytes!("../fonts/NotoSans-Italic.ttf")),
-            std::borrow::Cow::Borrowed(include_bytes!("../fonts/OpenDyslexic-Regular.ttf")),
-            std::borrow::Cow::Borrowed(include_bytes!("../fonts/OpenDyslexic-Bold.ttf")),
-            std::borrow::Cow::Borrowed(include_bytes!("../fonts/OpenDyslexic-Italic.ttf")),
-            std::borrow::Cow::Borrowed(include_bytes!("../fonts/OpenDyslexic-BoldItalic.ttf")),
-        ];
-        cx.text_system()
-            .add_fonts(fonts)
-            .expect("Failed to load bundled fonts");
+    application()
+        .with_assets(assets::Assets)
+        .run(|cx: &mut App| {
+            // ── Load bundled fonts ────────────────────────────────────────
+            assets::Assets
+                .load_fonts(cx)
+                .expect("Failed to load bundled fonts");
 
         // ── Init settings + theme ──────────────────────────────────
         let settings = crate::backend::settings::Settings::load();

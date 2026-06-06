@@ -609,12 +609,14 @@ dependencies = [
 name = "bludio"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bluer",
  "futures",
  "gpui-platform-gpui-unofficial",
  "gpui-unofficial",
  "libpulse-binding",
  "libpulse-sys",
+ "rust-embed",
  "serde",
  "serde_json",
  "tokio",

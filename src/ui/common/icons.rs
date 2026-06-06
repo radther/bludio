@@ -1,37 +1,17 @@
 //! Lucide icon helpers for GPUI.
 //!
-//! Icons are loaded from standard data directories or the crate directory
-//! during development.
+//! Icons are embedded into the binary via `rust-embed` and loaded through
+//! gpui's `AssetSource` at runtime.
 
-use gpui::{SharedString, Styled, px, svg};
-use std::path::Path;
+use gpui::{Styled, px, svg};
 
 /// Standard icon size for inline UI icons (matches text line-height at body size).
 const ICON_SIZE: f32 = 16.0;
 
-/// Resolve the path to an icon SVG, checking install locations and falling back
-/// to the crate directory for development builds.
-fn resolve_icon_path(name: &str) -> String {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let candidates = [
-        format!("{}/.local/share/bludio/icons/{}.svg", home, name),
-        format!("/usr/share/bludio/icons/{}.svg", name),
-        format!("{}/icons/{}.svg", env!("CARGO_MANIFEST_DIR"), name),
-    ];
-    for path in &candidates {
-        if Path::new(path).exists() {
-            return path.clone();
-        }
-    }
-    // Fallback to the first candidate (will show an error in the UI if missing)
-    candidates[0].clone()
-}
-
-/// Create an SVG icon element from the local icons directory.
+/// Create an SVG icon element from the embedded assets.
 fn icon(name: &str) -> gpui::Svg {
-    let path = resolve_icon_path(name);
     svg()
-        .external_path(SharedString::from(path))
+        .path(format!("icons/{}.svg", name))
         .w(px(ICON_SIZE))
         .h(px(ICON_SIZE))
 }
