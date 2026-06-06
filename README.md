@@ -4,41 +4,70 @@ A GPUI Bluetooth and audio device manager for Linux.
 
 ## Install
 
+### Binary (recommended)
+
+The fastest way to install Bludio — no Rust toolchain required.
+
 ```bash
-cargo install --git https://github.com/radther/bludio
+curl -fsSL https://raw.githubusercontent.com/toomosin/bludio/main/install.sh | bash
 ```
 
-Or, with `sudo` to also install the PolicyKit policy file for privileged Bluetooth operations (restarting bluetooth):
+For full functionality including privileged Bluetooth operations, run with `sudo`:
 
 ```bash
-sudo cargo install --git https://github.com/radther/bludio
+curl -fsSL https://raw.githubusercontent.com/toomosin/bludio/main/install.sh | sudo bash
+```
+
+> The install script detects your architecture, downloads the latest release, and sets up the app. Without `sudo`, the PolicyKit policy won't be installed and the Bluetooth restart feature will be unavailable.
+
+### Manual download
+
+If you prefer not to pipe to bash, download the latest release tarball for your architecture from [GitHub Releases](https://github.com/toomosin/bludio/releases), extract it, and copy the files to the appropriate locations:
+
+```bash
+# Example for v0.1.0 on x86_64
+tar xzf bludio-v0.1.0-linux-x86_64.tar.gz
+sudo cp bludio-v0.1.0-linux-x86_64/bludio /usr/local/bin/
+sudo cp bludio-v0.1.0-linux-x86_64/bludio.desktop /usr/share/applications/
+sudo cp bludio-v0.1.0-linux-x86_64/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/
+```
+
+### Build from source
+
+Requires the Rust toolchain:
+
+```bash
+cargo install --git https://github.com/toomosin/bludio
+```
+
+Or with `sudo` to also install the PolicyKit policy:
+
+```bash
+sudo cargo install --git https://github.com/toomosin/bludio
 ```
 
 > If `sudo cargo` fails with "command not found", your `cargo` is in your user PATH but not root's. Use this instead:
 > ```bash
-> sudo -E env "PATH=$PATH" cargo install --git https://github.com/radther/bludio
+> sudo -E env "PATH=$PATH" cargo install --git https://github.com/toomosin/bludio
 > ```
 
-## PolicyKit
+## Supported Systems
 
-If you installed without root privileges, the PolicyKit policy file was not copied to the system directory automatically. To enable privileged Bluetooth operations, manually copy it:
+Prebuilt binaries are compiled on Ubuntu 22.04 (glibc 2.35) and are compatible with:
 
-```bash
-sudo cp policy/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/
-```
+- Ubuntu 22.04 LTS and newer
+- Debian 11 (Bullseye) and newer
+- Fedora 35 and newer
+- Arch Linux and other rolling distributions
 
-Or re-run the install with `sudo`:
-
-```bash
-sudo cargo install --git https://github.com/radther/bludio
-```
+Users on older systems (Ubuntu 20.04 LTS, RHEL 8, etc.) should build from source with `cargo install --git`.
 
 ## System Requirements
 
-Bludio requires the following system services to be running. These are **not** installed by `cargo install`:
+Bludio requires the following system services to be running:
 
 - **BlueZ / `bluetoothd`** — D-Bus Bluetooth daemon (bluer talks to this)
-- **PulseAudio** — Audio backend for device management
+- **PulseAudio or PipeWire-Pulse** — Audio backend for device management
 - **PolicyKit / Polkit** — Required for the privileged policy file to function
 - **GPU with Vulkan support** — gpui-unofficial is GPU-accelerated via Vulkan
 - **X11 or Wayland** — Display server (both are supported)

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Bludio
+Comment=GPUI Bluetooth and audio device manager
+Exec=bludio
+Type=Application
+Categories=AudioVideo;Audio;Settings;
+Icon=bluetooth
+Terminal=false

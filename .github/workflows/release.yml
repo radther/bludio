@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-x86_64:
+    runs-on: ubuntu-latest
+    container: ubuntu:22.04
+    steps:
+      - name: Install container prerequisites
+        run: |
+          apt-get update
+          apt-get install -y git curl ca-certificates
+
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          apt-get install -y build-essential pkg-config \
+            libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libdbus-1-dev libpulse-dev libwayland-dev \
+            libvulkan-dev vulkan-validationlayers-dev libx11-dev
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
+          . "$HOME/.cargo/env"
+          rustup show
+
+      - name: Build release binary
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build --release --locked
+
+      - name: Package tarball
+        run: |
+          mkdir -p "bludio-${GITHUB_REF_NAME}-linux-x86_64"
+          cp target/release/bludio "bludio-${GITHUB_REF_NAME}-linux-x86_64/"
+          cp policy/dev.toomosin.bludio.policy "bludio-${GITHUB_REF_NAME}-linux-x86_64/"
+          cp bludio.desktop "bludio-${GITHUB_REF_NAME}-linux-x86_64/"
+          strip "bludio-${GITHUB_REF_NAME}-linux-x86_64/bludio"
+          tar czf "bludio-${GITHUB_REF_NAME}-linux-x86_64.tar.gz" "bludio-${GITHUB_REF_NAME}-linux-x86_64"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bludio-x86_64
+          path: bludio-*.tar.gz
+
+  build-aarch64:
+    runs-on: ubuntu-24.04-arm
+    container: ubuntu:22.04
+    steps:
+      - name: Install container prerequisites
+        run: |
+          apt-get update
+          apt-get install -y git curl ca-certificates
+
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          apt-get install -y build-essential pkg-config \
+            libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev \
+            libdbus-1-dev libpulse-dev libwayland-dev \
+            libvulkan-dev vulkan-validationlayers-dev libx11-dev
+
+      - name: Install Rust
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none
+          . "$HOME/.cargo/env"
+          rustup show
+
+      - name: Build release binary
+        run: |
+          . "$HOME/.cargo/env"
+          cargo build --release --locked
+
+      - name: Package tarball
+        run: |
+          mkdir -p "bludio-${GITHUB_REF_NAME}-linux-aarch64"
+          cp target/release/bludio "bludio-${GITHUB_REF_NAME}-linux-aarch64/"
+          cp policy/dev.toomosin.bludio.policy "bludio-${GITHUB_REF_NAME}-linux-aarch64/"
+          cp bludio.desktop "bludio-${GITHUB_REF_NAME}-linux-aarch64/"
+          strip "bludio-${GITHUB_REF_NAME}-linux-aarch64/bludio"
+          tar czf "bludio-${GITHUB_REF_NAME}-linux-aarch64.tar.gz" "bludio-${GITHUB_REF_NAME}-linux-aarch64"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bludio-aarch64
+          path: bludio-*.tar.gz
+
+  release:
+    needs: [build-x86_64, build-aarch64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: bludio-*
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/bludio-*.tar.gz
+          generate_release_notes: true
