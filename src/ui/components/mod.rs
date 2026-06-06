@@ -1,6 +1,7 @@
 //! Reusable UI components: button, dropdown, loading bar, slider, text field, page header, status strip, error banner.
 
 pub mod button;
+pub mod checkbox;
 pub mod dropdown;
 pub mod error_banner;
 pub mod loading_bar;

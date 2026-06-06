@@ -48,3 +48,11 @@ pub fn chevron_down() -> gpui::Svg {
 pub fn bolt() -> gpui::Svg {
     icon("bolt")
 }
+
+pub fn check() -> gpui::Svg {
+    icon("check")
+}
+
+pub fn merge() -> gpui::Svg {
+    icon("merge")
+}

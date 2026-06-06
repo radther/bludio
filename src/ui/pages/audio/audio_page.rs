@@ -8,10 +8,11 @@ use crate::backend::audio::pulse::PaWakeup;
 use crate::backend::audio::{AudioCommand, AudioState, DeviceKind};
 use crate::backend::subsystem::SubsystemStatus;
 use crate::ui::common::animation::FadeInAnimationExt;
+use crate::ui::common::icons;
 use crate::ui::{h_flex, v_flex};
 use crate::ui::components::page_header::page_header;
-use crate::ui::pages::audio::audio_device_row::AudioDeviceRow;
-use gpui::{Context, Entity, Render, Window, div, prelude::*, px};
+use crate::ui::pages::audio::audio_device_row::{AudioDeviceRow, AudioDeviceRowEvent};
+use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Subscription, Window, div, prelude::*, px};
 
 // ── Audio page entity ──────────────────────────────────────────────────────
 
@@ -22,9 +23,27 @@ pub(crate) struct AudioPage {
     cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
     wakeup: Option<PaWakeup>,
     subsystem_status: SubsystemStatus,
+    /// Whether the user is in selection mode for creating a combined sink.
+    selection_mode: bool,
+    /// Selected sink PA names while in selection mode.
+    selected_sinks: Vec<String>,
+    /// Subscriptions to row events (kept to avoid dropping them).
+    _row_subs: Vec<Subscription>,
 }
 
 impl AudioPage {
+    /// Generate a unique combined sink name that doesn't collide with existing sinks.
+    fn generate_combine_name(&self, existing_names: &std::collections::HashSet<String>) -> String {
+        let mut n = 1;
+        loop {
+            let name = format!("Bludio-combined-{}", n);
+            if !existing_names.contains(&name) {
+                return name;
+            }
+            n += 1;
+        }
+    }
+
     /// Create a new page entity.
     pub(crate) fn new(
         kind: DeviceKind,
@@ -38,6 +57,9 @@ impl AudioPage {
             cmd_tx,
             wakeup,
             subsystem_status: SubsystemStatus::Connecting,
+            selection_mode: false,
+            selected_sinks: Vec::new(),
+            _row_subs: Vec::new(),
         }
     }
 
@@ -88,16 +110,37 @@ impl AudioPage {
             return;
         };
         let cmd_tx = self.cmd_tx.clone();
+        let selection_mode = self.selection_mode;
+        let selected = &self.selected_sinks;
 
         for sink in &state.sinks {
+            let is_selected = selected.contains(&sink.name);
             if let Some(row) = self.rows.iter().find(|r| r.read(cx).index == sink.index) {
                 row.update(cx, |row, row_cx| {
-                    row.update_from_sink(sink, row_cx);
+                    row.update_from_sink(sink, selection_mode, is_selected, row_cx);
                 });
             } else {
                 let row = cx.new(|row_cx| {
-                    AudioDeviceRow::new_sink(sink, cmd_tx.clone(), wakeup, window, row_cx)
+                    AudioDeviceRow::new_sink(
+                        sink,
+                        selection_mode,
+                        is_selected,
+                        cmd_tx.clone(),
+                        wakeup,
+                        window,
+                        row_cx,
+                    )
                 });
+                let sub = cx.subscribe(&row, |this, _row, event: &AudioDeviceRowEvent, _cx| {
+                    let AudioDeviceRowEvent::ToggleSelection(pa_name) = event;
+                    if let Some(pos) = this.selected_sinks.iter().position(|n| n == pa_name) {
+                        this.selected_sinks.remove(pos);
+                    } else {
+                        this.selected_sinks.push(pa_name.clone());
+                    }
+                    _cx.notify();
+                });
+                self._row_subs.push(sub);
                 self.rows.push(row);
             }
         }
@@ -167,6 +210,12 @@ impl Render for AudioPage {
             ),
         };
 
+        let is_output = self.kind == DeviceKind::Output;
+        let selection_mode = self.selection_mode;
+        let cmd_tx = self.cmd_tx.clone();
+        let wakeup = self.wakeup;
+        let _selected_sinks = self.selected_sinks.clone();
+
         v_flex()
             .flex_1()
             .child(
@@ -175,6 +224,68 @@ impl Render for AudioPage {
                     .px_4()
                     .py_2()
                     .child(page_header(title, caption, colors, text_styles))
+                    .when(is_output && self.subsystem_status == SubsystemStatus::Connected, |el| {
+                        let (btn_bg, btn_hover, icon_color) = if selection_mode {
+                            (colors.audio_accent, colors.audio_accent, colors.text_colored_button)
+                        } else {
+                            (
+                                colors.element_background,
+                                colors.element_hover,
+                                colors.text_secondary,
+                            )
+                        };
+                        el.child(
+                            h_flex()
+                                .id("combine-btn")
+                                .justify_center()
+                                .w(px(48.0))
+                                .h(px(48.0))
+                                .rounded_lg()
+                                .bg(btn_bg)
+                                .cursor(CursorStyle::PointingHand)
+                                .hover(move |el| el.bg(btn_hover))
+                                .child(
+                                    icons::merge()
+                                        .w(px(24.0))
+                                        .h(px(24.0))
+                                        .text_color(icon_color),
+                                )
+                                .on_click({
+                                    let cmd_tx = cmd_tx.clone();
+                                    let entity = cx.entity().clone();
+                                    move |_: &ClickEvent, _window, cx| {
+                                        entity.update(cx, |this, cx| {
+                                            if this.selection_mode {
+                                                // Exit selection mode and create combined sink if items selected
+                                                if !this.selected_sinks.is_empty() {
+                                                    let slaves = this.selected_sinks.clone();
+                                                    let existing_names: std::collections::HashSet<String> =
+                                                        this.rows.iter().map(|r| r.read(cx).pa_name.clone()).collect();
+                                                    let name = this.generate_combine_name(&existing_names);
+                                                    let _ = cmd_tx.send(AudioCommand::LoadCombineSink(name, slaves));
+                                                    if let Some(w) = wakeup {
+                                                        w.wake();
+                                                    }
+                                                }
+                                                this.selection_mode = false;
+                                                this.selected_sinks.clear();
+                                            } else {
+                                                // Enter selection mode
+                                                this.selection_mode = true;
+                                            }
+                                            // Update all rows with new selection_mode state
+                                            let new_mode = this.selection_mode;
+                                            for row in &this.rows {
+                                                row.update(cx, |row, cx| {
+                                                    row.set_selection_mode(new_mode, cx);
+                                                });
+                                            }
+                                            cx.notify();
+                                        });
+                                    }
+                                }),
+                        )
+                    })
                     .with_fade_in_up("audio-header", 1),
             )
             .child(match &self.subsystem_status {

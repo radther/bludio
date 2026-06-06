@@ -9,16 +9,26 @@ use crate::backend::audio::{AudioCommand, DeviceKind};
 use crate::ui::StyledExt;
 use crate::ui::{h_flex, v_flex};
 use crate::ui::components::button::action_btn;
+use crate::ui::components::checkbox::checkbox;
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
 use crate::ui::components::slider::{Slider, SliderEvent, SliderState};
 use crate::ui::components::status_strip::status_strip;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use gpui::{
-    App, Context, Div, Entity, FocusHandle, Focusable, Render, SharedString, Stateful,
+    App, Context, Div, Entity, EventEmitter, FocusHandle, Focusable, Render, SharedString, Stateful,
     Subscription, Window, div, prelude::*, px,
 };
 
 const LABEL_WIDTH: f32 = 48.0;
+
+// ── Events ─────────────────────────────────────────────────────────────────
+
+/// Events emitted by `AudioDeviceRow` to its parent `AudioPage`.
+#[derive(Clone, Debug)]
+pub(crate) enum AudioDeviceRowEvent {
+    /// Toggle selection of this sink for combined sink creation.
+    ToggleSelection(String),
+}
 
 // ── Audio device row entity ────────────────────────────────────────────────
 
@@ -28,12 +38,20 @@ pub(crate) struct AudioDeviceRow {
     pub(crate) index: u32,
     card_index: Option<u32>,
     display_name: String,
-    pa_name: String,
+    pub(crate) pa_name: String,
     channels: u8,
     volume: f64,
     muted: bool,
     is_default: bool,
     kind: DeviceKind,
+    /// Whether the parent page is in selection mode (for combined sink creation).
+    selection_mode: bool,
+    /// Whether this sink is selected in selection mode.
+    is_selected: bool,
+    /// Whether this sink is a combined (virtual) sink.
+    is_combined_sink: bool,
+    /// The module index for this combined sink, if applicable.
+    combined_module_index: Option<u32>,
     text_field: Entity<TextField>,
     profile_dropdown: Entity<crate::ui::components::dropdown::Dropdown>,
     slider: Entity<SliderState>,
@@ -57,12 +75,18 @@ struct RowParams {
     is_default: bool,
     card_index: Option<u32>,
     profile_data: Option<(Vec<String>, usize)>,
+    selection_mode: bool,
+    is_selected: bool,
+    is_combined_sink: bool,
+    combined_module_index: Option<u32>,
 }
 
 impl AudioDeviceRow {
     /// Create a new device row entity for a sink (output).
     pub(crate) fn new_sink(
         sink: &crate::backend::audio::SinkInfo,
+        selection_mode: bool,
+        is_selected: bool,
         cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
         wakeup: PaWakeup,
         window: &mut Window,
@@ -90,6 +114,10 @@ impl AudioDeviceRow {
                 is_default: sink.is_default,
                 card_index: sink.card_index,
                 profile_data: Some((profiles, selected_idx)),
+                selection_mode,
+                is_selected,
+                is_combined_sink: sink.is_combined_sink,
+                combined_module_index: sink.combined_module_index,
             },
             cmd_tx,
             wakeup,
@@ -118,6 +146,10 @@ impl AudioDeviceRow {
                 is_default: source.is_default,
                 card_index: None,
                 profile_data: None,
+                selection_mode: false,
+                is_selected: false,
+                is_combined_sink: false,
+                combined_module_index: None,
             },
             cmd_tx,
             wakeup,
@@ -226,6 +258,10 @@ impl AudioDeviceRow {
             muted: params.muted,
             is_default: params.is_default,
             kind: params.kind,
+            selection_mode: params.selection_mode,
+            is_selected: params.is_selected,
+            is_combined_sink: params.is_combined_sink,
+            combined_module_index: params.combined_module_index,
             text_field,
             profile_dropdown,
             slider,
@@ -238,10 +274,21 @@ impl AudioDeviceRow {
         }
     }
 
+    /// Set selection mode (called from parent AudioPage when toggling).
+    pub(crate) fn set_selection_mode(&mut self, mode: bool, cx: &mut Context<Self>) {
+        self.selection_mode = mode;
+        if !mode {
+            self.is_selected = false;
+        }
+        cx.notify();
+    }
+
     /// Sync row state from a fresh sink snapshot.
     pub(crate) fn update_from_sink(
         &mut self,
         sink: &crate::backend::audio::SinkInfo,
+        selection_mode: bool,
+        is_selected: bool,
         cx: &mut Context<Self>,
     ) {
         self.card_index = sink.card_index;
@@ -251,6 +298,10 @@ impl AudioDeviceRow {
         self.volume = sink.volume;
         self.muted = sink.muted;
         self.is_default = sink.is_default;
+        self.selection_mode = selection_mode;
+        self.is_selected = is_selected;
+        self.is_combined_sink = sink.is_combined_sink;
+        self.combined_module_index = sink.combined_module_index;
 
         let profiles: Vec<String> = sink
             .available_profiles
@@ -291,6 +342,8 @@ impl Focusable for AudioDeviceRow {
         self.focus_handle.clone()
     }
 }
+
+impl EventEmitter<AudioDeviceRowEvent> for AudioDeviceRow {}
 
 impl Render for AudioDeviceRow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -361,41 +414,73 @@ impl AudioDeviceRow {
             .child(
                 h_flex()
                     .gap_2()
-                    .child(action_btn(
-                        format!("mute-btn-{}", self.index),
-                        mute_label,
-                        mute_bg,
-                        mute_hover,
-                        mute_text,
-                        {
-                            let cmd_tx = self.cmd_tx.clone();
-                            let kind = self.kind;
-                            let idx = self.index;
-                            let muted = self.muted;
-                            let wk = self.wakeup;
-                            move || {
-                                let _ = cmd_tx.send(AudioCommand::SetMute(kind, idx, !muted));
-                                wk.wake();
-                            }
-                        },
-                        text_styles,
-                    ))
-                    .child(self.render_default_button(cx))
-                    .when(
-                        self.kind == DeviceKind::Output
-                            && self.card_index.is_some()
-                            && self.profile_dropdown.read(cx).has_items(),
-                        |el| el.child(self.profile_dropdown.clone()),
-                    ),
+                    .when(self.selection_mode && !self.is_combined_sink, |el| {
+                        el.child(
+                            checkbox(
+                                format!("cb-{}", self.index),
+                                self.is_selected,
+                                colors,
+                            )
+                            .on_click({
+                                let pa_name = self.pa_name.clone();
+                                let entity = cx.entity().clone();
+                                move |_, _, cx| {
+                                    entity.update(cx, |row, cx| {
+                                        row.is_selected = !row.is_selected;
+                                        cx.emit(AudioDeviceRowEvent::ToggleSelection(pa_name.clone()));
+                                    });
+                                }
+                            }),
+                        )
+                    })
+                    .when(!self.selection_mode, |el| {
+                        el.child(action_btn(
+                            format!("mute-btn-{}", self.index),
+                            mute_label,
+                            mute_bg,
+                            mute_hover,
+                            mute_text,
+                            {
+                                let cmd_tx = self.cmd_tx.clone();
+                                let kind = self.kind;
+                                let idx = self.index;
+                                let muted = self.muted;
+                                let wk = self.wakeup;
+                                move || {
+                                    let _ = cmd_tx.send(AudioCommand::SetMute(kind, idx, !muted));
+                                    wk.wake();
+                                }
+                            },
+                            text_styles,
+                        ))
+                        .child(self.render_default_button(cx))
+                        .when(self.is_combined_sink, |el| {
+                            el.child(self.render_delete_button(cx))
+                        })
+                        .when(
+                            self.kind == DeviceKind::Output
+                                && self.card_index.is_some()
+                                && self.profile_dropdown.read(cx).has_items(),
+                            |el| el.child(self.profile_dropdown.clone()),
+                        )
+                    }),
             )
     }
 
-    /// Device name with optional "● Default" badge.
+    /// Device name with optional "Default" badge and merge icon for combined sinks.
     fn render_device_name(&self, cx: &App) -> Div {
         let colors = &crate::ui::theme::theme(cx).colors;
         let text_styles = &crate::ui::theme::theme(cx).text_styles;
         h_flex()
             .gap_2()
+            .when(self.is_combined_sink, |el| {
+                el.child(
+                    crate::ui::common::icons::merge()
+                        .w(px(16.0))
+                        .h(px(16.0))
+                        .text_color(colors.audio_accent),
+                )
+            })
             .child(
                 div()
                     .styled(text_styles.body)
@@ -464,6 +549,30 @@ impl AudioDeviceRow {
                     }
                 };
                 wk.wake();
+            },
+            text_styles,
+        )
+    }
+
+    /// "Delete" action button for combined sinks.
+    fn render_delete_button(&self, cx: &App) -> Stateful<Div> {
+        let cmd_tx = self.cmd_tx.clone();
+        let module_index = self.combined_module_index;
+        let wk = self.wakeup;
+        let colors = &crate::ui::theme::theme(cx).colors;
+        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+
+        action_btn(
+            format!("btn-delete-{}", self.index),
+            "Delete",
+            colors.danger,
+            colors.danger,
+            colors.text_colored_button,
+            move || {
+                if let Some(idx) = module_index {
+                    let _ = cmd_tx.send(AudioCommand::UnloadModule(idx));
+                    wk.wake();
+                }
             },
             text_styles,
         )

@@ -15,6 +15,14 @@ pub(crate) enum DeviceKind {
 
 // ── Audio state ────────────────────────────────────────────────────────────
 
+/// Info about a loaded PulseAudio module (used for combined sink discovery).
+#[derive(Clone, Debug)]
+pub(crate) struct ModuleInfo {
+    pub(crate) index: u32,
+    pub(crate) name: String,
+    pub(crate) argument: String,
+}
+
 /// Complete snapshot of the `PulseAudio` audio state.
 #[derive(Clone, Debug)]
 pub(crate) struct AudioState {
@@ -22,6 +30,8 @@ pub(crate) struct AudioState {
     pub(crate) sources: Vec<SourceInfo>,
     /// Card info for the Configuration page and sink profile decoration.
     pub(crate) cards: Vec<CardInfo>,
+    /// Loaded modules (for combined sink discovery).
+    pub(crate) modules: Vec<ModuleInfo>,
     /// Unified subsystem health status.
     pub(crate) subsystem_status: SubsystemStatus,
 }
@@ -32,6 +42,7 @@ impl Default for AudioState {
             sinks: Vec::new(),
             sources: Vec::new(),
             cards: Vec::new(),
+            modules: Vec::new(),
             subsystem_status: SubsystemStatus::Connecting,
         }
     }
@@ -59,6 +70,10 @@ pub(crate) struct SinkInfo {
     pub(crate) active_profile: Option<String>,
     /// All available profiles on the owning card.
     pub(crate) available_profiles: Vec<ProfileInfo>,
+    /// Whether this sink is a combined (virtual) sink created by module-combine-sink.
+    pub(crate) is_combined_sink: bool,
+    /// The index of the module that created this combined sink, if applicable.
+    pub(crate) combined_module_index: Option<u32>,
 }
 
 // ── Source (input device) ─────────────────────────────────────────────────
@@ -128,4 +143,8 @@ pub(crate) enum AudioCommand {
     SetCardCodec(u32, String, String),
     SetDefaultSink(String),
     SetDefaultSource(String),
+    /// Load module-combine-sink with the given name and slave list.
+    LoadCombineSink(String, Vec<String>),
+    /// Unload a PulseAudio module by its index.
+    UnloadModule(u32),
 }

@@ -6,7 +6,8 @@
 //! receiver end needs a Tokio runtime.)
 
 use crate::backend::audio::{
-    AudioCommand, AudioState, CardInfo, CodecInfo, DeviceKind, ProfileInfo, SinkInfo, SourceInfo,
+    AudioCommand, AudioState, CardInfo, CodecInfo, DeviceKind, ModuleInfo, ProfileInfo, SinkInfo,
+    SourceInfo,
 };
 use crate::backend::subsystem::SubsystemStatus;
 use libpulse_binding as pulse;
@@ -190,6 +191,7 @@ fn run_pa_loop(
                     sinks: Vec::new(),
                     sources: Vec::new(),
                     cards: Vec::new(),
+                    modules: Vec::new(),
                     subsystem_status: SubsystemStatus::Disconnected(
                         "PulseAudio connection lost".into(),
                     ),
@@ -214,6 +216,7 @@ fn run_pa_loop(
                     sinks: Vec::new(),
                     sources: Vec::new(),
                     cards: Vec::new(),
+                    modules: Vec::new(),
                     subsystem_status: SubsystemStatus::Disconnected(
                         "PulseAudio connection lost".into(),
                     ),
@@ -247,6 +250,22 @@ fn wait_for_ready(mainloop: &mut Mainloop, ctx: &Context) -> Result<(), String> 
 }
 
 // ── Command execution ──────────────────────────────────────────────────────
+
+/// Parse a `module-combine-sink` argument string to extract `sink_name` and `slaves`.
+fn parse_combine_sink_args(arg: &str) -> (Option<String>, Vec<String>) {
+    let mut sink_name = None;
+    let mut slaves = Vec::new();
+
+    for part in arg.split_whitespace() {
+        if let Some(val) = part.strip_prefix("sink_name=") {
+            sink_name = Some(val.to_string());
+        } else if let Some(val) = part.strip_prefix("slaves=") {
+            slaves = val.split(',').map(|s| s.to_string()).collect();
+        }
+    }
+
+    (sink_name, slaves)
+}
 
 fn execute_command(
     pa_ctx: &Rc<RefCell<Context>>,
@@ -366,6 +385,32 @@ fn execute_command(
             let d = done.clone();
             let _op = ctx_mut.set_default_source(
                 name,
+                Box::new(move |_success| {
+                    *d.borrow_mut() = true;
+                }),
+            );
+            spin_until(ml, done);
+        }
+        AudioCommand::LoadCombineSink(name, slaves) => {
+            let slaves_arg = slaves.join(",");
+            let arg = format!("sink_name={} slaves={}", name, slaves_arg);
+            let mut intro = pa_ctx.borrow_mut().introspect();
+            let d = done.clone();
+            let _op = intro.load_module(
+                "module-combine-sink",
+                &arg,
+                Box::new(move |_index: u32| {
+                    *d.borrow_mut() = true;
+                }),
+            );
+            spin_until(ml, done);
+        }
+        AudioCommand::UnloadModule(index) => {
+            let index = *index;
+            let mut intro = pa_ctx.borrow_mut().introspect();
+            let d = done.clone();
+            let _op = intro.unload_module(
+                index,
                 Box::new(move |_success| {
                     *d.borrow_mut() = true;
                 }),
@@ -492,6 +537,7 @@ fn build_audio_state(
     let sinks_data: Rc<RefCell<Vec<SinkInfo>>> = Rc::new(RefCell::new(Vec::new()));
     let sources_data: Rc<RefCell<Vec<SourceInfo>>> = Rc::new(RefCell::new(Vec::new()));
     let cards_data: Rc<RefCell<Vec<CardInfo>>> = Rc::new(RefCell::new(Vec::new()));
+    let modules_data: Rc<RefCell<Vec<ModuleInfo>>> = Rc::new(RefCell::new(Vec::new()));
     let default_sink: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
     let default_source: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
 
@@ -522,6 +568,8 @@ fn build_audio_state(
                     card_index: si.card,
                     active_profile: None,
                     available_profiles: Vec::new(),
+                    is_combined_sink: false,
+                    combined_module_index: None,
                 });
             }
             ListResult::End | ListResult::Error => *d.borrow_mut() = true,
@@ -629,6 +677,34 @@ fn build_audio_state(
         }
     }
 
+    // ── List modules (combined sink discovery) ──
+    {
+        let modules = modules_data.clone();
+        let intro = pa_ctx.borrow().introspect();
+        let d = done.clone();
+        let _op = intro.get_module_info_list(move |result| match result {
+            ListResult::Item(mi) => {
+                let name = mi
+                    .name
+                    .as_ref()
+                    .map(std::string::ToString::to_string)
+                    .unwrap_or_default();
+                let argument = mi
+                    .argument
+                    .as_ref()
+                    .map(std::string::ToString::to_string)
+                    .unwrap_or_default();
+                modules.borrow_mut().push(ModuleInfo {
+                    index: mi.index,
+                    name,
+                    argument,
+                });
+            }
+            ListResult::End | ListResult::Error => *d.borrow_mut() = true,
+        });
+        spin_until(ml, done);
+    }
+
     // ── List server info (defaults) ──
     {
         let ds = default_sink.clone();
@@ -649,10 +725,22 @@ fn build_audio_state(
         spin_until(ml, done);
     }
 
-    // ── Cross-reference: card profiles → sinks ──
+    // ── Cross-reference: card profiles → sinks, combined sink detection ──
     let cards = cards_data.borrow();
+    let modules = modules_data.borrow();
     let ds = default_sink.borrow();
     let dsrc = default_source.borrow();
+
+    // Build a map of combined sink names → module index
+    let mut combined_sink_names: HashMap<String, u32> = HashMap::new();
+    for module in modules.iter() {
+        if module.name == "module-combine-sink" {
+            let (sink_name, _) = parse_combine_sink_args(&module.argument);
+            if let Some(name) = sink_name {
+                combined_sink_names.insert(name, module.index);
+            }
+        }
+    }
 
     let card_map: std::collections::HashMap<u32, &CardInfo> =
         cards.iter().map(|c| (c.index, c)).collect();
@@ -666,6 +754,14 @@ fn build_audio_state(
             sink.available_profiles.clone_from(&card.profiles);
         }
         sink.is_default = ds.as_ref() == Some(&sink.name);
+        // Mark combined sinks
+        if let Some(&module_index) = combined_sink_names.get(&sink.name) {
+            sink.is_combined_sink = true;
+            sink.combined_module_index = Some(module_index);
+        } else {
+            sink.is_combined_sink = false;
+            sink.combined_module_index = None;
+        }
     }
 
     let mut sources = sources_data.borrow_mut();
@@ -677,6 +773,7 @@ fn build_audio_state(
         sinks: sinks.clone(),
         sources: sources.clone(),
         cards: cards.clone(),
+        modules: modules.clone(),
         subsystem_status: SubsystemStatus::Connected,
     }
 }
