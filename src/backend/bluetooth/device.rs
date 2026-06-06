@@ -83,12 +83,12 @@ pub(crate) async fn quick_device_status(
     addr: bluer::Address,
 ) -> Option<BluetoothDevice> {
     let device = adapter.device(addr).ok()?;
-    let props = crate::bluetooth::properties::fetch_properties(
+    let props = crate::backend::bluetooth::properties::fetch_properties(
         &device,
-        crate::bluetooth::properties::PropertyTimeouts::default(),
+        crate::backend::bluetooth::properties::PropertyTimeouts::default(),
     )
     .await;
-    crate::bluetooth::properties::build_device(addr, &props, false, false)
+    crate::backend::bluetooth::properties::build_device(addr, &props, false, false)
 }
 
 /// Compare two device lists — returns `true` if display-relevant fields

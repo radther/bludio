@@ -5,17 +5,16 @@
 //! Actions are sent as `BluetoothPageCommand`s through a channel — the row
 //! never spawns async tasks directly.
 
+use crate::backend::bluetooth::device::{DeviceRowAction, PairingStatus};
 use crate::ui::StyledExt;
-use bluer::Address;
-use futures::channel::mpsc::UnboundedSender;
-use gpui::{Context, Render, SharedString, Window, div, prelude::*};
-
-use super::BluetoothPageCommand;
-use crate::bluetooth::device::{DeviceRowAction, PairingStatus};
+use crate::ui::{h_flex, v_flex};
 use crate::ui::components::button::action_btn;
 use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::status_strip::status_strip;
-use crate::ui::{h_flex, v_flex};
+use crate::ui::pages::bluetooth::BluetoothPageCommand;
+use bluer::Address;
+use futures::channel::mpsc::UnboundedSender;
+use gpui::{Context, Render, SharedString, Window, div, prelude::*};
 
 // ── Row entity ─────────────────────────────────────────────────────────────
 
@@ -57,7 +56,7 @@ impl BluetoothDeviceRow {
     /// Update the device state from a `BluetoothDevice`.
     pub(crate) fn update_from_device(
         &mut self,
-        device: &crate::bluetooth::device::BluetoothDevice,
+        device: &crate::backend::bluetooth::device::BluetoothDevice,
     ) {
         self.display_name.clone_from(&device.display_name);
         self.paired = device.paired;

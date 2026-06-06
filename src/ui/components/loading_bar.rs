@@ -61,7 +61,7 @@ fn cycle_position(delta: f32) -> f32 {
 /// When animations are globally disabled, the bar is rendered as a static
 /// full-width solid color instead.
 pub(crate) fn loading_bar(id: impl Into<gpui::ElementId>, color: Hsla) -> Div {
-    if crate::ui::accessibility::disable_animations() {
+    if crate::ui::common::accessibility::disable_animations() {
         return div().w_full().h_1().bg(color);
     }
 

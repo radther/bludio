@@ -10,9 +10,9 @@
 //! animations are handled via a generation counter.
 
 use crate::ui::h_flex;
-use crate::ui::theme;
-use crate::ui::tooltip;
 use crate::ui::v_flex;
+use crate::ui::components::tooltip;
+use crate::ui::theme;
 use gpui::{
     App, ClickEvent, Context, CursorStyle, EventEmitter, FocusHandle, Focusable, Render,
     SharedString, Window, div, prelude::*, px,
@@ -123,7 +123,7 @@ impl TabBar {
         let generation = self.animation_generation;
 
         // When animations are globally disabled, snap instantly.
-        if crate::ui::accessibility::disable_animations() {
+        if crate::ui::common::accessibility::disable_animations() {
             self.indicator_offset = target;
             cx.notify();
             return;

@@ -4,14 +4,15 @@
 //! profile selection. Renders the volume bar, text field, mute button,
 //! default button, and profile dropdown inline.
 
-use crate::audio::pulse::PaWakeup;
-use crate::audio::{AudioCommand, DeviceKind};
+use crate::backend::audio::pulse::PaWakeup;
+use crate::backend::audio::{AudioCommand, DeviceKind};
+use crate::ui::StyledExt;
+use crate::ui::{h_flex, v_flex};
 use crate::ui::components::button::action_btn;
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
 use crate::ui::components::slider::{Slider, SliderEvent, SliderState};
 use crate::ui::components::status_strip::status_strip;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
-use crate::ui::{StyledExt, h_flex, v_flex};
 use gpui::{
     App, Context, Div, Entity, FocusHandle, Focusable, Render, SharedString, Stateful,
     Subscription, Window, div, prelude::*, px,
@@ -61,7 +62,7 @@ struct RowParams {
 impl AudioDeviceRow {
     /// Create a new device row entity for a sink (output).
     pub(crate) fn new_sink(
-        sink: &crate::audio::SinkInfo,
+        sink: &crate::backend::audio::SinkInfo,
         cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
         wakeup: PaWakeup,
         window: &mut Window,
@@ -99,7 +100,7 @@ impl AudioDeviceRow {
 
     /// Create a new device row entity for a source (input).
     pub(crate) fn new_source(
-        source: &crate::audio::SourceInfo,
+        source: &crate::backend::audio::SourceInfo,
         cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
         wakeup: PaWakeup,
         window: &mut Window,
@@ -240,7 +241,7 @@ impl AudioDeviceRow {
     /// Sync row state from a fresh sink snapshot.
     pub(crate) fn update_from_sink(
         &mut self,
-        sink: &crate::audio::SinkInfo,
+        sink: &crate::backend::audio::SinkInfo,
         cx: &mut Context<Self>,
     ) {
         self.card_index = sink.card_index;
@@ -270,7 +271,7 @@ impl AudioDeviceRow {
     /// Sync row state from a fresh source snapshot.
     pub(crate) fn update_from_source(
         &mut self,
-        source: &crate::audio::SourceInfo,
+        source: &crate::backend::audio::SourceInfo,
         cx: &mut Context<Self>,
     ) {
         self.display_name.clone_from(&source.description);

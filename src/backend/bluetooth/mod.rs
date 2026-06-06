@@ -6,7 +6,7 @@ pub mod discovery;
 pub(crate) mod monitor;
 pub(crate) mod properties;
 
-use crate::subsystem::SubsystemStatus;
+use crate::backend::subsystem::SubsystemStatus;
 use device::BluetoothDevice;
 
 /// Holds the Bluetooth session and adapter state shared with the UI.

@@ -5,10 +5,10 @@
 //! (`tokio::sync::mpsc::UnboundedSender` works from any thread — only the
 //! receiver end needs a Tokio runtime.)
 
-use crate::audio::{
+use crate::backend::audio::{
     AudioCommand, AudioState, CardInfo, CodecInfo, DeviceKind, ProfileInfo, SinkInfo, SourceInfo,
 };
-use crate::subsystem::SubsystemStatus;
+use crate::backend::subsystem::SubsystemStatus;
 use libpulse_binding as pulse;
 use pulse::callbacks::ListResult;
 use pulse::context::{Context, FlagSet as ContextFlags, State as ContextState};

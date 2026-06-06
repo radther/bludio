@@ -293,7 +293,7 @@ impl RenderOnce for DropdownComponent {
                     .hover(move |el| el.bg(self.hover))
                     .child(
                         h_flex().gap_1().child(selected.clone()).child(
-                            crate::ui::icons::chevron_down()
+                            crate::ui::common::icons::chevron_down()
                                 .w(px(12.))
                                 .h(px(12.))
                                 .text_color(self.icon_color),

@@ -4,13 +4,13 @@
 //!   `BludioApp` → Entity<AudioPage> → Vec<Entity<AudioDeviceRow>>
 //!     → Entity<TextField> + Entity<Dropdown>
 
-use crate::audio::pulse::PaWakeup;
-use crate::audio::{AudioCommand, AudioState, DeviceKind};
-use crate::subsystem::SubsystemStatus;
-use crate::ui::animation::FadeInAnimationExt;
-use crate::ui::audio::device_row::AudioDeviceRow;
-use crate::ui::components::page_header::page_header;
+use crate::backend::audio::pulse::PaWakeup;
+use crate::backend::audio::{AudioCommand, AudioState, DeviceKind};
+use crate::backend::subsystem::SubsystemStatus;
+use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::{h_flex, v_flex};
+use crate::ui::components::page_header::page_header;
+use crate::ui::pages::audio::audio_device_row::AudioDeviceRow;
 use gpui::{Context, Entity, Render, Window, div, prelude::*, px};
 
 // ── Audio page entity ──────────────────────────────────────────────────────

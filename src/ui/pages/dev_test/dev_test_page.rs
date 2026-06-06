@@ -9,12 +9,13 @@ use gpui::{
     Subscription, Window, div, prelude::*, px,
 };
 
-use crate::ui::animation::FadeInAnimationExt;
+use crate::ui::common::animation::FadeInAnimationExt;
+use crate::ui::StyledExt;
+use crate::ui::{h_flex, v_flex};
 use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use crate::ui::theme;
-use crate::ui::{StyledExt, h_flex, v_flex};
 
 // ── Test page entity ───────────────────────────────────────────────────────
 

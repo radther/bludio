@@ -8,7 +8,7 @@ use gpui::{
     Animation, AnimationElement, AnimationExt, ElementId, IntoElement, Styled, ease_out_quint, px,
 };
 
-use crate::ui::accessibility::disable_animations;
+use crate::ui::common::accessibility::disable_animations;
 
 // ── Fade-in animation ──────────────────────────────────────────────────────
 

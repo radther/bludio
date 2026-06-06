@@ -4,11 +4,11 @@
 //! shows a display name, a profile dropdown, and optionally a Bluetooth codec
 //! dropdown. Owns its own `Dropdown` entities for profile and codec selection.
 
-use crate::audio::pulse::PaWakeup;
-use crate::audio::{AudioCommand, CardInfo};
+use crate::backend::audio::pulse::PaWakeup;
+use crate::backend::audio::{AudioCommand, CardInfo};
 use crate::ui::StyledExt;
-use crate::ui::components::dropdown::DropdownEvent as DdEvt;
 use crate::ui::{h_flex, v_flex};
+use crate::ui::components::dropdown::DropdownEvent as DdEvt;
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, Render, SharedString, Subscription, Window, div,
     prelude::*,

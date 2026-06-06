@@ -3,22 +3,22 @@
 //! Follows Zed's pattern where the entry point (`main.rs`) is thin and the
 //! app entity lives in its own module.
 
-use crate::audio::AudioState;
-use crate::audio::DeviceKind;
-use crate::audio::pulse::PaWakeup;
-use crate::bluetooth::BluetoothState;
-use crate::bluetooth::device::{
+use crate::backend::audio::AudioState;
+use crate::backend::audio::DeviceKind;
+use crate::backend::audio::pulse::PaWakeup;
+use crate::backend::bluetooth::BluetoothState;
+use crate::backend::bluetooth::device::{
     DeviceRowAction, PairingStatus, devices_changed, execute_device_action, format_device_error,
     quick_device_status,
 };
-use crate::bluetooth::monitor::MonitorEvent;
-use crate::subsystem::SubsystemStatus;
+use crate::backend::bluetooth::monitor::MonitorEvent;
+use crate::backend::subsystem::SubsystemStatus;
 
 // ── Audio connection helper ────────────────────────────────────────────────
 
 /// Channels and receiver from a PulseAudio thread spawn attempt.
 struct AudioConnection {
-    cmd_tx: tokio::sync::mpsc::UnboundedSender<crate::audio::AudioCommand>,
+    cmd_tx: tokio::sync::mpsc::UnboundedSender<crate::backend::audio::AudioCommand>,
     state_rx: tokio::sync::mpsc::UnboundedReceiver<AudioState>,
     wakeup_rx: std::sync::mpsc::Receiver<PaWakeup>,
 }
@@ -35,7 +35,7 @@ impl AudioConnection {
         let (wakeup_tx, wakeup_rx) = std::sync::mpsc::channel();
 
         std::thread::spawn(move || {
-            crate::audio::pulse::run_pa_thread_from_channels(cmd_rx, &state_tx, &wakeup_tx);
+            crate::backend::audio::pulse::run_pa_thread_from_channels(cmd_rx, &state_tx, &wakeup_tx);
         });
 
         Self {
@@ -45,16 +45,16 @@ impl AudioConnection {
         }
     }
 }
-use crate::settings::update_settings;
-use crate::ui::audio::audio_page::AudioPage;
-use crate::ui::audio::configuration_page::ConfigurationPage;
-use crate::ui::bluetooth::BluetoothPageCommand;
-use crate::ui::bluetooth::bluetooth_page::BluetoothPage;
-use crate::ui::dev_test_page::DevTestPage;
-use crate::ui::icons;
-use crate::ui::settings_page::{SettingsEvent, SettingsPage};
-use crate::ui::tab_bar::{Tab, TabAction, TabBar, TabBarEvent};
+use crate::backend::settings::update_settings;
+use crate::ui::common::icons;
 use crate::ui::{h_flex, v_flex};
+use crate::ui::components::tab_bar::{Tab, TabAction, TabBar, TabBarEvent};
+use crate::ui::pages::audio::audio_page::AudioPage;
+use crate::ui::pages::bluetooth::BluetoothPageCommand;
+use crate::ui::pages::bluetooth::bluetooth_page::BluetoothPage;
+use crate::ui::pages::configuration::configuration_page::ConfigurationPage;
+use crate::ui::pages::dev_test::dev_test_page::DevTestPage;
+use crate::ui::pages::settings::settings_page::{SettingsEvent, SettingsPage};
 use futures::{FutureExt, StreamExt};
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, IntoElement, Render, Subscription, Window,
@@ -102,7 +102,7 @@ impl std::fmt::Display for PkexecError {
 
 pub(crate) struct BludioApp {
     pub(crate) bt_state: BluetoothState,
-    pub(crate) bt_agent: Option<crate::bluetooth::agent::AgentHandle>,
+    pub(crate) bt_agent: Option<crate::backend::bluetooth::agent::AgentHandle>,
     pub(crate) audio_state: AudioState,
     /// PA mainloop wakeup handle — `None` until the PA thread connects.
     pa_wakeup: Option<PaWakeup>,
@@ -175,7 +175,7 @@ impl BludioApp {
                     }
                     SettingsEvent::DisableAnimationsChanged(value) => {
                         update_settings(|s| s.disable_animations = *value, cx);
-                        crate::ui::accessibility::set_disable_animations(*value);
+                        crate::ui::common::accessibility::set_disable_animations(*value);
                     }
                     SettingsEvent::FontChanged(family) => {
                         update_settings(|s| s.font_family = family.clone(), cx);
@@ -455,11 +455,11 @@ impl BludioApp {
     /// Connect to BlueZ, register agent, return (state, agent).
     /// Shared by initial connection and reconnection.
     async fn connect_bluetooth()
-    -> Result<(BluetoothState, crate::bluetooth::agent::AgentHandle), String> {
+    -> Result<(BluetoothState, crate::backend::bluetooth::agent::AgentHandle), String> {
         let state = BluetoothState::new().await?;
         // SAFETY: BluetoothState::new() only returns Ok after session is set.
         let agent =
-            crate::bluetooth::agent::register_agent(state.session.as_ref().unwrap()).await?;
+            crate::backend::bluetooth::agent::register_agent(state.session.as_ref().unwrap()).await?;
         Ok((state, agent))
     }
 
@@ -508,7 +508,7 @@ impl BludioApp {
             let (monitor_tx, mut monitor_rx) = futures::channel::mpsc::unbounded::<MonitorEvent>();
             let monitor_adapter = adapter.clone();
             crate::TOKIO.spawn(async move {
-                crate::bluetooth::monitor::run_monitor(&monitor_adapter, monitor_tx).await;
+                crate::backend::bluetooth::monitor::run_monitor(&monitor_adapter, monitor_tx).await;
             });
 
             // ── Session event watcher (AdapterAdded/Removed = BlueZ restart) ──
@@ -593,7 +593,7 @@ impl BludioApp {
                         // 10s fallback: full list refresh.
                         let a = adapter.clone();
                         if let Ok(Some(fresh)) = crate::tokio_task(async move {
-                            crate::bluetooth::discovery::refresh_device_list(&a).await
+                            crate::backend::bluetooth::discovery::refresh_device_list(&a).await
                         })
                         .await
                         {
@@ -694,7 +694,7 @@ impl BludioApp {
         // Phase 1: quick single-device status refresh
         let a = adapter.clone();
         if let Ok(Some(device)) = crate::tokio_task(async move {
-            crate::bluetooth::device::quick_device_status(&a, addr).await
+            crate::backend::bluetooth::device::quick_device_status(&a, addr).await
         })
         .await
         {
@@ -710,7 +710,7 @@ impl BludioApp {
         let a = adapter.clone();
         if let Ok(Some(devices)) = crate::tokio_task(async move {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            crate::bluetooth::discovery::refresh_device_list(&a).await
+            crate::backend::bluetooth::discovery::refresh_device_list(&a).await
         })
         .await
         {
@@ -1009,7 +1009,7 @@ impl BludioApp {
                             } else {
                                 this.bt_state.discovering = true;
                                 cx.spawn_in(window, async move |this, cx| {
-                                    crate::bluetooth::discovery::run_discovery(this, cx).await;
+                                    crate::backend::bluetooth::discovery::run_discovery(this, cx).await;
                                 })
                                 .detach();
                             }

@@ -2,7 +2,7 @@
 
 pub(crate) mod pulse;
 
-use crate::subsystem::SubsystemStatus;
+use crate::backend::subsystem::SubsystemStatus;
 
 // ── Device kind ────────────────────────────────────────────────────────────
 

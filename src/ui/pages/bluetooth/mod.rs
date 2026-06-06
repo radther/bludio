@@ -1,13 +1,13 @@
 //! Bluetooth UI components: page entity, device row entity, and shared types.
 //!
 //! `BluetoothPageCommand` lives here so it can be imported by both
-//! `bluetooth_page` and `device_row` without circular deps.
+//! `bluetooth_page` and `bluetooth_device_row` without circular deps.
 
-use crate::bluetooth::device::DeviceRowAction;
+use crate::backend::bluetooth::device::DeviceRowAction;
 use bluer::Address;
 
 pub(crate) mod bluetooth_page;
-pub(crate) mod device_row;
+pub(crate) mod bluetooth_device_row;
 
 // ── Command type ───────────────────────────────────────────────────────────
 

@@ -3,10 +3,7 @@
 //! Entry point: Tokio bridge setup, font loading, theme init, window creation.
 
 mod app;
-mod audio;
-mod bluetooth;
-mod settings;
-mod subsystem;
+mod backend;
 mod ui;
 
 use std::sync::LazyLock;
@@ -55,9 +52,9 @@ fn main() {
             .expect("Failed to load bundled fonts");
 
         // ── Init settings + theme ──────────────────────────────────
-        let settings = crate::settings::Settings::load();
-        cx.set_global(crate::settings::GlobalSettings::new(settings.clone()));
-        crate::ui::accessibility::set_disable_animations(settings.disable_animations);
+        let settings = crate::backend::settings::Settings::load();
+        cx.set_global(crate::backend::settings::GlobalSettings::new(settings.clone()));
+        crate::ui::common::accessibility::set_disable_animations(settings.disable_animations);
 
         let bounds = Bounds::centered(None, size(px(1100.0), px(700.0)), cx);
 

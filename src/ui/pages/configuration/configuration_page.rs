@@ -4,13 +4,13 @@
 //!   `BludioApp` → Entity<ConfigurationPage> → Vec<Entity<CardRow>>
 //!     → Entity<Dropdown>
 
-use crate::audio::pulse::PaWakeup;
-use crate::audio::{AudioCommand, AudioState};
-use crate::subsystem::SubsystemStatus;
-use crate::ui::animation::FadeInAnimationExt;
-use crate::ui::audio::card_row::CardRow;
-use crate::ui::components::page_header::page_header;
+use crate::backend::audio::pulse::PaWakeup;
+use crate::backend::audio::{AudioCommand, AudioState};
+use crate::backend::subsystem::SubsystemStatus;
+use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::{h_flex, v_flex};
+use crate::ui::components::page_header::page_header;
+use crate::ui::pages::configuration::config_card_row::CardRow;
 use gpui::{Context, Entity, Render, Window, div, prelude::*, px};
 
 // ── Configuration page entity ──────────────────────────────────────────────
