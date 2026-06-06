@@ -39,11 +39,11 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Test `cargo build --release --locked` in an `ubuntu:22.04` container locally (or via Actions test run)
-- [ ] 5.2 Verify the built binary runs on the host system after container build
+- [x] 5.1 Test `cargo build --release --locked` in an `ubuntu:22.04` container locally (or via Actions test run)
+- [x] 5.2 Verify the built binary runs on the host system after container build
 - [x] 5.3 Test `install.sh` locally in a fresh environment (e.g., container or VM)
 - [x] 5.4 Verify user install places files correctly and prints PATH warning when needed
 - [x] 5.5 Verify system install places PolicyKit policy correctly
 - [x] 5.6 Verify the `.desktop` file appears in the app launcher after install
-- [ ] 5.7 Tag a test release (`v0.1.0-test.1`) and confirm the workflow completes end-to-end
-- [ ] 5.8 Download and extract the published tarball, verify all three files are present
+- [x] 5.7 Tag a test release (`v0.1.0-test.1`) and confirm the workflow completes end-to-end
+- [x] 5.8 Download and extract the published tarball, verify all three files are present
