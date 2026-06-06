@@ -16,7 +16,7 @@ esac
 # GitHub's /releases/latest redirects to /releases/tag/<tag>. This avoids
 # the GitHub API and its strict rate limits (60 req/hr for unauthenticated).
 echo "Fetching latest release..."
-FINAL_URL=$(curl -fsSL -o /dev/null -w "%{url_effective}" "$RELEASE_URL")
+FINAL_URL=$(curl -fsSL -o /dev/null -w "%{url_effective}" -H "User-Agent: bludio-installer" "$RELEASE_URL")
 TAG=$(echo "$FINAL_URL" | sed -E 's|.*/tag/||')
 if [ -z "$TAG" ] || [ "$TAG" = "$FINAL_URL" ]; then
     echo "Error: Could not determine latest release tag" >&2
