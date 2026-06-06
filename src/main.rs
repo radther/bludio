@@ -45,6 +45,10 @@ fn main() {
         let fonts: Vec<std::borrow::Cow<'static, [u8]>> = vec![
             std::borrow::Cow::Borrowed(include_bytes!("../fonts/NotoSans.ttf")),
             std::borrow::Cow::Borrowed(include_bytes!("../fonts/NotoSans-Italic.ttf")),
+            std::borrow::Cow::Borrowed(include_bytes!("../fonts/OpenDyslexic-Regular.ttf")),
+            std::borrow::Cow::Borrowed(include_bytes!("../fonts/OpenDyslexic-Bold.ttf")),
+            std::borrow::Cow::Borrowed(include_bytes!("../fonts/OpenDyslexic-Italic.ttf")),
+            std::borrow::Cow::Borrowed(include_bytes!("../fonts/OpenDyslexic-BoldItalic.ttf")),
         ];
         cx.text_system()
             .add_fonts(fonts)
@@ -52,7 +56,8 @@ fn main() {
 
         // ── Init settings + theme ──────────────────────────────────
         let settings = crate::settings::Settings::load();
-        cx.set_global(crate::settings::GlobalSettings::new(settings));
+        cx.set_global(crate::settings::GlobalSettings::new(settings.clone()));
+        crate::ui::accessibility::set_disable_animations(settings.disable_animations);
 
         let bounds = Bounds::centered(None, size(px(1100.0), px(700.0)), cx);
 

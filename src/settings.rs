@@ -25,10 +25,13 @@ pub(crate) enum ThemeMode {
 
 /// User-facing settings persisted to disk.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub(crate) struct Settings {
     pub theme_mode: ThemeMode,
     pub light_theme_id: String,
     pub dark_theme_id: String,
+    pub disable_animations: bool,
+    pub font_family: String,
 }
 
 impl Default for Settings {
@@ -37,6 +40,8 @@ impl Default for Settings {
             theme_mode: ThemeMode::Light,
             light_theme_id: "rose-pine-dawn".to_string(),
             dark_theme_id: "rose-pine".to_string(),
+            disable_animations: false,
+            font_family: "Noto Sans".to_string(),
         }
     }
 }
@@ -103,8 +108,10 @@ impl GlobalSettings {
             ThemeMode::Light => &settings.light_theme_id,
             ThemeMode::Dark => &settings.dark_theme_id,
         };
-        theme_for_id(id)
-            .unwrap_or_else(|| theme_for_id("rose-pine-dawn").expect("default theme must exist"))
+        let mut theme = theme_for_id(id)
+            .unwrap_or_else(|| theme_for_id("rose-pine-dawn").expect("default theme must exist"));
+        Arc::make_mut(&mut theme).font_family = settings.font_family.clone().into();
+        theme
     }
 }
 

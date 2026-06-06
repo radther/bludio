@@ -57,7 +57,14 @@ fn cycle_position(delta: f32) -> f32 {
 /// 25 % of the container width and has transparent-to-solid gradients on
 /// both ends. It starts fully off-screen left, sweeps across to fully
 /// off-screen right, returns left, pauses 500 ms, then repeats.
+///
+/// When animations are globally disabled, the bar is rendered as a static
+/// full-width solid color instead.
 pub(crate) fn loading_bar(id: impl Into<gpui::ElementId>, color: Hsla) -> Div {
+    if crate::ui::accessibility::disable_animations() {
+        return div().w_full().h_1().bg(color);
+    }
+
     let fade_width = relative(FADE_FRAC);
     let transparent = color.opacity(0.0);
 

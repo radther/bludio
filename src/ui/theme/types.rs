@@ -119,6 +119,7 @@ pub(crate) struct TextStyleSet {
     pub body: (gpui::AbsoluteLength, FontWeight),
     pub body2: (gpui::AbsoluteLength, FontWeight),
     pub heading: (gpui::AbsoluteLength, FontWeight),
+    pub heading2: (gpui::AbsoluteLength, FontWeight),
     pub caption: (gpui::AbsoluteLength, FontWeight),
 }
 
@@ -128,6 +129,7 @@ impl Default for TextStyleSet {
             body: (gpui::rems(1.0).into(), FontWeight::MEDIUM),
             body2: (gpui::rems(0.875).into(), FontWeight::MEDIUM),
             heading: (gpui::rems(1.5).into(), FontWeight::EXTRA_BOLD),
+            heading2: (gpui::rems(1.125).into(), FontWeight::BOLD),
             caption: (gpui::rems(0.75).into(), FontWeight::BOLD),
         }
     }

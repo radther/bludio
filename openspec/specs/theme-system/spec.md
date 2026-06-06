@@ -28,11 +28,16 @@ The system SHALL provide a `ThemeColors` struct with named color fields for back
 - **THEN** it uses the appropriate domain accent: `bluetooth_accent` (foam), `audio_accent` (iris), or `dev_accent` (pine)
 
 ### Requirement: Theme provides font configuration
-The system SHALL store font family and text style roles in the theme. The font family SHALL be "Noto Sans", provided as a bundled variable font (`fonts/NotoSans.ttf` and `fonts/NotoSans-Italic.ttf`) covering all weights and italic.
+The system SHALL store font family and text style roles in the theme. The font family SHALL be "Noto Sans", provided as a bundled variable font (`fonts/NotoSans.ttf` and `fonts/NotoSans-Italic.ttf`) covering all weights and italic. The active font family at runtime SHALL come from `Settings`, overriding the theme's default if the user has selected a different bundled font.
 
-#### Scenario: Font family is Noto Sans
-- **WHEN** any text is rendered
+#### Scenario: Font family is Noto Sans by default
+- **WHEN** any text is rendered and the user has not changed the font
 - **THEN** the default font family is "Noto Sans" (set on the root element via `.font_family()`)
+
+#### Scenario: Font family switches to OpenDyslexic
+- **WHEN** the user selects "OpenDyslexic" in Settings
+- **THEN** the root element SHALL use `.font_family("OpenDyslexic")`
+- **THEN** all rendered text SHALL use the OpenDyslexic font
 
 #### Scenario: Font weights are named
 - **WHEN** a component needs a text style for a specific role
@@ -78,7 +83,7 @@ The system SHALL provide two Rose Pine theme variants: `rose_pine()` (dark) and 
 - **THEN** the theme ID SHALL be `"rose-pine"`
 
 ### Requirement: Theme switching from DevTestPage
-The system SHALL allow switching between Rose Pine (dark) and Rose Pine Dawn (light) themes at runtime from the DevTestPage. The page SHALL render "Dark" and "Light" toggle buttons. Switching themes SHALL call `update_settings()` which recomputes the active theme, persists to disk, and triggers a full UI re-render.
+The system SHALL allow switching between Rose Pine (dark) and Rose Pine Dawn (light) themes at runtime from the DevTestPage. The page SHALL render "Dark" and "Light" toggle buttons. Switching themes SHALL call `update_settings()` which recomputes the active theme, persists to disk, and triggers a full UI re-render. The system SHALL also support switching to and from the high-contrast themes via the Settings page.
 
 #### Scenario: Switch to dark theme
 - **WHEN** the user clicks the "Dark" button on DevTestPage
@@ -119,3 +124,31 @@ The system SHALL allow the active theme to be set at runtime via `update_setting
 #### Scenario: Theme file structure
 - **WHEN** a developer looks at the theme module
 - **THEN** it SHALL be organized as `src/ui/theme/mod.rs` (module root) + `types.rs` (core types) + `rose_pine_theme.rs` (dark) + `rose_pine_dawn_theme.rs` (light) + `registry.rs` (ID-to-constructor map)
+
+### Requirement: High Contrast Light theme constructor
+The system SHALL provide a `high_contrast_light()` constructor that returns a complete `Theme` with a high-contrast light palette. The theme SHALL have the ID `"high-contrast-light"` and appearance `Appearance::Light`.
+
+#### Scenario: Construct High Contrast Light
+- **WHEN** `high_contrast_light()` is called
+- **THEN** it SHALL return a `Theme` with ID `"high-contrast-light"`
+- **THEN** the appearance SHALL be `Light`
+- **THEN** all color tokens SHALL have high-contrast values
+- **THEN** the font family SHALL be `"Noto Sans"` (or match the active user preference)
+
+### Requirement: High Contrast Dark theme constructor
+The system SHALL provide a `high_contrast_dark()` constructor that returns a complete `Theme` with a high-contrast dark palette. The theme SHALL have the ID `"high-contrast-dark"` and appearance `Appearance::Dark`.
+
+#### Scenario: Construct High Contrast Dark
+- **WHEN** `high_contrast_dark()` is called
+- **THEN** it SHALL return a `Theme` with ID `"high-contrast-dark"`
+- **THEN** the appearance SHALL be `Dark`
+- **THEN** all color tokens SHALL have high-contrast values
+- **THEN** the font family SHALL be `"Noto Sans"` (or match the active user preference)
+
+### Requirement: Active font family is applied at the root
+The system SHALL apply the active font family from `Settings` to the root UI element so that all child elements inherit it. The font family SHALL be accessible via `settings(cx).font_family`.
+
+#### Scenario: Root element applies font family
+- **WHEN** `BludioApp` renders its root element
+- **THEN** it SHALL call `.font_family(settings(cx).font_family.clone())` on the root container
+- **THEN** all text descendants SHALL inherit the selected font family

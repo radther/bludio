@@ -8,3 +8,4 @@ pub mod page_header;
 pub mod slider;
 pub mod status_strip;
 pub mod text_field;
+pub mod toggle;

@@ -1,7 +1,7 @@
 //! Settings page: application preferences.
 //!
 //! Ownership chain:
-//!   `BludioApp` → Entity<SettingsPage> → Entity<Dropdown> × 2
+//!   `BludioApp` → Entity<SettingsPage> → Entity<Dropdown> × 3
 
 use gpui::{
     App, Context, CursorStyle, Entity, EventEmitter, FocusHandle, Focusable, Render, Subscription,
@@ -12,8 +12,9 @@ use crate::settings::settings;
 use crate::ui::animation::FadeInAnimationExt;
 use crate::ui::components::dropdown::{Dropdown, DropdownEvent};
 use crate::ui::components::page_header::page_header;
+use crate::ui::components::toggle::toggle_switch;
 use crate::ui::ext::StyledExt;
-use crate::ui::theme::{ThemeMode, dark_theme_ids, light_theme_ids};
+use crate::ui::theme::{TextStyleSet, ThemeColors, ThemeMode, dark_theme_ids, light_theme_ids};
 use crate::ui::{h_flex, v_flex};
 
 // ── Events ───────────────────────────────────────────────────────────────────
@@ -25,6 +26,8 @@ pub(crate) enum SettingsEvent {
     ModeChanged(ThemeMode),
     LightThemeChanged(String),
     DarkThemeChanged(String),
+    DisableAnimationsChanged(bool),
+    FontChanged(String),
 }
 
 // ── Settings page entity ───────────────────────────────────────────────────
@@ -33,9 +36,11 @@ pub(crate) enum SettingsEvent {
 pub(crate) struct SettingsPage {
     light_theme_dropdown: Entity<Dropdown>,
     dark_theme_dropdown: Entity<Dropdown>,
+    font_dropdown: Entity<Dropdown>,
     focus_handle: FocusHandle,
     _light_dropdown_sub: Subscription,
     _dark_dropdown_sub: Subscription,
+    _font_dropdown_sub: Subscription,
 }
 
 impl SettingsPage {
@@ -49,13 +54,16 @@ impl SettingsPage {
             .iter()
             .map(|id| theme_display_name(id).to_string())
             .collect::<Vec<_>>();
+        let font_items = vec!["Noto Sans".to_string(), "OpenDyslexic".to_string()];
 
         let current = settings(cx);
         let light_idx = index_for_id(light_theme_ids(), &current.light_theme_id);
         let dark_idx = index_for_id(dark_theme_ids(), &current.dark_theme_id);
+        let font_idx = index_for_font(&current.font_family);
 
         let light_theme_dropdown = cx.new(|cx| Dropdown::new(light_items, light_idx, cx));
         let dark_theme_dropdown = cx.new(|cx| Dropdown::new(dark_items, dark_idx, cx));
+        let font_dropdown = cx.new(|cx| Dropdown::new(font_items, font_idx, cx));
 
         let _light_dropdown_sub = cx.subscribe(
             &light_theme_dropdown,
@@ -81,12 +89,24 @@ impl SettingsPage {
             },
         );
 
+        let _font_dropdown_sub = cx.subscribe(
+            &font_dropdown,
+            |_this, _dropdown, event: &DropdownEvent, cx| {
+                if let DropdownEvent::Selected(idx, _text) = event {
+                    let name = font_name_for_index(*idx);
+                    cx.emit(SettingsEvent::FontChanged(name.to_string()));
+                }
+            },
+        );
+
         Self {
             light_theme_dropdown,
             dark_theme_dropdown,
+            font_dropdown,
             focus_handle: cx.focus_handle(),
             _light_dropdown_sub,
             _dark_dropdown_sub,
+            _font_dropdown_sub,
         }
     }
 
@@ -97,12 +117,16 @@ impl SettingsPage {
         let current = settings(cx);
         let light_idx = index_for_id(light_theme_ids(), &current.light_theme_id);
         let dark_idx = index_for_id(dark_theme_ids(), &current.dark_theme_id);
+        let font_idx = index_for_font(&current.font_family);
 
         self.light_theme_dropdown.update(cx, |d, cx| {
             d.set_selected_index(light_idx, cx);
         });
         self.dark_theme_dropdown.update(cx, |d, cx| {
             d.set_selected_index(dark_idx, cx);
+        });
+        self.font_dropdown.update(cx, |d, cx| {
+            d.set_selected_index(font_idx, cx);
         });
     }
 }
@@ -120,8 +144,6 @@ impl Render for SettingsPage {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
         let text_styles = &theme.text_styles;
-        let is_light = settings(cx).theme_mode == ThemeMode::Light;
-        let entity = cx.entity().clone();
 
         v_flex()
             .flex_1()
@@ -144,62 +166,190 @@ impl Render for SettingsPage {
                     .id("settings-content")
                     .overflow_y_scroll()
                     .px_8()
-                    .gap_4()
-                    // ── Theme Mode ──
-                    .child(
-                        v_flex()
-                            .gap_2()
-                            .child(div().styled(text_styles.body2).child("Theme Mode"))
-                            .child(
-                                h_flex()
-                                    .gap_2()
-                                    .child(mode_button(
-                                        "Light",
-                                        is_light,
-                                        colors,
-                                        text_styles,
-                                        window,
-                                        &entity,
-                                        ThemeMode::Light,
-                                    ))
-                                    .child(mode_button(
-                                        "Dark",
-                                        !is_light,
-                                        colors,
-                                        text_styles,
-                                        window,
-                                        &entity,
-                                        ThemeMode::Dark,
-                                    )),
-                            ),
-                    )
-                    // ── Light Theme ──
-                    .child(
-                        v_flex()
-                            .gap_2()
-                            .child(div().styled(text_styles.body2).child("Light Theme"))
-                            .child(self.light_theme_dropdown.clone()),
-                    )
-                    // ── Dark Theme ──
-                    .child(
-                        v_flex()
-                            .gap_2()
-                            .child(div().styled(text_styles.body2).child("Dark Theme"))
-                            .child(self.dark_theme_dropdown.clone()),
-                    )
+                    .gap_6()
+                    .child(self.render_appearance_section(window, cx))
+                    .child(self.render_accessibility_section(window, cx))
                     .with_fade_in_up("settings-content", 2),
+            )
+    }
+}
+
+// ── Render sub-views ──────────────────────────────────────────────────────
+
+impl SettingsPage {
+    /// Appearance section: Font, Theme Mode, Light Theme, Dark Theme.
+    fn render_appearance_section(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::Div {
+        let theme = crate::ui::theme::theme(cx);
+        let colors = &theme.colors;
+        let text_styles = &theme.text_styles;
+        let is_light = settings(cx).theme_mode == ThemeMode::Light;
+        let entity = cx.entity().clone();
+
+        v_flex()
+            .gap_2()
+            .child(
+                div()
+                    .styled(text_styles.heading2)
+                    .child("Appearance")
+                    .border_b_1()
+                    .border_color(colors.border),
+            )
+            .child(
+                v_flex()
+                    .gap_4()
+                    .child(self.render_font_row(text_styles))
+                    .child(self.render_theme_mode_row(
+                        is_light,
+                        colors,
+                        text_styles,
+                        window,
+                        &entity,
+                    ))
+                    .child(self.render_light_theme_row(text_styles))
+                    .child(self.render_dark_theme_row(text_styles)),
+            )
+    }
+
+    /// Accessibility section: Disable Animations toggle.
+    fn render_accessibility_section(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> gpui::Div {
+        let theme = crate::ui::theme::theme(cx);
+        let colors = &theme.colors;
+        let text_styles = &theme.text_styles;
+        let disable_animations = settings(cx).disable_animations;
+        let entity = cx.entity().clone();
+
+        v_flex()
+            .gap_2()
+            .child(
+                div()
+                    .styled(text_styles.heading2)
+                    .child("Accessibility")
+                    .border_b_1()
+                    .border_color(colors.border),
+            )
+            .child(self.render_disable_animations_row(
+                disable_animations,
+                colors,
+                text_styles,
+                window,
+                &entity,
+            ))
+    }
+
+    // ── Row builders ───────────────────────────────────────────────────────
+
+    /// Font dropdown row.
+    fn render_font_row(&self, text_styles: &TextStyleSet) -> gpui::Div {
+        setting_row("Font", text_styles, self.font_dropdown.clone())
+    }
+
+    /// Theme mode toggle row.
+    fn render_theme_mode_row(
+        &self,
+        is_light: bool,
+        colors: &ThemeColors,
+        text_styles: &TextStyleSet,
+        window: &mut Window,
+        entity: &Entity<SettingsPage>,
+    ) -> gpui::Div {
+        setting_row(
+            "Theme Mode",
+            text_styles,
+            h_flex()
+                .gap_2()
+                .child(mode_button(
+                    "Light",
+                    is_light,
+                    colors,
+                    text_styles,
+                    window,
+                    entity,
+                    ThemeMode::Light,
+                ))
+                .child(mode_button(
+                    "Dark",
+                    !is_light,
+                    colors,
+                    text_styles,
+                    window,
+                    entity,
+                    ThemeMode::Dark,
+                )),
+        )
+    }
+
+    /// Light theme dropdown row.
+    fn render_light_theme_row(&self, text_styles: &TextStyleSet) -> gpui::Div {
+        setting_row(
+            "Light Theme",
+            text_styles,
+            self.light_theme_dropdown.clone(),
+        )
+    }
+
+    /// Dark theme dropdown row.
+    fn render_dark_theme_row(&self, text_styles: &TextStyleSet) -> gpui::Div {
+        setting_row("Dark Theme", text_styles, self.dark_theme_dropdown.clone())
+    }
+
+    /// Disable Animations toggle row — label left, switch right, whole row clickable.
+    fn render_disable_animations_row(
+        &self,
+        disable_animations: bool,
+        colors: &ThemeColors,
+        text_styles: &TextStyleSet,
+        window: &mut Window,
+        entity: &Entity<SettingsPage>,
+    ) -> gpui::Stateful<gpui::Div> {
+        let new_value = !disable_animations;
+
+        h_flex()
+            .id("disable-animations-row")
+            .w_full()
+            .justify_between()
+            .items_center()
+            .cursor(CursorStyle::PointingHand)
+            .child(div().styled(text_styles.body).child("Disable Animations"))
+            .child(toggle_switch(
+                "disable-animations-switch",
+                disable_animations,
+                colors,
+            ))
+            .on_click(
+                window.listener_for(entity, move |_this: &mut SettingsPage, _, _, cx| {
+                    cx.emit(SettingsEvent::DisableAnimationsChanged(new_value));
+                }),
             )
     }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+/// A labelled setting row: label above, control below.
+fn setting_row(
+    label: &'static str,
+    text_styles: &TextStyleSet,
+    control: impl IntoElement,
+) -> gpui::Div {
+    v_flex()
+        .child(div().styled(text_styles.body).child(label))
+        .child(control)
+}
+
 /// Build a theme mode toggle button.
 fn mode_button(
     label: &'static str,
     active: bool,
-    colors: &crate::ui::theme::ThemeColors,
-    text_styles: &crate::ui::theme::TextStyleSet,
+    colors: &ThemeColors,
+    text_styles: &TextStyleSet,
     window: &mut Window,
     entity: &Entity<SettingsPage>,
     mode: ThemeMode,
@@ -247,6 +397,8 @@ fn theme_display_name(id: &str) -> &'static str {
     match id {
         "rose-pine-dawn" => "Rose Pine Dawn",
         "rose-pine" => "Rose Pine",
+        "high-contrast-light" => "High Contrast Light",
+        "high-contrast-dark" => "High Contrast Dark",
         _ => "Unknown Theme",
     }
 }
@@ -254,4 +406,20 @@ fn theme_display_name(id: &str) -> &'static str {
 /// Find the index of a theme ID within a list of IDs.
 fn index_for_id(ids: &[&'static str], target: &str) -> usize {
     ids.iter().position(|id| *id == target).unwrap_or(0)
+}
+
+/// Font name for a given dropdown index.
+fn font_name_for_index(index: usize) -> &'static str {
+    match index {
+        1 => "OpenDyslexic",
+        _ => "Noto Sans",
+    }
+}
+
+/// Find the index of a font name in the dropdown.
+fn index_for_font(name: &str) -> usize {
+    match name {
+        "OpenDyslexic" => 1,
+        _ => 0,
+    }
 }

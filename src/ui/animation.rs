@@ -8,6 +8,8 @@ use gpui::{
     Animation, AnimationElement, AnimationExt, ElementId, IntoElement, Styled, ease_out_quint, px,
 };
 
+use crate::ui::accessibility::disable_animations;
+
 // ── Fade-in animation ──────────────────────────────────────────────────────
 
 /// Extension trait for fade-in animations on any styled element.
@@ -18,10 +20,18 @@ pub trait FadeInAnimationExt: Styled + Sized + IntoElement + 'static {
     /// animates up while opacity goes from 30% to 100%. Increase `count`
     /// for each successive item (e.g. header = 0, first list item = 1,
     /// second = 2, …) so each element has a larger staggered entrance.
+    ///
+    /// When `disable_animations` is true, the animation duration is zero
+    /// so the element appears immediately.
     fn with_fade_in_up(self, id: impl Into<ElementId>, count: usize) -> AnimationElement<Self> {
+        let duration = if disable_animations() {
+            Duration::ZERO
+        } else {
+            Duration::from_millis(400)
+        };
         self.with_animation(
             id,
-            Animation::new(Duration::from_millis(400)).with_easing(ease_out_quint()),
+            Animation::new(duration).with_easing(ease_out_quint()),
             move |this, delta| {
                 let offset = 20.0 * count as f32;
                 this.relative()

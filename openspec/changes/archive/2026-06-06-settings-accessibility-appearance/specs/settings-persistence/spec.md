@@ -1,10 +1,39 @@
-# Settings Persistence
+## ADDED Requirements
 
-## Purpose
+### Requirement: Settings struct includes disable_animations
+The system SHALL include a `disable_animations: bool` field in the `Settings` struct. The field SHALL be serialized and deserialized alongside existing fields. When the field is missing from the settings file, it SHALL default to `false`.
 
-Persistent storage for user application preferences. Loads settings from disk at startup and saves whenever settings change via a single centralized write path.
+#### Scenario: Settings file includes disable_animations
+- **WHEN** the application loads a settings file containing `"disable_animations": true`
+- **THEN** the loaded `Settings` SHALL have `disable_animations == true`
 
-## Requirements
+#### Scenario: Settings file missing disable_animations
+- **WHEN** the application loads a settings file that does not contain `disable_animations`
+- **THEN** the loaded `Settings` SHALL have `disable_animations == false`
+
+### Requirement: Settings struct includes font_family
+The system SHALL include a `font_family: String` field in the `Settings` struct. The field SHALL be serialized and deserialized alongside existing fields. When the field is missing from the settings file, it SHALL default to `"Noto Sans"`.
+
+#### Scenario: Settings file includes font_family
+- **WHEN** the application loads a settings file containing `"font_family": "OpenDyslexic"`
+- **THEN** the loaded `Settings` SHALL have `font_family == "OpenDyslexic"`
+
+#### Scenario: Settings file missing font_family
+- **WHEN** the application loads a settings file that does not contain `font_family`
+- **THEN** the loaded `Settings` SHALL have `font_family == "Noto Sans"`
+
+### Requirement: New settings fields are saved when changed
+The system SHALL write `disable_animations` and `font_family` to the settings JSON file whenever they change via `update_settings()`.
+
+#### Scenario: Disable animations is toggled
+- **WHEN** the user toggles Disable Animations
+- **THEN** the settings file SHALL be updated with the new `disable_animations` value
+
+#### Scenario: Font is changed
+- **WHEN** the user selects a different font
+- **THEN** the settings file SHALL be updated with the new `font_family` value
+
+## MODIFIED Requirements
 
 ### Requirement: Settings are loaded at application startup
 The system SHALL load user settings from a JSON file at application startup. If the file is missing or cannot be parsed, the system SHALL use default values: theme mode Light, light theme ID `"rose-pine-dawn"`, dark theme ID `"rose-pine"`, `disable_animations` false, and `font_family` `"Noto Sans"`.
@@ -50,38 +79,5 @@ The system SHALL write the current settings to the JSON file whenever a setting 
 - **THEN** the settings file SHALL be updated with the new `disable_animations` value
 
 #### Scenario: Font family is changed
-- **WHEN** the user selects a different font
-- **THEN** the settings file SHALL be updated with the new `font_family` value
-
-### Requirement: Settings struct includes disable_animations
-The system SHALL include a `disable_animations: bool` field in the `Settings` struct. The field SHALL be serialized and deserialized alongside existing fields. When the field is missing from the settings file, it SHALL default to `false`.
-
-#### Scenario: Settings file includes disable_animations
-- **WHEN** the application loads a settings file containing `"disable_animations": true`
-- **THEN** the loaded `Settings` SHALL have `disable_animations == true`
-
-#### Scenario: Settings file missing disable_animations
-- **WHEN** the application loads a settings file that does not contain `disable_animations`
-- **THEN** the loaded `Settings` SHALL have `disable_animations == false`
-
-### Requirement: Settings struct includes font_family
-The system SHALL include a `font_family: String` field in the `Settings` struct. The field SHALL be serialized and deserialized alongside existing fields. When the field is missing from the settings file, it SHALL default to `"Noto Sans"`.
-
-#### Scenario: Settings file includes font_family
-- **WHEN** the application loads a settings file containing `"font_family": "OpenDyslexic"`
-- **THEN** the loaded `Settings` SHALL have `font_family == "OpenDyslexic"`
-
-#### Scenario: Settings file missing font_family
-- **WHEN** the application loads a settings file that does not contain `font_family`
-- **THEN** the loaded `Settings` SHALL have `font_family == "Noto Sans"`
-
-### Requirement: New settings fields are saved when changed
-The system SHALL write `disable_animations` and `font_family` to the settings JSON file whenever they change via `update_settings()`.
-
-#### Scenario: Disable animations is toggled
-- **WHEN** the user toggles Disable Animations
-- **THEN** the settings file SHALL be updated with the new `disable_animations` value
-
-#### Scenario: Font is changed
 - **WHEN** the user selects a different font
 - **THEN** the settings file SHALL be updated with the new `font_family` value

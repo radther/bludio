@@ -173,6 +173,13 @@ impl BludioApp {
                     SettingsEvent::DarkThemeChanged(id) => {
                         update_settings(|s| s.dark_theme_id = id.clone(), cx);
                     }
+                    SettingsEvent::DisableAnimationsChanged(value) => {
+                        update_settings(|s| s.disable_animations = *value, cx);
+                        crate::ui::accessibility::set_disable_animations(*value);
+                    }
+                    SettingsEvent::FontChanged(family) => {
+                        update_settings(|s| s.font_family = family.clone(), cx);
+                    }
                 }
                 this.settings_page
                     .update(cx, |page, cx| page.sync_dropdowns(cx));

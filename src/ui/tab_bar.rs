@@ -118,10 +118,18 @@ impl TabBar {
             return;
         }
         self.active_index = index;
-        let from = self.indicator_offset;
+        let target = index as f32 * TAB_HEIGHT + 28.0;
         self.animation_generation = self.animation_generation.wrapping_add(1);
         let generation = self.animation_generation;
-        let target = index as f32 * (TAB_HEIGHT) + 28.0;
+
+        // When animations are globally disabled, snap instantly.
+        if crate::ui::accessibility::disable_animations() {
+            self.indicator_offset = target;
+            cx.notify();
+            return;
+        }
+
+        let from = self.indicator_offset;
 
         // ── Spawn animation driver (frame loop) ──
         cx.spawn(async move |this, cx| {
