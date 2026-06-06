@@ -2,7 +2,12 @@
 name = "bludio"
 version = "0.1.0"
 edition = "2024"
-description = "A GPUI application shell"
+rust-version = "1.95.0"
+description = "A GPUI Bluetooth and audio device manager for Linux"
+license = "MIT"
+repository = "https://github.com/toomosin/bludio"
+keywords = ["bluetooth", "audio", "pulseaudio", "gui", "linux"]
+categories = ["gui", "hardware-support"]
 
 [[bin]]
 name = "bludio"
