@@ -2,7 +2,7 @@
 set -e
 
 REPO="radther/bludio"
-API_URL="https://api.github.com/repos/${REPO}/releases/latest"
+RELEASE_URL="https://github.com/${REPO}/releases/latest"
 
 # ── Detect architecture ──
 ARCH=$(uname -m)
@@ -12,10 +12,13 @@ case "$ARCH" in
     *)       echo "Error: Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 
-# ── Fetch latest release tag ──
+# ── Fetch latest release tag via redirect ──
+# GitHub's /releases/latest redirects to /releases/tag/<tag>. This avoids
+# the GitHub API and its strict rate limits (60 req/hr for unauthenticated).
 echo "Fetching latest release..."
-TAG=$(curl -fsSL "$API_URL" | grep '"tag_name":' | head -n1 | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-if [ -z "$TAG" ]; then
+FINAL_URL=$(curl -fsSL -o /dev/null -w "%{url_effective}" "$RELEASE_URL")
+TAG=$(echo "$FINAL_URL" | sed -E 's|.*/tag/||')
+if [ -z "$TAG" ] || [ "$TAG" = "$FINAL_URL" ]; then
     echo "Error: Could not determine latest release tag" >&2
     exit 1
 fi
