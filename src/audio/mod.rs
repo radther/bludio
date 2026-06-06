@@ -88,6 +88,10 @@ pub(crate) struct CardInfo {
     pub(crate) description: Option<String>,
     pub(crate) active_profile: Option<String>,
     pub(crate) profiles: Vec<ProfileInfo>,
+    /// Active Bluetooth codec name (e.g., "aac", "ldac"), if any.
+    pub(crate) active_codec: Option<String>,
+    /// Available Bluetooth codecs for this card.
+    pub(crate) codecs: Vec<CodecInfo>,
 }
 
 #[derive(Clone, Debug)]
@@ -103,6 +107,14 @@ pub(crate) struct ProfileInfo {
     pub(crate) available: bool,
 }
 
+// ── Bluetooth codec ──────────────────────────────────────────────────────
+
+#[derive(Clone, Debug)]
+pub(crate) struct CodecInfo {
+    pub(crate) name: String,
+    pub(crate) description: String,
+}
+
 // ── Commands (UI → PA thread) ──────────────────────────────────────────────
 
 /// Commands sent from the UI to the `PulseAudio` backend thread.
@@ -113,6 +125,7 @@ pub(crate) enum AudioCommand {
     SetVolume(DeviceKind, u32, u8, f64),
     SetMute(DeviceKind, u32, bool),
     SetCardProfile(u32, String),
+    SetCardCodec(u32, String, String),
     SetDefaultSink(String),
     SetDefaultSource(String),
 }

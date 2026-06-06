@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Configuration page lists all audio cards with profiles
 
@@ -84,6 +84,8 @@ The system SHALL display connection status information on the configuration page
 - **WHEN** PulseAudio is not connected (e.g., server not running)
 - **THEN** the configuration page SHALL display a "Connecting to PulseAudio..." message
 - **THEN** the card list SHALL not be displayed
+
+## ADDED Requirements
 
 ### Requirement: Bluetooth codec dropdown on card rows
 

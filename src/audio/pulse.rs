@@ -6,7 +6,7 @@
 //! receiver end needs a Tokio runtime.)
 
 use crate::audio::{
-    AudioCommand, AudioState, CardInfo, DeviceKind, ProfileInfo, SinkInfo, SourceInfo,
+    AudioCommand, AudioState, CardInfo, CodecInfo, DeviceKind, ProfileInfo, SinkInfo, SourceInfo,
 };
 use crate::subsystem::SubsystemStatus;
 use libpulse_binding as pulse;
@@ -330,6 +330,26 @@ fn execute_command(
             );
             spin_until(ml, done);
         }
+        AudioCommand::SetCardCodec(_index, card_name, codec) => {
+            let card_name = card_name.clone();
+            let codec = codec.clone();
+            let d = done.clone();
+
+            // Build the message handler path: /card/<name>/bluez
+            let handler_path = format!("/card/{}/bluez", card_name);
+            let params = format!("\"{}\"", codec);
+
+            let mut intro = pa_ctx.borrow_mut().introspect();
+            let _op = intro.send_message_to_object(
+                &handler_path,
+                "switch-codec",
+                &params,
+                Box::new(move |_success: bool, _response: Option<String>| {
+                    *d.borrow_mut() = true;
+                }),
+            );
+            spin_until(ml, done);
+        }
         AudioCommand::SetDefaultSink(name) => {
             let mut ctx_mut = pa_ctx.borrow_mut();
             let d = done.clone();
@@ -376,6 +396,90 @@ fn make_channel_volumes(channels: u8, v: Volume) -> pulse::volume::ChannelVolume
     let mut cv = pulse::volume::ChannelVolumes::default();
     cv.set(channels, v);
     cv
+}
+
+// ── Bluetooth codec discovery helpers ──────────────────────────────────────
+
+/// Query available Bluetooth codecs for a card via the PA messaging API.
+/// Returns `(Vec<CodecInfo>, Option<String>)` where the second element is the active codec.
+fn query_card_codecs(
+    pa_ctx: &Rc<RefCell<Context>>,
+    ml: &Rc<RefCell<Mainloop>>,
+    done: &DoneFlag,
+    card_name: &str,
+) -> (Vec<CodecInfo>, Option<String>) {
+    let handler_path = format!("/card/{}/bluez", card_name);
+
+    // ── list-codecs ──
+    let codecs_result: Rc<RefCell<Vec<CodecInfo>>> = Rc::new(RefCell::new(Vec::new()));
+    {
+        let codecs = codecs_result.clone();
+        let d = done.clone();
+        let mut intro = pa_ctx.borrow_mut().introspect();
+        let _op = intro.send_message_to_object(
+            &handler_path,
+            "list-codecs",
+            "",
+            Box::new(move |success: bool, response: Option<String>| {
+                if success
+                    && let Some(resp) = response
+                    && let Ok(value) = serde_json::from_str::<serde_json::Value>(&resp)
+                    && let Some(arr) = value.as_array()
+                {
+                    let mut list = Vec::new();
+                    for item in arr {
+                        if let Some(obj) = item.as_object() {
+                            let name = obj
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let description = obj
+                                .get("description")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            if !name.is_empty() {
+                                list.push(CodecInfo { name, description });
+                            }
+                        }
+                    }
+                    *codecs.borrow_mut() = list;
+                }
+                *d.borrow_mut() = true;
+            }),
+        );
+        spin_until(ml, done);
+    }
+
+    // ── get-codec ──
+    let active_result: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(None));
+    {
+        let active = active_result.clone();
+        let d = done.clone();
+        let mut intro = pa_ctx.borrow_mut().introspect();
+        let _op = intro.send_message_to_object(
+            &handler_path,
+            "get-codec",
+            "",
+            Box::new(move |success: bool, response: Option<String>| {
+                if success
+                    && let Some(resp) = response
+                    && let Ok(value) = serde_json::from_str::<serde_json::Value>(&resp)
+                    && let Some(name) = value.as_str()
+                {
+                    *active.borrow_mut() = Some(name.to_string());
+                }
+                *d.borrow_mut() = true;
+            }),
+        );
+        spin_until(ml, done);
+    }
+
+    (
+        codecs_result.borrow().clone(),
+        active_result.borrow().clone(),
+    )
 }
 
 // ── State building ─────────────────────────────────────────────────────────
@@ -496,11 +600,33 @@ fn build_audio_state(
                     description,
                     active_profile,
                     profiles,
+                    active_codec: None,
+                    codecs: Vec::new(),
                 });
             }
             ListResult::End | ListResult::Error => *d.borrow_mut() = true,
         });
         spin_until(ml, done);
+    }
+
+    // ── Discover Bluetooth codecs ──
+    {
+        let bt_cards: Vec<(u32, String)> = {
+            let cards = cards_data.borrow();
+            cards
+                .iter()
+                .filter(|c| c.name.starts_with("bluez_"))
+                .map(|c| (c.index, c.name.clone()))
+                .collect()
+        };
+        for (index, name) in bt_cards {
+            let (codecs, active) = query_card_codecs(pa_ctx, ml, done, &name);
+            let mut cards = cards_data.borrow_mut();
+            if let Some(card) = cards.iter_mut().find(|c| c.index == index) {
+                card.codecs = codecs;
+                card.active_codec = active;
+            }
+        }
     }
 
     // ── List server info (defaults) ──

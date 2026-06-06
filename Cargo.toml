@@ -14,8 +14,12 @@ gpui-platform-gpui-unofficial = { version = "1.2.7", features = ["font-kit", "x1
 bluer = { version = "0.17", features = ["bluetoothd"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "process"] }
 futures = "0.3"
-libpulse-binding = "2.30"
+libpulse-binding = { version = "2.30.1", features = ["pa_v15"] }
 libpulse-sys = "1.23"
+serde_json = "1"
 unicode-segmentation = "1"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+
+[patch.crates-io]
+libpulse-binding = { git = "https://github.com/radther/pulse-binding-rust", rev = "7adc0a391db7c885e13378c3c62a67f3a7ec2ad9" }
+libpulse-sys = { git = "https://github.com/radther/pulse-binding-rust", rev = "7adc0a391db7c885e13378c3c62a67f3a7ec2ad9" }
