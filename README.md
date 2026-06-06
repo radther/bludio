@@ -45,7 +45,7 @@ Bludio requires the following system services to be running. These are **not** i
 
 ## Note on Pairing
 
-Pairing requests are automatically accepted without user confirmation. This works well with devices that don't require authentication — most headphones, keyboards, speakers, etc. Devices that require a PIN or passkey to pair are not currently supported.
+Pairing requests are automatically accepted without user confirmation. This works well with devices that don't require authentication — most headphones, keyboards, speakers, etc. Devices that require a PIN or passkey may not pair, though some devices that support PIN entry can choose to skip authentication and pair without verification.
 
 ## Third-Party Notices
 
