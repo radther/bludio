@@ -46,25 +46,25 @@ fn main() {
                 .load_fonts(cx)
                 .expect("Failed to load bundled fonts");
 
-        // ── Init settings + theme ──────────────────────────────────
-        let settings = crate::backend::settings::Settings::load();
-        cx.set_global(crate::backend::settings::GlobalSettings::new(
-            settings.clone(),
-        ));
-        crate::ui::common::accessibility::set_disable_animations(settings.disable_animations);
+            // ── Init settings + theme ──────────────────────────────────
+            let settings = crate::backend::settings::Settings::load();
+            cx.set_global(crate::backend::settings::GlobalSettings::new(
+                settings.clone(),
+            ));
+            crate::ui::common::accessibility::set_disable_animations(settings.disable_animations);
 
-        let bounds = Bounds::centered(None, size(px(1100.0), px(700.0)), cx);
+            let bounds = Bounds::centered(None, size(px(1100.0), px(700.0)), cx);
 
-        cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                app_id: Some("dev.toomosin.bludio".to_string()),
-                ..Default::default()
-            },
-            |window, cx| cx.new(|cx| app::BludioApp::new(window, cx)),
-        )
-        .unwrap();
+            cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    app_id: Some("dev.toomosin.bludio".to_string()),
+                    ..Default::default()
+                },
+                |window, cx| cx.new(|cx| app::BludioApp::new(window, cx)),
+            )
+            .unwrap();
 
-        cx.activate(true);
-    });
+            cx.activate(true);
+        });
 }

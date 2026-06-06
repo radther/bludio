@@ -10,15 +10,13 @@ pub struct Assets;
 
 impl AssetSource for Assets {
     fn load(&self, path: &str) -> Result<Option<Cow<'static, [u8]>>> {
-        Self::get(path)
-            .map(|f| Some(f.data))
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("asset not found: {path}"),
-                )
-                .into()
-            })
+        Self::get(path).map(|f| Some(f.data)).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("asset not found: {path}"),
+            )
+            .into()
+        })
     }
 
     fn list(&self, path: &str) -> Result<Vec<SharedString>> {
