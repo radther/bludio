@@ -45,11 +45,13 @@ if [ "$(id -u)" -eq 0 ]; then
     BIN_DIR="/usr/local/bin"
     DESKTOP_DIR="/usr/share/applications"
     POLICY_DIR="/usr/share/polkit-1/actions"
+    ICONS_DIR="/usr/share/bludio/icons"
 else
     SYSTEM_INSTALL=0
     BIN_DIR="$HOME/.local/bin"
     DESKTOP_DIR="$HOME/.local/share/applications"
     POLICY_DIR=""
+    ICONS_DIR="$HOME/.local/share/bludio/icons"
 fi
 
 # ── Install binary ──
@@ -62,6 +64,11 @@ chmod +x "$BIN_DIR/bludio"
 echo "Installing desktop entry..."
 mkdir -p "$DESKTOP_DIR"
 cp "$EXTRACTED_DIR/bludio.desktop" "$DESKTOP_DIR/"
+
+# ── Install icons ──
+echo "Installing icons..."
+mkdir -p "$ICONS_DIR"
+cp -r "$EXTRACTED_DIR/icons/"* "$ICONS_DIR/"
 
 # ── Install PolicyKit policy (system only) ──
 if [ "$SYSTEM_INSTALL" -eq 1 ]; then
@@ -92,6 +99,7 @@ fi
 echo ""
 echo "Bludio $TAG installed successfully!"
 echo "  Binary:   $BIN_DIR/bludio"
+echo "  Icons:    $ICONS_DIR"
 echo "  Desktop:  $DESKTOP_DIR/bludio.desktop"
 if [ "$SYSTEM_INSTALL" -eq 1 ]; then
     echo "  Policy:   $POLICY_DIR/dev.toomosin.bludio.policy"
