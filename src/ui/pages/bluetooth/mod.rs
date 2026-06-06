@@ -6,8 +6,8 @@
 use crate::backend::bluetooth::device::DeviceRowAction;
 use bluer::Address;
 
-pub(crate) mod bluetooth_page;
 pub(crate) mod bluetooth_device_row;
+pub(crate) mod bluetooth_page;
 
 // ── Command type ───────────────────────────────────────────────────────────
 

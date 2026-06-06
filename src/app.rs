@@ -35,7 +35,9 @@ impl AudioConnection {
         let (wakeup_tx, wakeup_rx) = std::sync::mpsc::channel();
 
         std::thread::spawn(move || {
-            crate::backend::audio::pulse::run_pa_thread_from_channels(cmd_rx, &state_tx, &wakeup_tx);
+            crate::backend::audio::pulse::run_pa_thread_from_channels(
+                cmd_rx, &state_tx, &wakeup_tx,
+            );
         });
 
         Self {
@@ -47,7 +49,6 @@ impl AudioConnection {
 }
 use crate::backend::settings::update_settings;
 use crate::ui::common::icons;
-use crate::ui::{h_flex, v_flex};
 use crate::ui::components::tab_bar::{Tab, TabAction, TabBar, TabBarEvent};
 use crate::ui::pages::audio::audio_page::AudioPage;
 use crate::ui::pages::bluetooth::BluetoothPageCommand;
@@ -56,6 +57,7 @@ use crate::ui::pages::configuration::configuration_page::ConfigurationPage;
 #[cfg(debug_assertions)]
 use crate::ui::pages::dev_test::dev_test_page::DevTestPage;
 use crate::ui::pages::settings::settings_page::{SettingsEvent, SettingsPage};
+use crate::ui::{h_flex, v_flex};
 use futures::{FutureExt, StreamExt};
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, IntoElement, Render, Subscription, Window,
@@ -461,12 +463,18 @@ impl BludioApp {
 
     /// Connect to BlueZ, register agent, return (state, agent).
     /// Shared by initial connection and reconnection.
-    async fn connect_bluetooth()
-    -> Result<(BluetoothState, crate::backend::bluetooth::agent::AgentHandle), String> {
+    async fn connect_bluetooth() -> Result<
+        (
+            BluetoothState,
+            crate::backend::bluetooth::agent::AgentHandle,
+        ),
+        String,
+    > {
         let state = BluetoothState::new().await?;
         // SAFETY: BluetoothState::new() only returns Ok after session is set.
         let agent =
-            crate::backend::bluetooth::agent::register_agent(state.session.as_ref().unwrap()).await?;
+            crate::backend::bluetooth::agent::register_agent(state.session.as_ref().unwrap())
+                .await?;
         Ok((state, agent))
     }
 

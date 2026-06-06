@@ -1,7 +1,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Output devices are listed with properties
-The system SHALL display all PulseAudio output devices (sinks) in a scrollable list within the "Output Devices" page. Each device row SHALL show the device name, a volume slider with inline text field for numeric entry, mute state, a default button, and a profile dropdown for output devices with an associated card. When the system is in selection mode, each real sink row SHALL display a checkbox on the right side for toggling selection. Combined sink rows SHALL display a special icon between the name and the "Default" label, and a delete button instead of the default button. The default sink SHALL be visually distinguished by a status strip colored with the audio accent and a "Default" text badge. When the Audio subsystem is disconnected or reconnecting, the page SHALL display the corresponding status state instead of the device list.
+The system SHALL display all PulseAudio output devices (sinks) in a scrollable list within the "Output Devices" page. Each device row SHALL show the device name, a volume slider with inline text field for numeric entry, mute state, a default button, and a profile dropdown for output devices with an associated card. When the system is in selection mode, each real sink row SHALL display a checkbox on the right side for toggling selection. Combined sink rows SHALL display a special icon between the name and the "Default" label, and a delete button in addition to the default button. The default sink SHALL be visually distinguished by a status strip colored with the audio accent and a "Default" text badge. When the Audio subsystem is disconnected or reconnecting, the page SHALL display the corresponding status state instead of the device list.
 
 #### Scenario: Output devices page shows all sinks
 - **WHEN** the user navigates to the "Output Devices" tab
@@ -10,7 +10,7 @@ The system SHALL display all PulseAudio output devices (sinks) in a scrollable l
 - **THEN** each row SHALL show a horizontal slider (filled portion proportional to volume) and a text field displaying the volume as a whole number (e.g., "75")
 - **THEN** each row SHALL have a mute/unmute action button
 - **THEN** each real sink row SHALL have a "Default" action button
-- **THEN** each combined sink row SHALL have a delete action button (danger-colored) instead of a "Default" button
+- **THEN** each combined sink row SHALL have a delete action button (danger-colored) in addition to a "Default" button
 - **THEN** each combined sink row SHALL display the merge icon between the name and any label
 - **THEN** each row with an associated card SHALL show a profile dropdown listing available profiles
 - **THEN** the default sink SHALL display a status strip in the audio accent color and a "Default" text badge

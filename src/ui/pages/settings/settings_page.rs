@@ -9,13 +9,13 @@ use gpui::{
 };
 
 use crate::backend::settings::settings;
-use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::StyledExt;
-use crate::ui::{h_flex, v_flex};
+use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::components::dropdown::{Dropdown, DropdownEvent};
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::toggle::toggle_switch;
 use crate::ui::theme::{TextStyleSet, ThemeColors, ThemeMode, dark_theme_ids, light_theme_ids};
+use crate::ui::{h_flex, v_flex};
 
 // ── Events ───────────────────────────────────────────────────────────────────
 

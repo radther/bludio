@@ -8,9 +8,9 @@ use crate::backend::audio::pulse::PaWakeup;
 use crate::backend::audio::{AudioCommand, AudioState};
 use crate::backend::subsystem::SubsystemStatus;
 use crate::ui::common::animation::FadeInAnimationExt;
-use crate::ui::{h_flex, v_flex};
 use crate::ui::components::page_header::page_header;
 use crate::ui::pages::configuration::config_card_row::CardRow;
+use crate::ui::{h_flex, v_flex};
 use gpui::{Context, Entity, Render, Window, div, prelude::*, px};
 
 // ── Configuration page entity ──────────────────────────────────────────────

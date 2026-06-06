@@ -57,9 +57,9 @@
 
 - [x] 7.1 Verify `cargo build` passes with no errors
 - [x] 7.2 Verify `cargo clippy` passes with no warnings (1 expected warning: modules field never read directly)
-- [ ] 7.3 Run the app and test: enter selection mode, select sinks, create combined sink, verify icon and delete button appear
-- [ ] 7.4 Test creating a second combined sink with a different set of sinks
-- [ ] 7.5 Test deleting a combined sink: verify PulseAudio automatically sets a new default sink
-- [ ] 7.6 Test that externally-created combined sinks (via `pactl`) show the same icon and delete button
-- [ ] 7.7 Test that after PA reconnect, the combined state is correctly rediscovered
-- [ ] 7.8 Test empty selection: enter selection mode, press button with no selection, verify no combined sink is created
+- [x] 7.3 Run the app and test: enter selection mode, select sinks, create combined sink, verify icon and delete button appear
+- [x] 7.4 Test creating a second combined sink with a different set of sinks
+- [x] 7.5 Test deleting a combined sink: verify PulseAudio automatically sets a new default sink
+- [x] 7.6 Test that externally-created combined sinks (via `pactl`) show the same icon and delete button
+- [x] 7.7 Test that after PA reconnect, the combined state is correctly rediscovered
+- [x] 7.8 Test empty selection: enter selection mode, press button with no selection, verify no combined sink is created

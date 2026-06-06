@@ -9,10 +9,10 @@
 //! the new one using ease-out cubic interpolation over ~250ms. Interrupted
 //! animations are handled via a generation counter.
 
-use crate::ui::h_flex;
-use crate::ui::v_flex;
 use crate::ui::components::tooltip;
+use crate::ui::h_flex;
 use crate::ui::theme;
+use crate::ui::v_flex;
 use gpui::{
     App, ClickEvent, Context, CursorStyle, EventEmitter, FocusHandle, Focusable, Render,
     SharedString, Window, div, prelude::*, px,

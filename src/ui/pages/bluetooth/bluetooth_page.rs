@@ -9,12 +9,12 @@ use crate::backend::bluetooth::BluetoothState;
 use crate::backend::subsystem::SubsystemStatus;
 use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::common::icons;
-use crate::ui::{h_flex, v_flex};
 use crate::ui::components::error_banner::error_banner;
 use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::pages::bluetooth::BluetoothPageCommand;
 use crate::ui::pages::bluetooth::bluetooth_device_row::BluetoothDeviceRow;
+use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Window, div, prelude::*, px};
 

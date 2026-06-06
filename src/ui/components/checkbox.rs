@@ -6,6 +6,7 @@
 
 use gpui::{CursorStyle, Hsla, Stateful, div, prelude::*, px};
 
+use crate::ui::h_flex;
 use crate::ui::theme::ThemeColors;
 
 // ── Checkbox builder ───────────────────────────────────────────────────────
@@ -25,45 +26,11 @@ pub fn checkbox(
     is_checked: bool,
     colors: &ThemeColors,
 ) -> Stateful<gpui::Div> {
-    let box_bg = if is_checked {
-        colors.audio_accent
-    } else {
-        colors.element_background
-    };
-    let box_border = if is_checked {
-        colors.audio_accent
-    } else {
-        colors.border
-    };
-    let icon_color = colors.text_colored_button;
-
-    div()
-        .id(id.into())
-        .cursor(CursorStyle::PointingHand)
-        .child(
-            div()
-                .w(px(20.0))
-                .h(px(20.0))
-                .rounded_sm()
-                .bg(box_bg)
-                .border_1()
-                .border_color(box_border)
-                .flex()
-                .items_center()
-                .justify_center()
-                .when(is_checked, |checked| {
-                    checked.child(
-                        crate::ui::common::icons::check()
-                            .w(px(14.0))
-                            .h(px(14.0))
-                            .text_color(icon_color),
-                    )
-                }),
-        )
+    checkbox_with_color(id, is_checked, colors.audio_accent, colors)
 }
 
 /// Render a checkbox using a custom color instead of the default audio accent.
-#[allow(dead_code)]
+/// Kept for future use — e.g. Bluetooth-pairing checkboxes that need a brand color.
 pub fn checkbox_with_color(
     id: impl Into<gpui::ElementId>,
     is_checked: bool,
@@ -82,27 +49,22 @@ pub fn checkbox_with_color(
     };
     let icon_color = colors.text_colored_button;
 
-    div()
-        .id(id.into())
-        .cursor(CursorStyle::PointingHand)
-        .child(
-            div()
-                .w(px(20.0))
-                .h(px(20.0))
-                .rounded_sm()
-                .bg(box_bg)
-                .border_1()
-                .border_color(box_border)
-                .flex()
-                .items_center()
-                .justify_center()
-                .when(is_checked, |checked| {
-                    checked.child(
-                        crate::ui::common::icons::check()
-                            .w(px(14.0))
-                            .h(px(14.0))
-                            .text_color(icon_color),
-                    )
-                }),
-        )
+    div().id(id.into()).cursor(CursorStyle::PointingHand).child(
+        h_flex()
+            .w(px(20.0))
+            .h(px(20.0))
+            .rounded_sm()
+            .bg(box_bg)
+            .border_1()
+            .border_color(box_border)
+            .justify_center()
+            .when(is_checked, |checked| {
+                checked.child(
+                    crate::ui::common::icons::check()
+                        .w(px(14.0))
+                        .h(px(14.0))
+                        .text_color(icon_color),
+                )
+            }),
+    )
 }

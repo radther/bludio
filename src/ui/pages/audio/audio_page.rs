@@ -9,10 +9,13 @@ use crate::backend::audio::{AudioCommand, AudioState, DeviceKind};
 use crate::backend::subsystem::SubsystemStatus;
 use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::common::icons;
-use crate::ui::{h_flex, v_flex};
 use crate::ui::components::page_header::page_header;
 use crate::ui::pages::audio::audio_device_row::{AudioDeviceRow, AudioDeviceRowEvent};
-use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Subscription, Window, div, prelude::*, px};
+use crate::ui::{h_flex, v_flex};
+use gpui::{
+    ClickEvent, Context, CursorStyle, Entity, Render, Subscription, Window, div, prelude::*, px,
+};
+use std::collections::{HashMap, HashSet};
 
 // ── Audio page entity ──────────────────────────────────────────────────────
 
@@ -28,20 +31,46 @@ pub(crate) struct AudioPage {
     /// Selected sink PA names while in selection mode.
     selected_sinks: Vec<String>,
     /// Subscriptions to row events (kept to avoid dropping them).
-    _row_subs: Vec<Subscription>,
+    _row_subs: HashMap<u32, Subscription>,
 }
 
 impl AudioPage {
     /// Generate a unique combined sink name that doesn't collide with existing sinks.
-    fn generate_combine_name(&self, existing_names: &std::collections::HashSet<String>) -> String {
-        let mut n = 1;
-        loop {
-            let name = format!("Bludio-combined-{}", n);
-            if !existing_names.contains(&name) {
-                return name;
+    fn generate_combine_name(&self, existing_names: &HashSet<String>) -> String {
+        (1..)
+            .map(|n| format!("Bludio-combined-{}", n))
+            .find(|name| !existing_names.contains(name))
+            .expect("infinite sequence guarantees a free name")
+    }
+
+    /// Toggle combined-sink selection mode, creating the sink on exit if any are selected.
+    fn toggle_combine_mode(&mut self, cx: &mut Context<Self>) {
+        if self.selection_mode {
+            if !self.selected_sinks.is_empty() {
+                let slaves = self.selected_sinks.clone();
+                let existing_names: HashSet<String> = self
+                    .rows
+                    .iter()
+                    .map(|r| r.read(cx).pa_name.clone())
+                    .collect();
+                let name = self.generate_combine_name(&existing_names);
+                let _ = self
+                    .cmd_tx
+                    .send(AudioCommand::LoadCombineSink(name, slaves));
+                if let Some(w) = self.wakeup {
+                    w.wake();
+                }
             }
-            n += 1;
+            self.selection_mode = false;
+            self.selected_sinks.clear();
+        } else {
+            self.selection_mode = true;
         }
+        let new_mode = self.selection_mode;
+        for row in &self.rows {
+            row.update(cx, |row, cx| row.set_selection_mode(new_mode, cx));
+        }
+        cx.notify();
     }
 
     /// Create a new page entity.
@@ -59,7 +88,7 @@ impl AudioPage {
             subsystem_status: SubsystemStatus::Connecting,
             selection_mode: false,
             selected_sinks: Vec::new(),
-            _row_subs: Vec::new(),
+            _row_subs: HashMap::new(),
         }
     }
 
@@ -140,12 +169,17 @@ impl AudioPage {
                     }
                     _cx.notify();
                 });
-                self._row_subs.push(sub);
+                self._row_subs.insert(sink.index, sub);
                 self.rows.push(row);
             }
         }
         self.rows
             .retain(|r| state.sinks.iter().any(|s| s.index == r.read(cx).index));
+        let retained: HashSet<u32> = self.rows.iter().map(|r| r.read(cx).index).collect();
+        self._row_subs.retain(|idx, _| retained.contains(idx));
+        let active_names: HashSet<String> = state.sinks.iter().map(|s| s.name.clone()).collect();
+        self.selected_sinks
+            .retain(|name| active_names.contains(name));
     }
 
     fn sync_input_rows(&mut self, state: &AudioState, window: &mut Window, cx: &mut Context<Self>) {
@@ -212,9 +246,6 @@ impl Render for AudioPage {
 
         let is_output = self.kind == DeviceKind::Output;
         let selection_mode = self.selection_mode;
-        let cmd_tx = self.cmd_tx.clone();
-        let wakeup = self.wakeup;
-        let _selected_sinks = self.selected_sinks.clone();
 
         v_flex()
             .flex_1()
@@ -224,68 +255,49 @@ impl Render for AudioPage {
                     .px_4()
                     .py_2()
                     .child(page_header(title, caption, colors, text_styles))
-                    .when(is_output && self.subsystem_status == SubsystemStatus::Connected, |el| {
-                        let (btn_bg, btn_hover, icon_color) = if selection_mode {
-                            (colors.audio_accent, colors.audio_accent, colors.text_colored_button)
-                        } else {
-                            (
-                                colors.element_background,
-                                colors.element_hover,
-                                colors.text_secondary,
-                            )
-                        };
-                        el.child(
-                            h_flex()
-                                .id("combine-btn")
-                                .justify_center()
-                                .w(px(48.0))
-                                .h(px(48.0))
-                                .rounded_lg()
-                                .bg(btn_bg)
-                                .cursor(CursorStyle::PointingHand)
-                                .hover(move |el| el.bg(btn_hover))
-                                .child(
-                                    icons::merge()
-                                        .w(px(24.0))
-                                        .h(px(24.0))
-                                        .text_color(icon_color),
+                    .when(
+                        is_output && self.subsystem_status == SubsystemStatus::Connected,
+                        |el| {
+                            let (btn_bg, btn_hover, icon_color) = if selection_mode {
+                                (
+                                    colors.audio_accent,
+                                    colors.audio_accent,
+                                    colors.text_colored_button,
                                 )
-                                .on_click({
-                                    let cmd_tx = cmd_tx.clone();
-                                    let entity = cx.entity().clone();
-                                    move |_: &ClickEvent, _window, cx| {
-                                        entity.update(cx, |this, cx| {
-                                            if this.selection_mode {
-                                                // Exit selection mode and create combined sink if items selected
-                                                if !this.selected_sinks.is_empty() {
-                                                    let slaves = this.selected_sinks.clone();
-                                                    let existing_names: std::collections::HashSet<String> =
-                                                        this.rows.iter().map(|r| r.read(cx).pa_name.clone()).collect();
-                                                    let name = this.generate_combine_name(&existing_names);
-                                                    let _ = cmd_tx.send(AudioCommand::LoadCombineSink(name, slaves));
-                                                    if let Some(w) = wakeup {
-                                                        w.wake();
-                                                    }
-                                                }
-                                                this.selection_mode = false;
-                                                this.selected_sinks.clear();
-                                            } else {
-                                                // Enter selection mode
-                                                this.selection_mode = true;
-                                            }
-                                            // Update all rows with new selection_mode state
-                                            let new_mode = this.selection_mode;
-                                            for row in &this.rows {
-                                                row.update(cx, |row, cx| {
-                                                    row.set_selection_mode(new_mode, cx);
-                                                });
-                                            }
-                                            cx.notify();
-                                        });
-                                    }
-                                }),
-                        )
-                    })
+                            } else {
+                                (
+                                    colors.element_background,
+                                    colors.element_hover,
+                                    colors.text_secondary,
+                                )
+                            };
+                            el.child(
+                                h_flex()
+                                    .id("combine-btn")
+                                    .justify_center()
+                                    .w(px(48.0))
+                                    .h(px(48.0))
+                                    .rounded_lg()
+                                    .bg(btn_bg)
+                                    .cursor(CursorStyle::PointingHand)
+                                    .hover(move |el| el.bg(btn_hover))
+                                    .child(
+                                        icons::merge()
+                                            .w(px(24.0))
+                                            .h(px(24.0))
+                                            .text_color(icon_color),
+                                    )
+                                    .on_click({
+                                        let entity = cx.entity().clone();
+                                        move |_: &ClickEvent, _window, cx| {
+                                            entity.update(cx, |this, cx| {
+                                                this.toggle_combine_mode(cx)
+                                            });
+                                        }
+                                    }),
+                            )
+                        },
+                    )
                     .with_fade_in_up("audio-header", 1),
             )
             .child(match &self.subsystem_status {

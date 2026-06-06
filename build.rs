@@ -13,7 +13,10 @@ fn main() {
         .join("dev.toomosin.bludio.policy");
 
     if !policy_src.exists() {
-        println!("cargo:warning=PolicyKit policy file not found at {:?}", policy_src);
+        println!(
+            "cargo:warning=PolicyKit policy file not found at {:?}",
+            policy_src
+        );
         return;
     }
 
@@ -35,19 +38,35 @@ fn main() {
                     let _ = fs::remove_file(&test_file);
                 }
                 Err(_) => {
-                    println!("cargo:warning=Insufficient privileges to write to {:?}. PolicyKit policy was NOT installed.", policy_dir);
-                    println!("cargo:warning=To enable privileged Bluetooth operations, run one of the following:");
-                    println!("cargo:warning=  sudo cargo install --git https://github.com/toomosin/bludio");
-                    println!("cargo:warning=  sudo cp policy/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/");
+                    println!(
+                        "cargo:warning=Insufficient privileges to write to {:?}. PolicyKit policy was NOT installed.",
+                        policy_dir
+                    );
+                    println!(
+                        "cargo:warning=To enable privileged Bluetooth operations, run one of the following:"
+                    );
+                    println!(
+                        "cargo:warning=  sudo cargo install --git https://github.com/toomosin/bludio"
+                    );
+                    println!(
+                        "cargo:warning=  sudo cp policy/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/"
+                    );
                     return;
                 }
             }
         }
         _ => {
-            println!("cargo:warning=PolicyKit actions directory {:?} does not exist. Policy was NOT installed.", policy_dir);
-            println!("cargo:warning=To enable privileged Bluetooth operations, manually copy the policy file:");
+            println!(
+                "cargo:warning=PolicyKit actions directory {:?} does not exist. Policy was NOT installed.",
+                policy_dir
+            );
+            println!(
+                "cargo:warning=To enable privileged Bluetooth operations, manually copy the policy file:"
+            );
             println!("cargo:warning=  sudo mkdir -p /usr/share/polkit-1/actions/");
-            println!("cargo:warning=  sudo cp policy/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/");
+            println!(
+                "cargo:warning=  sudo cp policy/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/"
+            );
             return;
         }
     }
@@ -55,12 +74,22 @@ fn main() {
     // Copy the policy file
     match fs::copy(&policy_src, &policy_dest) {
         Ok(_) => {
-            println!("cargo:warning=PolicyKit policy installed to {:?}", policy_dest);
+            println!(
+                "cargo:warning=PolicyKit policy installed to {:?}",
+                policy_dest
+            );
         }
         Err(e) => {
-            println!("cargo:warning=Failed to install PolicyKit policy to {:?}: {}", policy_dest, e);
-            println!("cargo:warning=To enable privileged Bluetooth operations, manually copy the policy file:");
-            println!("cargo:warning=  sudo cp policy/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/");
+            println!(
+                "cargo:warning=Failed to install PolicyKit policy to {:?}: {}",
+                policy_dest, e
+            );
+            println!(
+                "cargo:warning=To enable privileged Bluetooth operations, manually copy the policy file:"
+            );
+            println!(
+                "cargo:warning=  sudo cp policy/dev.toomosin.bludio.policy /usr/share/polkit-1/actions/"
+            );
         }
     }
 }

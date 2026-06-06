@@ -7,8 +7,8 @@
 use crate::backend::audio::pulse::PaWakeup;
 use crate::backend::audio::{AudioCommand, CardInfo};
 use crate::ui::StyledExt;
-use crate::ui::{h_flex, v_flex};
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
+use crate::ui::{h_flex, v_flex};
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, Render, SharedString, Subscription, Window, div,
     prelude::*,

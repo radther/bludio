@@ -15,14 +15,6 @@ pub(crate) enum DeviceKind {
 
 // ── Audio state ────────────────────────────────────────────────────────────
 
-/// Info about a loaded PulseAudio module (used for combined sink discovery).
-#[derive(Clone, Debug)]
-pub(crate) struct ModuleInfo {
-    pub(crate) index: u32,
-    pub(crate) name: String,
-    pub(crate) argument: String,
-}
-
 /// Complete snapshot of the `PulseAudio` audio state.
 #[derive(Clone, Debug)]
 pub(crate) struct AudioState {
@@ -30,10 +22,6 @@ pub(crate) struct AudioState {
     pub(crate) sources: Vec<SourceInfo>,
     /// Card info for the Configuration page and sink profile decoration.
     pub(crate) cards: Vec<CardInfo>,
-    /// Loaded modules (for combined sink discovery).
-    /// Populated by the PA thread but consumed indirectly via `SinkInfo` flags.
-    #[allow(dead_code)]
-    pub(crate) modules: Vec<ModuleInfo>,
     /// Unified subsystem health status.
     pub(crate) subsystem_status: SubsystemStatus,
 }
@@ -44,7 +32,6 @@ impl Default for AudioState {
             sinks: Vec::new(),
             sources: Vec::new(),
             cards: Vec::new(),
-            modules: Vec::new(),
             subsystem_status: SubsystemStatus::Connecting,
         }
     }

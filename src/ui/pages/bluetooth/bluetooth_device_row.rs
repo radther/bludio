@@ -7,11 +7,11 @@
 
 use crate::backend::bluetooth::device::{DeviceRowAction, PairingStatus};
 use crate::ui::StyledExt;
-use crate::ui::{h_flex, v_flex};
 use crate::ui::components::button::action_btn;
 use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::status_strip::status_strip;
 use crate::ui::pages::bluetooth::BluetoothPageCommand;
+use crate::ui::{h_flex, v_flex};
 use bluer::Address;
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{Context, Render, SharedString, Window, div, prelude::*};

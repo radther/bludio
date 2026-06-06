@@ -53,7 +53,9 @@ fn main() {
 
         // ── Init settings + theme ──────────────────────────────────
         let settings = crate::backend::settings::Settings::load();
-        cx.set_global(crate::backend::settings::GlobalSettings::new(settings.clone()));
+        cx.set_global(crate::backend::settings::GlobalSettings::new(
+            settings.clone(),
+        ));
         crate::ui::common::accessibility::set_disable_animations(settings.disable_animations);
 
         let bounds = Bounds::centered(None, size(px(1100.0), px(700.0)), cx);
