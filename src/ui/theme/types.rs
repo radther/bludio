@@ -7,17 +7,18 @@
 //!
 //! ```text
 //! Theme
+//! ├── id: &'static str (stable identifier for registry lookups)
 //! ├── appearance: Appearance (Light | Dark)
 //! ├── font_family: SharedString ("Noto Sans")
 //! ├── colors: ThemeColors (semantic color tokens)
 //! └── text_styles: TextStyleSet (size + weight per role)
 //! ```
 //!
-//! The active theme is stored as a GPUI global (`GlobalTheme`) and accessed
-//! via the free functions `theme(cx)` and `set_theme(theme, cx)`.
+//! The active theme is stored in `GlobalSettings` (see `src/settings.rs`) and
+//! accessed via `crate::settings::theme(cx)`. Runtime changes go through
+//! `crate::settings::update_settings()`.
 
-use gpui::{App, BorrowAppContext, FontWeight, Global, Hsla, SharedString};
-use std::sync::Arc;
+use gpui::{FontWeight, Hsla, SharedString};
 
 // ── Appearance ─────────────────────────────────────────────────────────────
 
@@ -137,48 +138,33 @@ impl Default for TextStyleSet {
 /// The full theme definition: appearance, colors, font family, and text styles.
 #[derive(Clone, Debug)]
 pub(crate) struct Theme {
+    /// Stable ID set at construction time. Backing store for the [`Theme::id()`]
+    /// accessor; read via the method rather than directly.
+    pub id: &'static str,
     pub appearance: Appearance,
     pub font_family: SharedString,
     pub colors: ThemeColors,
     pub text_styles: TextStyleSet,
 }
 
-// ── Global theme ───────────────────────────────────────────────────────────
-
-/// Wrapper that stores the active theme as a GPUI global.
-///
-/// Stored as `Arc<Theme>` so async tasks can cheaply clone and hold a
-/// reference without lifetime issues.
-pub(crate) struct GlobalTheme {
-    theme: Arc<Theme>,
-}
-
-impl Global for GlobalTheme {}
-
-impl GlobalTheme {
-    /// Create a new global theme wrapper.
-    pub fn new(theme: Theme) -> Self {
-        Self {
-            theme: Arc::new(theme),
-        }
+impl Theme {
+    /// Stable string identifier for this theme variant.
+    ///
+    /// This is the canonical way to read a theme's ID (the backing field is
+    /// public only so constructors in sibling modules can set it).
+    #[allow(dead_code)]
+    pub(crate) fn id(&self) -> &'static str {
+        self.id
     }
 }
 
-// ── Public accessors ──────────────────────────────────────────────────────
-
-/// Retrieve the current active theme.
-///
-/// Panics if `GlobalTheme` has not been initialized (set via `set_theme` or
-/// via `cx.set_global(GlobalTheme::new(...))`).
-pub(crate) fn theme(cx: &App) -> &Arc<Theme> {
-    &cx.global::<GlobalTheme>().theme
-}
-
-/// Replace the active theme.
-///
-/// The UI will re-render automatically via GPUI's global observation.
-pub(crate) fn set_theme(new_theme: Theme, cx: &mut App) {
-    cx.update_global::<GlobalTheme, _>(|global, _cx| {
-        global.theme = Arc::new(new_theme);
-    });
-}
+// ── Theme accessors ────────────────────────────────────────────────────────
+//
+// The active theme is stored in `GlobalSettings` (defined in `src/settings.rs`)
+// and accessed via `crate::settings::theme(cx)`. The functions below are
+// re-exported from `src/ui/theme/mod.rs` for backward compatibility with
+// existing call sites.
+//
+// To change the theme at runtime, call `crate::settings::update_settings()`
+// which updates the settings struct, recomputes the theme, persists, and
+// triggers re-render.

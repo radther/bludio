@@ -10,6 +10,7 @@ pub mod components;
 pub mod dev_test_page;
 pub mod ext;
 pub mod icons;
+pub mod settings_page;
 pub mod stack;
 pub mod tab_bar;
 pub(crate) mod theme;

@@ -48,27 +48,28 @@ The system SHALL render the application window as a horizontal flex row comprisi
 - **WHEN** a tab is selected
 - **THEN** the right content area SHALL render the page entity corresponding to the active tab
 - **THEN** switching tabs SHALL instantly swap the content area contents
-- **THEN** the active page entity SHALL be one of: `BluetoothPage`, `AudioPage` (output), `AudioPage` (input), `ConfigurationPage`, or `DevTestPage`
+- **THEN** the active page entity SHALL be one of: `BluetoothPage`, `AudioPage` (output), `AudioPage` (input), `ConfigurationPage`, `DevTestPage`, or `SettingsPage`
 
-### Requirement: Tab bar supports five pages
+### Requirement: Tab bar supports six pages
 
-The system SHALL provide five tabs in the left tab bar: Bluetooth Devices, Output Devices, Input Devices, Configuration, and Text Field Test. Each tab SHALL display an icon and a tooltip. The Bluetooth Devices tab SHALL be active on startup.
+The system SHALL provide six tabs in the left tab bar: Bluetooth Devices, Output Devices, Input Devices, Configuration, Text Field Test, and Settings. Each tab SHALL display an icon and a tooltip. The Bluetooth Devices tab SHALL be active on startup.
 
-#### Scenario: Five tabs are present
+#### Scenario: Six tabs are present
 
 - **WHEN** the application starts
-- **THEN** the tab bar SHALL contain five tabs at indices 0–4
+- **THEN** the tab bar SHALL contain six tabs at indices 0–5
 - **THEN** tab 0 SHALL be Bluetooth Devices (icon: `radar`, tooltip: "Bluetooth Devices")
 - **THEN** tab 1 SHALL be Output Devices (icon: `speaker`, tooltip: "Output Devices")
 - **THEN** tab 2 SHALL be Input Devices (icon: `mic`, tooltip: "Input Devices")
 - **THEN** tab 3 SHALL be Configuration (icon: `form`, tooltip: "Configuration")
 - **THEN** tab 4 SHALL be Text Field Test (icon: `test-tube-diagonal`, tooltip: "Text Field Test")
+- **THEN** tab 5 SHALL be Settings (icon: `bolt`, tooltip: "Settings")
 - **THEN** tab 0 (Bluetooth Devices) SHALL be the active tab on startup
 
 #### Scenario: Keyboard shortcuts switch tabs
 
-- **WHEN** the user presses Ctrl+1 through Ctrl+5
-- **THEN** the corresponding tab (index 0–4) SHALL become active
+- **WHEN** the user presses Ctrl+1 through Ctrl+6
+- **THEN** the corresponding tab (index 0–5) SHALL become active
 - **THEN** the content area SHALL render the page for that tab
 
 ### Requirement: Content area renders audio output devices page

@@ -14,7 +14,7 @@ The system SHALL render a `TabBar` entity as a fixed-width vertical tab bar on t
 
 - **WHEN** the application starts
 - **THEN** a vertical `TabBar` entity SHALL appear on the left side of the window
-- **THEN** the bar SHALL contain five icon tabs: Bluetooth, Output Devices, Input Devices, Configuration, and Text Field Test
+- **THEN** the bar SHALL contain six icon tabs: Bluetooth, Output Devices, Input Devices, Configuration, Text Field Test, and Settings
 - **THEN** the bar SHALL be 48 pixels wide
 
 #### Scenario: Tab bar accepts Tab definitions as input
@@ -62,11 +62,11 @@ The system SHALL visually distinguish the active tab from inactive tabs through 
 - **THEN** the tab SHALL change its background color to indicate hover state
 - **THEN** the cursor SHALL change to a pointing hand
 
-### Requirement: Five tabs are configured
+### Requirement: Six tabs are configured
 
-The system SHALL configure five tabs at indices 0–4: Bluetooth Devices (index 0, icon `radar`), Output Devices (index 1, icon `speaker`), Input Devices (index 2, icon `mic`), Configuration (index 3, icon `form`), and Text Field Test (index 4, icon `test-tube-diagonal`). Each tab SHALL have a tooltip matching its page name. The tab bar SHALL also contain one action item: Restart Bluetooth (icon `bluetooth`, tooltip "Restart Bluetooth service", action ID `"restart-bluetooth"`), anchored to the bottom.
+The system SHALL configure six tabs at indices 0–5: Bluetooth Devices (index 0, icon `radar`), Output Devices (index 1, icon `speaker`), Input Devices (index 2, icon `mic`), Configuration (index 3, icon `form`), Text Field Test (index 4, icon `test-tube-diagonal`), and Settings (index 5, icon `bolt`). Each tab SHALL have a tooltip matching its page name. The tab bar SHALL also contain one action item: Restart Bluetooth (icon `bluetooth`, tooltip "Restart Bluetooth service", action ID `"restart-bluetooth"`), anchored to the bottom.
 
-#### Scenario: Five tabs and one action are present
+#### Scenario: Six tabs and one action are present
 
 - **WHEN** the application starts
 - **THEN** tab 0 SHALL use `icons::bluetooth` (radar.svg) with tooltip "Bluetooth Devices"
@@ -74,6 +74,7 @@ The system SHALL configure five tabs at indices 0–4: Bluetooth Devices (index 
 - **THEN** tab 2 SHALL use `icons::audio_input` (mic.svg) with tooltip "Input Devices"
 - **THEN** tab 3 SHALL use `icons::audio_card` (form.svg) with tooltip "Configuration"
 - **THEN** tab 4 SHALL use `icons::text_field_test` (test-tube-diagonal.svg) with tooltip "Text Field Test"
+- **THEN** tab 5 SHALL use `icons::bolt` (bolt.svg) with tooltip "Settings"
 - **THEN** tab 0 (Bluetooth Devices) SHALL be the active tab on startup
 - **THEN** one action item SHALL render at the bottom with icon `icons::bluetooth` and tooltip "Restart Bluetooth service"
 
@@ -120,7 +121,7 @@ The system SHALL support disabling individual action items. A disabled action it
 
 ### Requirement: Tab bar supports keyboard shortcuts
 
-The system SHALL observe keystrokes globally and switch tabs when Ctrl+1 through Ctrl+5 are pressed. The keyboard shortcut handler SHALL be registered via `cx.observe_keystrokes()`.
+The system SHALL observe keystrokes globally and switch tabs when Ctrl+1 through Ctrl+6 are pressed. The keyboard shortcut handler SHALL be registered via `cx.observe_keystrokes()`.
 
 #### Scenario: Ctrl+1 switches to Bluetooth tab
 
@@ -131,3 +132,8 @@ The system SHALL observe keystrokes globally and switch tabs when Ctrl+1 through
 
 - **WHEN** the user presses Ctrl+4
 - **THEN** the Configuration tab (index 3) SHALL become active
+
+#### Scenario: Ctrl+6 switches to Settings tab
+
+- **WHEN** the user presses Ctrl+6
+- **THEN** the Settings tab (index 5) SHALL become active

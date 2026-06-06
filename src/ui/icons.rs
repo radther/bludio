@@ -43,3 +43,7 @@ pub fn refresh_ccw() -> gpui::Svg {
 pub fn chevron_down() -> gpui::Svg {
     icon("chevron-down")
 }
+
+pub fn bolt() -> gpui::Svg {
+    icon("bolt")
+}

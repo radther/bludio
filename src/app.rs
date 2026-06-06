@@ -45,12 +45,14 @@ impl AudioConnection {
         }
     }
 }
+use crate::settings::update_settings;
 use crate::ui::audio::audio_page::AudioPage;
 use crate::ui::audio::configuration_page::ConfigurationPage;
 use crate::ui::bluetooth::BluetoothPageCommand;
 use crate::ui::bluetooth::bluetooth_page::BluetoothPage;
 use crate::ui::dev_test_page::DevTestPage;
 use crate::ui::icons;
+use crate::ui::settings_page::{SettingsEvent, SettingsPage};
 use crate::ui::tab_bar::{Tab, TabAction, TabBar, TabBarEvent};
 use crate::ui::{h_flex, v_flex};
 use futures::{FutureExt, StreamExt};
@@ -69,6 +71,7 @@ pub(crate) enum Page {
     AudioInputs,
     Configuration,
     DevTest,
+    Settings,
 }
 
 /// Errors that can occur when running a command via `pkexec`.
@@ -111,6 +114,9 @@ pub(crate) struct BludioApp {
     dev_test_page: Entity<DevTestPage>,
     /// Bluetooth device page: self-contained entity.
     pub(crate) bluetooth_page: Entity<BluetoothPage>,
+    /// Settings page: self-contained entity.
+    settings_page: Entity<SettingsPage>,
+    _settings_page_sub: Subscription,
     /// Tab bar entity: owns tab selection visual state + animation.
     tab_bar: Entity<TabBar>,
     _tab_bar_sub: Subscription,
@@ -154,6 +160,24 @@ impl BludioApp {
         let configuration_page =
             cx.new(|cx| ConfigurationPage::new(audio_cmd_tx.clone(), pa_wakeup, cx));
         let dev_test_page = cx.new(DevTestPage::new);
+        let settings_page = cx.new(SettingsPage::new);
+        let settings_page_sub = cx.subscribe(&settings_page, {
+            move |this, _, event: &SettingsEvent, cx| {
+                match event {
+                    SettingsEvent::ModeChanged(mode) => {
+                        update_settings(|s| s.theme_mode = *mode, cx);
+                    }
+                    SettingsEvent::LightThemeChanged(id) => {
+                        update_settings(|s| s.light_theme_id = id.clone(), cx);
+                    }
+                    SettingsEvent::DarkThemeChanged(id) => {
+                        update_settings(|s| s.dark_theme_id = id.clone(), cx);
+                    }
+                }
+                this.settings_page
+                    .update(cx, |page, cx| page.sync_dropdowns(cx));
+            }
+        });
 
         // ── Create tab bar entity and wire up events ──
         let tabs = vec![
@@ -176,6 +200,10 @@ impl BludioApp {
             Tab {
                 icon: icons::text_field_test,
                 tooltip: "Text Field Test",
+            },
+            Tab {
+                icon: icons::bolt,
+                tooltip: "Settings",
             },
         ];
         let actions = vec![TabAction {
@@ -210,6 +238,7 @@ impl BludioApp {
                         "3" => Some(2),
                         "4" => Some(3),
                         "5" => Some(4),
+                        "6" => Some(5),
                         _ => None,
                     };
                     if let Some(idx) = idx {
@@ -230,6 +259,8 @@ impl BludioApp {
             configuration_page,
             dev_test_page,
             bluetooth_page,
+            settings_page,
+            _settings_page_sub: settings_page_sub,
             tab_bar,
             _tab_bar_sub: tab_bar_sub,
             _keystroke_sub: keystroke_sub,
@@ -819,7 +850,8 @@ impl BludioApp {
             1 => Page::AudioOutputs,
             2 => Page::AudioInputs,
             3 => Page::Configuration,
-            _ => Page::DevTest,
+            4 => Page::DevTest,
+            _ => Page::Settings,
         };
         if this.active_page != new_page {
             this.active_page = new_page;
@@ -1098,6 +1130,7 @@ impl Render for BludioApp {
                         Page::AudioInputs => self.audio_input_page.clone().into_any_element(),
                         Page::Configuration => self.configuration_page.clone().into_any_element(),
                         Page::DevTest => self.dev_test_page.clone().into_any_element(),
+                        Page::Settings => self.settings_page.clone().into_any_element(),
                     })
                     .into_any_element(),
             )

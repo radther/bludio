@@ -66,6 +66,12 @@ impl Dropdown {
         cx.notify();
     }
 
+    /// Update just the selected index without changing items.
+    pub fn set_selected_index(&mut self, selected_index: usize, cx: &mut Context<Self>) {
+        self.selected_index = selected_index.clamp(0, self.items.len().saturating_sub(1));
+        cx.notify();
+    }
+
     /// Get the currently selected text (or placeholder if nothing selected).
     pub fn selected_text(&self) -> SharedString {
         self.items
