@@ -168,7 +168,7 @@ impl Render for BluetoothPage {
                             (
                                 colors.element_background,
                                 colors.element_background,
-                                colors.text_secondary.opacity(0.4),
+                                colors.text_secondary,
                             )
                         } else {
                             (

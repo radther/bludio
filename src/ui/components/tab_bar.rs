@@ -215,7 +215,7 @@ impl Render for TabBar {
             .w(px(TAB_BAR_WIDTH))
             .h_full()
             .pt_6()
-            .bg(colors.sidebar)
+            .bg(colors.surface)
             .relative()
             // ── Animated selection indicator ──
             .children(tab_buttons)

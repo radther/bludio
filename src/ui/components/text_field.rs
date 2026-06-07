@@ -578,8 +578,8 @@ impl TextFieldComponent {
         Self {
             entity,
             accent: colors.audio_accent,
-            text_placeholder: colors.text_placeholder,
-            selection_background: colors.selection_background,
+            text_placeholder: colors.text_muted,
+            selection_background: colors.element_hover,
         }
     }
 }

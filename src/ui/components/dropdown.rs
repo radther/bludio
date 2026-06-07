@@ -132,10 +132,10 @@ impl DropdownComponent {
             bg: colors.element_background,
             hover: colors.element_hover,
             accent: colors.audio_accent,
-            menu_bg: colors.background,
+            menu_bg: colors.surface,
             menu_border: colors.border,
             caption: text_styles.caption,
-            icon_color: colors.icon,
+            icon_color: colors.text_secondary,
         }
     }
 }

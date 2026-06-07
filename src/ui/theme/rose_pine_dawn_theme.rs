@@ -58,9 +58,8 @@ pub(crate) fn rose_pine_dawn() -> Theme {
         colors: ThemeColors {
             // ── Background levels ──────────────────────────────────────────
             background: BASE,
-            surface: SURFACE,
-            sidebar: OVERLAY,
-
+            surface: OVERLAY,
+            background_hover: HIGHLIGHT_LOW,
             element_background: HIGHLIGHT_MED,
             element_hover: HIGHLIGHT_HIGH,
             input_background: HIGHLIGHT_LOW,
@@ -68,7 +67,7 @@ pub(crate) fn rose_pine_dawn() -> Theme {
             // ── Text colors ────────────────────────────────────────────────
             text: TEXT,
             text_secondary: SUBTLE,
-            text_placeholder: MUTED,
+            text_muted: MUTED,
 
             text_colored_button: BASE,
 
@@ -82,34 +81,8 @@ pub(crate) fn rose_pine_dawn() -> Theme {
 
             // ── Status colors ──────────────────────────────────────────────
             danger: LOVE,
-            // Darker love for hover.
             warning: GOLD,
             success: PINE,
-
-            // ── Misc ───────────────────────────────────────────────────────
-            error_background: Hsla {
-                h: 343.0 / 360.0,
-                s: 0.35,
-                l: 0.55,
-                a: 0.12,
-            },
-            // Love at 12% opacity — light enough to sit behind text.
-            hover_overlay: Hsla {
-                h: 25.0 / 360.0,
-                s: 0.35,
-                l: 0.93,
-                a: 0.50,
-            },
-            // Highlight Low at 50%.
-            selection_background: Hsla {
-                h: 268.0 / 360.0,
-                s: 0.21,
-                l: 0.57,
-                a: 0.15,
-            },
-            // Iris at 15%.
-            icon: SUBTLE,
-            muted: MUTED,
         },
     }
 }

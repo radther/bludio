@@ -39,7 +39,7 @@ pub(crate) fn error_banner(
         .h(px(BANNER_HEIGHT))
         .px_4()
         .items_center()
-        .bg(colors.sidebar)
+        .bg(colors.surface)
         .border_t_1()
         .border_color(colors.border)
         .cursor(CursorStyle::PointingHand)

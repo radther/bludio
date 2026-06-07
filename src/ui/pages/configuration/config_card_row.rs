@@ -211,7 +211,7 @@ impl Render for CardRow {
         v_flex()
             .id(SharedString::from(format!("card-{}", self.card_index)))
             .px_8()
-            .hover(|el| el.bg(colors.hover_overlay))
+            .hover(|el| el.bg(colors.background_hover))
             .gap_2()
             .items_start()
             .w_full()

@@ -364,7 +364,7 @@ impl Render for AudioDeviceRow {
             } else {
                 colors.text_secondary
             };
-            (colors.hover_overlay, status)
+            (colors.background_hover, status)
         };
 
         h_flex()
@@ -503,7 +503,7 @@ impl AudioDeviceRow {
         let colors = &crate::ui::theme::theme(cx).colors;
         let text_styles = &crate::ui::theme::theme(cx).text_styles;
         let vol_color = if self.muted {
-            colors.muted
+            colors.text_muted
         } else {
             colors.audio_accent
         };

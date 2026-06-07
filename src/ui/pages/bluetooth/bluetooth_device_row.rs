@@ -105,7 +105,7 @@ impl Render for BluetoothDeviceRow {
         h_flex()
             .items_stretch()
             .id(SharedString::from(format!("device-{addr}")))
-            .hover(|el| el.bg(colors.hover_overlay))
+            .hover(|el| el.bg(colors.background_hover))
             .child(status_strip(status_color))
             .child(
                 v_flex()
@@ -136,7 +136,7 @@ impl Render for BluetoothDeviceRow {
                                     .child(
                                         div()
                                             .styled(text_styles.body2)
-                                            .text_color(colors.muted)
+                                            .text_color(colors.text_muted)
                                             .child(SharedString::from(addr_str)),
                                     ),
                             )

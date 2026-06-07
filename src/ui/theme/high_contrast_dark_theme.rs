@@ -77,8 +77,7 @@ pub(crate) fn high_contrast_dark() -> Theme {
             // ── Background levels ──────────────────────────────────────────
             background: BLACK,
             surface: NEAR_BLACK,
-            sidebar: DARK_GRAY,
-
+            background_hover: DARK_GRAY,
             element_background: DARK_GRAY,
             element_hover: Hsla {
                 h: 0.0,
@@ -91,7 +90,7 @@ pub(crate) fn high_contrast_dark() -> Theme {
             // ── Text colors ────────────────────────────────────────────────
             text: WHITE,
             text_secondary: LIGHT_GRAY,
-            text_placeholder: LIGHT_GRAY,
+            text_muted: LIGHT_GRAY,
             text_colored_button: BLACK,
 
             // ── Borders ────────────────────────────────────────────────────
@@ -111,28 +110,6 @@ pub(crate) fn high_contrast_dark() -> Theme {
             danger: RED,
             warning: YELLOW,
             success: GREEN,
-
-            // ── Misc ───────────────────────────────────────────────────────
-            error_background: Hsla {
-                h: 0.0,
-                s: 1.0,
-                l: 0.55,
-                a: 0.15,
-            },
-            hover_overlay: Hsla {
-                h: 0.0,
-                s: 0.0,
-                l: 1.0,
-                a: 0.15,
-            },
-            selection_background: Hsla {
-                h: 180.0 / 360.0,
-                s: 1.0,
-                l: 0.55,
-                a: 0.25,
-            },
-            icon: LIGHT_GRAY,
-            muted: LIGHT_GRAY,
         },
     }
 }

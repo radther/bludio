@@ -43,8 +43,8 @@ pub(crate) struct ThemeColors {
     pub background: Hsla,
     /// Panel/header background.
     pub surface: Hsla,
-    /// Sidebar/tab bar background.
-    pub sidebar: Hsla,
+    /// Background hover state.
+    pub background_hover: Hsla,
 
     /// Button, input, element background.
     pub element_background: Hsla,
@@ -60,7 +60,7 @@ pub(crate) struct ThemeColors {
     /// Secondary/subdued text (descriptions, labels).
     pub text_secondary: Hsla,
     /// Muted/placeholder text in inputs.
-    pub text_placeholder: Hsla,
+    pub text_muted: Hsla,
     /// Text color for colored buttons.
     pub text_colored_button: Hsla,
 
@@ -83,18 +83,6 @@ pub(crate) struct ThemeColors {
     pub warning: Hsla,
     /// Success (connected, completed states).
     pub success: Hsla,
-
-    // ── Misc ───────────────────────────────────────────────────────────
-    /// Error banner / notification background.
-    pub error_background: Hsla,
-    /// Row/item hover overlay (typically a semi-transparent white/black).
-    pub hover_overlay: Hsla,
-    /// Selection highlight background (semi-transparent accent).
-    pub selection_background: Hsla,
-    /// Default icon fill color.
-    pub icon: Hsla,
-    /// Muted state text color (e.g., muted volume).
-    pub muted: Hsla,
 }
 
 // ── TextStyleSet ───────────────────────────────────────────────────────────

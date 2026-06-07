@@ -137,7 +137,7 @@ impl Render for DevTestPage {
                         h_flex()
                             .px_4()
                             .py_2()
-                            .bg(colors.sidebar)
+                            .bg(colors.surface)
                             .border_b_1()
                             .border_color(colors.border)
                             .child(
