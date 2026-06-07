@@ -1,0 +1,13 @@
+# Roadmap
+
+## v0.1.1
+- [x] Combine audio sinks
+- [ ] More theme options
+- [ ] GTK and QT themes
+- [ ] System theme mode reading
+- [ ] Theme cleanup
+- [ ] Better install options
+- [ ] UI adjustments for audio page
+- [ ] Default tab setting
+- [ ] Long text button pushed off bug
+- [ ]
