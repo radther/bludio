@@ -76,7 +76,7 @@ impl SliderState {
 
     /// Set the slider value and notify.
     pub fn set_value(&mut self, value: f64, cx: &mut Context<Self>) {
-        self.value = value.clamp(self.min, self.max);
+        self.value = self.percentage_to_value(self.value_to_percentage(value));
         cx.notify();
     }
 

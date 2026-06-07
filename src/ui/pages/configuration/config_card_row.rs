@@ -32,6 +32,7 @@ pub(crate) struct CardRow {
     display_name: String,
     profile_dropdown: Entity<crate::ui::components::dropdown::Dropdown>,
     codec_dropdown: Option<Entity<crate::ui::components::dropdown::Dropdown>>,
+    cmd_tx: tokio::sync::mpsc::UnboundedSender<AudioCommand>,
     wakeup: PaWakeup,
     focus_handle: FocusHandle,
     _dropdown_sub: Subscription,
@@ -78,7 +79,7 @@ impl CardRow {
         let (codec_dropdown, _codec_dropdown_sub) = Self::build_codec_dropdown(
             CodecDropdownParams {
                 card,
-                cmd_tx,
+                cmd_tx: cmd_tx.clone(),
                 wakeup,
             },
             cx,
@@ -90,6 +91,7 @@ impl CardRow {
             display_name,
             profile_dropdown,
             codec_dropdown,
+            cmd_tx: cmd_tx.clone(),
             wakeup,
             focus_handle: cx.focus_handle(),
             _dropdown_sub,
@@ -175,7 +177,21 @@ impl CardRow {
                 .unwrap_or(0);
             if let Some(ref dd) = self.codec_dropdown {
                 dd.update(cx, |d, cx| d.set_items(&codec_names, selected_idx, cx));
+            } else {
+                let (dd, sub) = Self::build_codec_dropdown(
+                    CodecDropdownParams {
+                        card,
+                        cmd_tx: self.cmd_tx.clone(),
+                        wakeup: self.wakeup,
+                    },
+                    cx,
+                );
+                self.codec_dropdown = dd;
+                self._codec_dropdown_sub = sub;
             }
+        } else {
+            self.codec_dropdown = None;
+            self._codec_dropdown_sub = None;
         }
 
         cx.notify();

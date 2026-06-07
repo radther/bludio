@@ -45,14 +45,14 @@ pub struct Tab {
 }
 
 /// Configuration for a bottom-anchored action button.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct TabAction {
     /// Function that returns the icon element for this action.
     pub icon: fn() -> gpui::Svg,
     /// Tooltip text shown on hover.
     pub tooltip: &'static str,
     /// Unique identifier for this action (matches what the parent handles).
-    pub action_id: &'static str,
+    pub action_id: SharedString,
 }
 
 // ── Events ─────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ pub(crate) enum TabBarEvent {
     /// User clicked a tab. Contains the tab index.
     TabClicked(usize),
     /// User clicked a bottom-anchored action button. Contains the action_id.
-    ActionButtonClicked(String),
+    ActionButtonClicked(SharedString),
 }
 
 // ── Entity ─────────────────────────────────────────────────────────────────
@@ -183,7 +183,6 @@ impl Render for TabBar {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = &theme::theme(cx).colors;
         let indicator_y = px(self.indicator_offset);
-        // let active_index = self.active_index;
 
         // Build tab button elements
         let tab_buttons = self.tabs.iter().enumerate().map({
@@ -217,8 +216,6 @@ impl Render for TabBar {
             .h_full()
             .pt_6()
             .bg(colors.sidebar)
-            // .border_r_1()
-            // .border_color(colors.border)
             .relative()
             // ── Animated selection indicator ──
             .children(tab_buttons)
@@ -230,9 +227,9 @@ impl Render for TabBar {
                 let actions = self.actions.clone();
                 actions.into_iter().map(move |action| {
                     let entity = entity.clone();
-                    let action_id = action.action_id;
+                    let action_id = action.action_id.clone();
                     h_flex()
-                        .id(SharedString::from(action.action_id))
+                        .id(action.action_id.clone())
                         .justify_center()
                         .w(px(TAB_BAR_WIDTH - 16.0))
                         .mx_2()
@@ -245,10 +242,9 @@ impl Render for TabBar {
                         .on_click({
                             let entity = entity.clone();
                             move |_: &ClickEvent, _window, app_cx: &mut App| {
+                                let action_id = action_id.clone();
                                 entity.update(app_cx, |_this, entity_cx| {
-                                    entity_cx.emit(TabBarEvent::ActionButtonClicked(
-                                        action_id.to_string(),
-                                    ));
+                                    entity_cx.emit(TabBarEvent::ActionButtonClicked(action_id));
                                 });
                             }
                         })

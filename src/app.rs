@@ -223,7 +223,7 @@ impl BludioApp {
         let actions = vec![TabAction {
             icon: icons::refresh_ccw,
             tooltip: "Restart Audio Stack",
-            action_id: "restart-audiostack",
+            action_id: "restart-audiostack".into(),
         }];
         let tab_bar = cx.new(|cx| TabBar::new(tabs, actions, 0, cx));
         let tab_bar_sub = cx.subscribe(&tab_bar, {
@@ -472,9 +472,11 @@ impl BludioApp {
     > {
         let state = BluetoothState::new().await?;
         // SAFETY: BluetoothState::new() only returns Ok after session is set.
-        let agent =
-            crate::backend::bluetooth::agent::register_agent(state.session.as_ref().unwrap())
-                .await?;
+        let session = state
+            .session
+            .as_ref()
+            .ok_or("BluetoothState::new() returned Ok but session is None")?;
+        let agent = crate::backend::bluetooth::agent::register_agent(session).await?;
         Ok((state, agent))
     }
 
@@ -484,7 +486,19 @@ impl BludioApp {
             let rx = crate::tokio_task(async { Self::connect_bluetooth().await });
             let adapter = match rx.await {
                 Ok(Ok((state, agent))) => {
-                    let adapter = state.adapter.clone().unwrap();
+                    let Some(adapter) = state.adapter.clone() else {
+                        let msg = "BluetoothState::new() returned Ok but adapter is None";
+                        eprintln!("[bluetooth] {msg}");
+                        this.update_in(cx, |this, _window, cx| {
+                            this.bt_state.subsystem_status =
+                                SubsystemStatus::Disconnected(msg.into());
+                            this.bluetooth_page
+                                .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                            cx.notify();
+                        })
+                        .ok();
+                        return;
+                    };
                     this.update_in(cx, |this, _window, cx| {
                         this.bt_state = state;
                         this.bt_agent = Some(agent);
@@ -559,17 +573,28 @@ impl BludioApp {
                 match event {
                     Some(MonitorEvent::DeviceChanged(addr)) => {
                         let a = adapter.clone();
-                        if let Ok(Some(device)) =
-                            crate::tokio_task(async move { quick_device_status(&a, addr).await })
-                                .await
+                        match crate::tokio_task(async move { quick_device_status(&a, addr).await })
+                            .await
                         {
-                            let _ = this.update_in(cx, |this, _window, cx| {
-                                this.bt_state.upsert_device(device);
-                                this.bluetooth_page.update(cx, |page, cx| {
-                                    page.sync_state(&this.bt_state, cx);
+                            Ok(Some(device)) => {
+                                let _ = this.update_in(cx, |this, _window, cx| {
+                                    this.bt_state.upsert_device(device);
+                                    this.bluetooth_page.update(cx, |page, cx| {
+                                        page.sync_state(&this.bt_state, cx);
+                                    });
+                                    cx.notify();
                                 });
-                                cx.notify();
-                            });
+                            }
+                            Ok(None) => {
+                                eprintln!(
+                                    "[bluetooth] quick_device_status returned None for {addr}"
+                                );
+                            }
+                            Err(_) => {
+                                eprintln!(
+                                    "[bluetooth] quick_device_status task cancelled for {addr}"
+                                );
+                            }
                         }
                     }
                     Some(MonitorEvent::AdapterPoweredOff) => {
@@ -607,24 +632,32 @@ impl BludioApp {
                     None => {
                         // 10s fallback: full list refresh.
                         let a = adapter.clone();
-                        if let Ok(Some(fresh)) = crate::tokio_task(async move {
+                        match crate::tokio_task(async move {
                             crate::backend::bluetooth::discovery::refresh_device_list(&a).await
                         })
                         .await
                         {
-                            let changed = this
-                                .read_with(cx, |app, _| {
-                                    devices_changed(&app.bt_state.devices, &fresh)
-                                })
-                                .unwrap_or(true);
-                            if changed {
-                                let _ = this.update_in(cx, |this, _window, cx| {
-                                    this.bt_state.replace_devices(fresh);
-                                    this.bluetooth_page.update(cx, |page, cx| {
-                                        page.sync_state(&this.bt_state, cx);
+                            Ok(Some(fresh)) => {
+                                let changed = this
+                                    .read_with(cx, |app, _| {
+                                        devices_changed(&app.bt_state.devices, &fresh)
+                                    })
+                                    .unwrap_or(true);
+                                if changed {
+                                    let _ = this.update_in(cx, |this, _window, cx| {
+                                        this.bt_state.replace_devices(fresh);
+                                        this.bluetooth_page.update(cx, |page, cx| {
+                                            page.sync_state(&this.bt_state, cx);
+                                        });
+                                        cx.notify();
                                     });
-                                    cx.notify();
-                                });
+                                }
+                            }
+                            Ok(None) => {
+                                eprintln!("[bluetooth] refresh_device_list returned None");
+                            }
+                            Err(_) => {
+                                eprintln!("[bluetooth] refresh_device_list task cancelled");
                             }
                         }
                     }
@@ -708,33 +741,49 @@ impl BludioApp {
     ) {
         // Phase 1: quick single-device status refresh
         let a = adapter.clone();
-        if let Ok(Some(device)) = crate::tokio_task(async move {
+        match crate::tokio_task(async move {
             crate::backend::bluetooth::device::quick_device_status(&a, addr).await
         })
         .await
         {
-            let _ = this.update_in(cx, |this, _window, cx| {
-                this.bt_state.upsert_device(device);
-                this.bluetooth_page
-                    .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
-                cx.notify();
-            });
+            Ok(Some(device)) => {
+                let _ = this.update_in(cx, |this, _window, cx| {
+                    this.bt_state.upsert_device(device);
+                    this.bluetooth_page
+                        .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                    cx.notify();
+                });
+            }
+            Ok(None) => {
+                eprintln!("[bluetooth] quick_device_status returned None for {addr}");
+            }
+            Err(_) => {
+                eprintln!("[bluetooth] quick_device_status task cancelled for {addr}");
+            }
         }
 
         // Phase 2: full list refresh after a small delay
         let a = adapter.clone();
-        if let Ok(Some(devices)) = crate::tokio_task(async move {
+        match crate::tokio_task(async move {
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             crate::backend::bluetooth::discovery::refresh_device_list(&a).await
         })
         .await
         {
-            let _ = this.update_in(cx, |this, _window, cx| {
-                this.bt_state.replace_devices(devices);
-                this.bluetooth_page
-                    .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
-                cx.notify();
-            });
+            Ok(Some(devices)) => {
+                let _ = this.update_in(cx, |this, _window, cx| {
+                    this.bt_state.replace_devices(devices);
+                    this.bluetooth_page
+                        .update(cx, |page, cx| page.sync_state(&this.bt_state, cx));
+                    cx.notify();
+                });
+            }
+            Ok(None) => {
+                eprintln!("[bluetooth] refresh_device_list returned None");
+            }
+            Err(_) => {
+                eprintln!("[bluetooth] refresh_device_list task cancelled");
+            }
         }
     }
 

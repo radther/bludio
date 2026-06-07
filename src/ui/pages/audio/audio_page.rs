@@ -160,14 +160,14 @@ impl AudioPage {
                         row_cx,
                     )
                 });
-                let sub = cx.subscribe(&row, |this, _row, event: &AudioDeviceRowEvent, _cx| {
+                let sub = cx.subscribe(&row, |this, _row, event: &AudioDeviceRowEvent, cx| {
                     let AudioDeviceRowEvent::ToggleSelection(pa_name) = event;
                     if let Some(pos) = this.selected_sinks.iter().position(|n| n == pa_name) {
                         this.selected_sinks.remove(pos);
                     } else {
                         this.selected_sinks.push(pa_name.clone());
                     }
-                    _cx.notify();
+                    cx.notify();
                 });
                 self._row_subs.insert(sink.index, sub);
                 self.rows.push(row);

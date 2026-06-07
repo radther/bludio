@@ -519,7 +519,6 @@ impl AudioDeviceRow {
                     .w(px(LABEL_WIDTH))
                     .bg(colors.element_background)
                     .rounded_sm()
-                    // .p_2()
                     .text_color(colors.text)
                     .styled(text_styles.caption)
                     .child(self.text_field.clone()),

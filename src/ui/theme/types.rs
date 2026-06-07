@@ -140,8 +140,9 @@ impl Default for TextStyleSet {
 /// The full theme definition: appearance, colors, font family, and text styles.
 #[derive(Clone, Debug)]
 pub(crate) struct Theme {
-    /// Stable ID set at construction time. Backing store for the [`Theme::id()`]
-    /// accessor; read via the method rather than directly.
+    /// Stable identifier for registry lookups.
+    /// Kept so a Theme value knows its own ID for future introspection.
+    #[allow(dead_code)]
     pub id: &'static str,
     /// Only read by the dev test page (debug builds); kept for parity.
     #[allow(dead_code)]
@@ -149,17 +150,6 @@ pub(crate) struct Theme {
     pub font_family: SharedString,
     pub colors: ThemeColors,
     pub text_styles: TextStyleSet,
-}
-
-impl Theme {
-    /// Stable string identifier for this theme variant.
-    ///
-    /// This is the canonical way to read a theme's ID (the backing field is
-    /// public only so constructors in sibling modules can set it).
-    #[allow(dead_code)]
-    pub(crate) fn id(&self) -> &'static str {
-        self.id
-    }
 }
 
 // ── Theme accessors ────────────────────────────────────────────────────────

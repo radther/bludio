@@ -48,6 +48,7 @@ pub(crate) struct Dropdown {
 impl Dropdown {
     /// Create a new dropdown with the given items and selected index.
     pub fn new(items: Vec<String>, selected_index: usize, cx: &mut Context<Self>) -> Self {
+        let selected_index = selected_index.clamp(0, items.len().saturating_sub(1));
         Self {
             items,
             selected_index,

@@ -141,13 +141,6 @@ impl BluetoothState {
         }
         device::sort_devices(&mut self.devices);
     }
-
-    /// Remove a device by address (no re-sort needed).
-    // Part of the public BluetoothState API — used when devices are explicitly removed.
-    #[allow(dead_code)]
-    pub fn remove_device(&mut self, addr: bluer::Address) {
-        self.devices.retain(|d| d.address != addr);
-    }
 }
 
 /// Build a `BluetoothDevice` from an address. Returns `Err` for devices

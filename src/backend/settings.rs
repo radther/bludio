@@ -131,6 +131,18 @@ pub(crate) fn settings(cx: &App) -> &Settings {
     &cx.global::<GlobalSettings>().settings
 }
 
+/// Background save channel — a single thread handles all settings writes.
+static SETTINGS_SAVE_TX: std::sync::LazyLock<std::sync::mpsc::Sender<Settings>> =
+    std::sync::LazyLock::new(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<Settings>();
+        std::thread::spawn(move || {
+            while let Ok(settings) = rx.recv() {
+                settings.save();
+            }
+        });
+        tx
+    });
+
 /// Update settings, recompute the active theme, persist to disk, and trigger
 /// a UI re-render.
 ///
@@ -144,21 +156,21 @@ where
         global.active_theme = GlobalSettings::compute_theme(&global.settings);
     });
 
-    // Fire-and-forget background save.
     let settings_to_save = cx.global::<GlobalSettings>().settings.clone();
-    std::thread::spawn(move || {
-        settings_to_save.save();
-    });
+    let _ = SETTINGS_SAVE_TX.send(settings_to_save);
 }
 
 // ── Config path helpers ──────────────────────────────────────────────────
 
 fn config_dir() -> std::path::PathBuf {
-    std::env::var("HOME")
-        .map(|home| {
-            std::path::PathBuf::from(home)
-                .join(".config")
-                .join("bludio")
+    std::env::var("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|_| {
+            std::env::var("HOME").map(|home| {
+                std::path::PathBuf::from(home)
+                    .join(".config")
+                    .join("bludio")
+            })
         })
         .unwrap_or_else(|_| std::path::PathBuf::from("/tmp").join("bludio"))
 }

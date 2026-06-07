@@ -86,7 +86,8 @@ pub(crate) struct SourceInfo {
 #[derive(Clone, Debug)]
 pub(crate) struct CardInfo {
     pub(crate) index: u32,
-    /// Card hardware name (fallback when `description` is not set).
+    /// PulseAudio internal card name (e.g., `bluez_card.XX_XX_XX_XX_XX_XX`),
+    /// used for messaging API paths. The `description` field is preferred for display.
     pub(crate) name: String,
     /// Human-readable description from proplist `device.description`.
     pub(crate) description: Option<String>,
