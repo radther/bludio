@@ -67,8 +67,6 @@ pub(crate) struct ThemeColors {
     // ── Borders ────────────────────────────────────────────────────────
     /// Primary border (panel separators, input borders).
     pub border: Hsla,
-    /// Subtle border (item separators in lists).
-    pub border_subtle: Hsla,
 
     // ── Accent / Interactive ───────────────────────────────────────────
     /// Bluetooth accent color.
@@ -97,10 +95,6 @@ pub(crate) struct ThemeColors {
     pub icon: Hsla,
     /// Muted state text color (e.g., muted volume).
     pub muted: Hsla,
-
-    // ── Menu ───────────────────────────────────────────────────────────
-    /// Dropdown/context menu border.
-    pub menu_border: Hsla,
 }
 
 // ── TextStyleSet ───────────────────────────────────────────────────────────

@@ -153,7 +153,7 @@ impl Render for DevTestPage {
                             .py_2()
                             .gap_2()
                             .border_b_1()
-                            .border_color(colors.border_subtle)
+                            .border_color(colors.border)
                             .child(
                                 div()
                                     .styled(text_styles.caption)

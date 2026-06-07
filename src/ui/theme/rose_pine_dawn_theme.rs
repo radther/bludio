@@ -74,7 +74,6 @@ pub(crate) fn rose_pine_dawn() -> Theme {
 
             // ── Borders ────────────────────────────────────────────────────
             border: HIGHLIGHT_HIGH,
-            border_subtle: HIGHLIGHT_MED,
 
             // ── Accent / Interactive ───────────────────────────────────────
             bluetooth_accent: FOAM,
@@ -111,9 +110,6 @@ pub(crate) fn rose_pine_dawn() -> Theme {
             // Iris at 15%.
             icon: SUBTLE,
             muted: MUTED,
-
-            // ── Menu ───────────────────────────────────────────────────────
-            menu_border: HIGHLIGHT_HIGH,
         },
     }
 }

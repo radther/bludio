@@ -133,7 +133,7 @@ impl DropdownComponent {
             hover: colors.element_hover,
             accent: colors.audio_accent,
             menu_bg: colors.background,
-            menu_border: colors.menu_border,
+            menu_border: colors.border,
             caption: text_styles.caption,
             icon_color: colors.icon,
         }

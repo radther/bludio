@@ -96,7 +96,6 @@ pub(crate) fn high_contrast_dark() -> Theme {
 
             // ── Borders ────────────────────────────────────────────────────
             border: WHITE,
-            border_subtle: LIGHT_GRAY,
 
             // ── Accent / Interactive ───────────────────────────────────────
             bluetooth_accent: CYAN,
@@ -134,9 +133,6 @@ pub(crate) fn high_contrast_dark() -> Theme {
             },
             icon: LIGHT_GRAY,
             muted: LIGHT_GRAY,
-
-            // ── Menu ───────────────────────────────────────────────────────
-            menu_border: WHITE,
         },
     }
 }
