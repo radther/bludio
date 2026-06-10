@@ -399,6 +399,16 @@ fn theme_display_name(id: &str) -> &'static str {
         "rose-pine" => "Rose Pine",
         "high-contrast-light" => "High Contrast Light",
         "high-contrast-dark" => "High Contrast Dark",
+        "extreme-high-contrast" => "Extreme High Contrast",
+        "theme2" => "Theme 2",
+        "theme3" => "Theme 3",
+        "theme4" => "Theme 4",
+        "theme5" => "Theme 5",
+        "extreme-high-contrast-dark" => "Extreme High Contrast Dark",
+        "theme2dark" => "Theme 2 Dark",
+        "theme3dark" => "Theme 3 Dark",
+        "theme4dark" => "Theme 4 Dark",
+        "theme5dark" => "Theme 5 Dark",
         _ => "Unknown Theme",
     }
 }
