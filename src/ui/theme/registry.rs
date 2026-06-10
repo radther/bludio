@@ -1,151 +1,244 @@
-//! Theme registry: static map of theme IDs to theme constructors.
+//! Dynamic theme registry: loads built-in JSON themes and user themes.
 //!
-//! Provides O(1) lookup by stable string ID and categorized lists
-//! for light/dark theme dropdowns.
+//! Built-in themes are embedded at compile time via `include_str!`. User
+//! themes are loaded from `~/.config/bludio/themes/` at first access.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::LazyLock;
 
-use super::types::Theme;
-use super::{
-    extreme_high_contrast, extreme_high_contrast_dark, high_contrast_dark, high_contrast_light,
-    rose_pine, rose_pine_dawn, theme2, theme2_dark, theme3, theme3_dark, theme4, theme4_dark,
-    theme5, theme5_dark,
-};
+use super::loader::load_theme_from_json;
+use super::types::{Appearance, Theme};
 
-// ── Type alias ─────────────────────────────────────────────────────────────
+// ── Built-in theme file paths ──────────────────────────────────────────────
 
-type ThemeCtor = fn() -> Arc<Theme>;
-
-// ── Theme constructors (function pointers for the registry) ────────────────
-
-fn make_rose_pine() -> Arc<Theme> {
-    Arc::new(rose_pine())
-}
-
-fn make_rose_pine_dawn() -> Arc<Theme> {
-    Arc::new(rose_pine_dawn())
-}
-
-fn make_high_contrast_light() -> Arc<Theme> {
-    Arc::new(high_contrast_light())
-}
-
-fn make_high_contrast_dark() -> Arc<Theme> {
-    Arc::new(high_contrast_dark())
-}
-
-fn make_extreme_high_contrast() -> Arc<Theme> {
-    Arc::new(extreme_high_contrast())
-}
-
-fn make_extreme_high_contrast_dark() -> Arc<Theme> {
-    Arc::new(extreme_high_contrast_dark())
-}
-
-fn make_theme2() -> Arc<Theme> {
-    Arc::new(theme2())
-}
-
-fn make_theme2_dark() -> Arc<Theme> {
-    Arc::new(theme2_dark())
-}
-
-fn make_theme3() -> Arc<Theme> {
-    Arc::new(theme3())
-}
-
-fn make_theme3_dark() -> Arc<Theme> {
-    Arc::new(theme3_dark())
-}
-
-fn make_theme4() -> Arc<Theme> {
-    Arc::new(theme4())
-}
-
-fn make_theme4_dark() -> Arc<Theme> {
-    Arc::new(theme4_dark())
-}
-
-fn make_theme5() -> Arc<Theme> {
-    Arc::new(theme5())
-}
-
-fn make_theme5_dark() -> Arc<Theme> {
-    Arc::new(theme5_dark())
-}
-
-// ── Registry ───────────────────────────────────────────────────────────────
-
-/// Static map of theme ID to constructor function returning `Arc<Theme>`.
-static REGISTRY: LazyLock<HashMap<&str, ThemeCtor>> = LazyLock::new(|| {
-    let mut m = HashMap::new();
-    m.insert("rose-pine", make_rose_pine as fn() -> Arc<Theme>);
-    m.insert("rose-pine-dawn", make_rose_pine_dawn as fn() -> Arc<Theme>);
-    m.insert(
+const BUILTIN_LIGHT: &[(&str, &str)] = &[
+    (
+        "rose-pine-dawn",
+        include_str!("../../../assets/themes/light/rose-pine-dawn.json"),
+    ),
+    (
         "high-contrast-light",
-        make_high_contrast_light as fn() -> Arc<Theme>,
-    );
-    m.insert(
-        "high-contrast-dark",
-        make_high_contrast_dark as fn() -> Arc<Theme>,
-    );
-    m.insert(
+        include_str!("../../../assets/themes/light/high-contrast-light.json"),
+    ),
+    (
         "extreme-high-contrast",
-        make_extreme_high_contrast as fn() -> Arc<Theme>,
-    );
-    m.insert(
+        include_str!("../../../assets/themes/light/extreme-high-contrast.json"),
+    ),
+    (
+        "theme2",
+        include_str!("../../../assets/themes/light/theme2.json"),
+    ),
+    (
+        "theme3",
+        include_str!("../../../assets/themes/light/theme3.json"),
+    ),
+    (
+        "theme4",
+        include_str!("../../../assets/themes/light/theme4.json"),
+    ),
+    (
+        "theme5",
+        include_str!("../../../assets/themes/light/theme5.json"),
+    ),
+];
+
+const BUILTIN_DARK: &[(&str, &str)] = &[
+    (
+        "rose-pine",
+        include_str!("../../../assets/themes/dark/rose-pine.json"),
+    ),
+    (
+        "high-contrast-dark",
+        include_str!("../../../assets/themes/dark/high-contrast-dark.json"),
+    ),
+    (
         "extreme-high-contrast-dark",
-        make_extreme_high_contrast_dark as fn() -> Arc<Theme>,
-    );
-    m.insert("theme2", make_theme2 as fn() -> Arc<Theme>);
-    m.insert("theme2dark", make_theme2_dark as fn() -> Arc<Theme>);
-    m.insert("theme3", make_theme3 as fn() -> Arc<Theme>);
-    m.insert("theme3dark", make_theme3_dark as fn() -> Arc<Theme>);
-    m.insert("theme4", make_theme4 as fn() -> Arc<Theme>);
-    m.insert("theme4dark", make_theme4_dark as fn() -> Arc<Theme>);
-    m.insert("theme5", make_theme5 as fn() -> Arc<Theme>);
-    m.insert("theme5dark", make_theme5_dark as fn() -> Arc<Theme>);
-    m
-});
-
-/// IDs of all themes registered as light variants.
-static LIGHT_THEME_IDS: &[&str] = &[
-    "rose-pine-dawn",
-    "high-contrast-light",
-    "extreme-high-contrast",
-    "theme2",
-    "theme3",
-    "theme4",
-    "theme5",
+        include_str!("../../../assets/themes/dark/extreme-high-contrast-dark.json"),
+    ),
+    (
+        "theme2dark",
+        include_str!("../../../assets/themes/dark/theme2dark.json"),
+    ),
+    (
+        "theme3dark",
+        include_str!("../../../assets/themes/dark/theme3dark.json"),
+    ),
+    (
+        "theme4dark",
+        include_str!("../../../assets/themes/dark/theme4dark.json"),
+    ),
+    (
+        "theme5dark",
+        include_str!("../../../assets/themes/dark/theme5dark.json"),
+    ),
 ];
 
-/// IDs of all themes registered as dark variants.
-static DARK_THEME_IDS: &[&str] = &[
-    "rose-pine",
-    "high-contrast-dark",
-    "extreme-high-contrast-dark",
-    "theme2dark",
-    "theme3dark",
-    "theme4dark",
-    "theme5dark",
-];
+// ── ThemeRegistry ──────────────────────────────────────────────────────────
+
+/// Dynamic theme registry holding all loaded themes.
+struct ThemeRegistry {
+    themes: HashMap<String, Arc<Theme>>,
+    light_ids: Vec<String>,
+    dark_ids: Vec<String>,
+}
+
+impl ThemeRegistry {
+    fn new() -> Self {
+        let mut themes = HashMap::new();
+        let mut light_ids = Vec::new();
+        let mut dark_ids = Vec::new();
+
+        // Load built-in light themes
+        for (id, content) in BUILTIN_LIGHT {
+            match load_theme_from_json(content, Appearance::Light) {
+                Ok(theme) => {
+                    light_ids.push(theme.id.clone());
+                    themes.insert(theme.id.clone(), Arc::new(theme));
+                }
+                Err(e) => {
+                    eprintln!("[theme-registry] Failed to load built-in light theme {id}: {e}")
+                }
+            }
+        }
+
+        // Load built-in dark themes
+        for (id, content) in BUILTIN_DARK {
+            match load_theme_from_json(content, Appearance::Dark) {
+                Ok(theme) => {
+                    dark_ids.push(theme.id.clone());
+                    themes.insert(theme.id.clone(), Arc::new(theme));
+                }
+                Err(e) => {
+                    eprintln!("[theme-registry] Failed to load built-in dark theme {id}: {e}")
+                }
+            }
+        }
+
+        // Load user themes
+        Self::load_user_themes(&mut themes, &mut light_ids, &mut dark_ids);
+
+        Self {
+            themes,
+            light_ids,
+            dark_ids,
+        }
+    }
+
+    /// Scan user theme directories and load valid themes.
+    /// User themes override built-in themes with the same ID.
+    fn load_user_themes(
+        themes: &mut HashMap<String, Arc<Theme>>,
+        light_ids: &mut Vec<String>,
+        dark_ids: &mut Vec<String>,
+    ) {
+        let base_dir = user_themes_dir();
+        let light_dir = base_dir.join("light");
+        let dark_dir = base_dir.join("dark");
+
+        Self::load_dir(&light_dir, Appearance::Light, themes, light_ids);
+        Self::load_dir(&dark_dir, Appearance::Dark, themes, dark_ids);
+    }
+
+    fn load_dir(
+        dir: &std::path::Path,
+        appearance: Appearance,
+        themes: &mut HashMap<String, Arc<Theme>>,
+        ids: &mut Vec<String>,
+    ) {
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return, // Directory doesn't exist — that's fine
+        };
+
+        for entry in entries.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[theme-registry] Failed to read {}: {e}", path.display());
+                    continue;
+                }
+            };
+
+            match load_theme_from_json(&content, appearance) {
+                Ok(theme) => {
+                    let id = theme.id.clone();
+                    // Remove old ID if overriding (built-in or previous user theme)
+                    ids.retain(|existing| existing != &id);
+                    ids.push(id.clone());
+                    themes.insert(id, Arc::new(theme));
+                }
+                Err(e) => {
+                    eprintln!("[theme-registry] Failed to load {}: {e}", path.display());
+                }
+            }
+        }
+    }
+}
+
+// ── LazyLock singleton ─────────────────────────────────────────────────────
+
+static REGISTRY: LazyLock<ThemeRegistry> = LazyLock::new(ThemeRegistry::new);
 
 // ── Public helpers ─────────────────────────────────────────────────────────
 
-/// Look up a theme constructor by its stable string ID.
+/// Look up a theme by its stable string ID.
 /// Returns `None` if the ID is not known.
 pub(crate) fn theme_for_id(id: &str) -> Option<Arc<Theme>> {
-    REGISTRY.get(id).map(|ctor| ctor())
+    REGISTRY.themes.get(id).cloned()
+}
+
+/// Return the display name for a theme ID.
+pub(crate) fn theme_display_name(id: &str) -> Option<&str> {
+    REGISTRY.themes.get(id).map(|t| t.display_name.as_str())
 }
 
 /// All registered light theme IDs.
-pub(crate) fn light_theme_ids() -> &'static [&'static str] {
-    LIGHT_THEME_IDS
+pub(crate) fn light_theme_ids() -> Vec<&'static str> {
+    // Leak the strings to get 'static references — the registry lives forever.
+    REGISTRY
+        .light_ids
+        .iter()
+        .map(|s| {
+            let leaked: &'static str = Box::leak(s.clone().into_boxed_str());
+            leaked
+        })
+        .collect()
 }
 
 /// All registered dark theme IDs.
-pub(crate) fn dark_theme_ids() -> &'static [&'static str] {
-    DARK_THEME_IDS
+pub(crate) fn dark_theme_ids() -> Vec<&'static str> {
+    REGISTRY
+        .dark_ids
+        .iter()
+        .map(|s| {
+            let leaked: &'static str = Box::leak(s.clone().into_boxed_str());
+            leaked
+        })
+        .collect()
+}
+
+// ── Config path helpers ────────────────────────────────────────────────────
+
+fn user_themes_dir() -> std::path::PathBuf {
+    std::env::var("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|_| {
+            std::env::var("HOME").map(|home| {
+                std::path::PathBuf::from(home)
+                    .join(".config")
+                    .join("bludio")
+                    .join("themes")
+            })
+        })
+        .unwrap_or_else(|_| {
+            std::path::PathBuf::from("/tmp")
+                .join("bludio")
+                .join("themes")
+        })
 }

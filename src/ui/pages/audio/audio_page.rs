@@ -11,6 +11,7 @@ use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::common::icons;
 use crate::ui::components::page_header::page_header;
 use crate::ui::pages::audio::audio_device_row::{AudioDeviceRow, AudioDeviceRowEvent};
+use crate::ui::theme::TextStyleSet;
 use crate::ui::{h_flex, v_flex};
 use gpui::{
     ClickEvent, Context, CursorStyle, Entity, Render, Subscription, Window, div, prelude::*, px,
@@ -216,7 +217,7 @@ impl Render for AudioPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = &theme.text_styles;
+        let text_styles = TextStyleSet::default();
 
         let count = self.rows.len();
         let (title, caption) = match self.kind {
@@ -254,7 +255,7 @@ impl Render for AudioPage {
                     .justify_between()
                     .px_4()
                     .py_2()
-                    .child(page_header(title, caption, colors, text_styles))
+                    .child(page_header(title, caption, colors, &text_styles))
                     .when(
                         is_output && self.subsystem_status == SubsystemStatus::Connected,
                         |el| {

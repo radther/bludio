@@ -1,0 +1,36 @@
+{
+  "id": "high-contrast-light",
+  "display_name": "High Contrast Light",
+  "colors": {
+    "white": "#ffffff",
+    "black": "#000000",
+    "dark_gray": "#262626",
+    "med_gray": "#666666",
+    "light_gray": "#d9d9d9",
+    "blue": "#0000ff",
+    "green": "#00b200",
+    "red": "#cc0000",
+    "yellow": "#ffff00",
+    "element_hover": "#bfbfbf",
+    "audio_accent": "#6600cc"
+  },
+  "theme": {
+    "background": "white",
+    "surface": "white",
+    "background_hover": "light_gray",
+    "element_background": "light_gray",
+    "element_hover": "element_hover",
+    "input_background": "white",
+    "text": "black",
+    "text_secondary": "dark_gray",
+    "text_muted": "med_gray",
+    "text_colored_button": "white",
+    "border": "black",
+    "bluetooth_accent": "blue",
+    "audio_accent": "audio_accent",
+    "dev_accent": "green",
+    "danger": "red",
+    "warning": "yellow",
+    "success": "green"
+  }
+}

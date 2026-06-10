@@ -47,7 +47,7 @@ impl AudioConnection {
         }
     }
 }
-use crate::backend::settings::update_settings;
+use crate::backend::settings::{settings, update_settings};
 use crate::ui::common::icons;
 use crate::ui::components::tab_bar::{Tab, TabAction, TabBar, TabBarEvent};
 use crate::ui::pages::audio::audio_page::AudioPage;
@@ -1188,7 +1188,7 @@ impl Render for BludioApp {
         h_flex()
             .size_full()
             .items_stretch()
-            .font_family(theme.font_family.clone())
+            .font_family(settings(cx).font_family.clone())
             .bg(colors.background)
             .text_color(colors.text)
             // ── Left tab bar ──

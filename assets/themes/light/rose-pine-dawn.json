@@ -1,0 +1,40 @@
+{
+  "id": "rose-pine-dawn",
+  "display_name": "Rose Pine Dawn",
+  "colors": {
+    "base": "#faf4ed",
+    "surface": "#fffaf3",
+    "overlay": "#f2e9e1",
+    "muted": "#9893a5",
+    "subtle": "#797593",
+    "text": "#575279",
+    "love": "#b4637a",
+    "gold": "#ea9d34",
+    "rose": "#d7827e",
+    "pine": "#286983",
+    "foam": "#56949f",
+    "iris": "#907aa9",
+    "highlight_low": "#f4ede8",
+    "highlight_med": "#dfdad9",
+    "highlight_high": "#cecacd"
+  },
+  "theme": {
+    "background": "base",
+    "surface": "overlay",
+    "background_hover": "highlight_low",
+    "element_background": "highlight_med",
+    "element_hover": "highlight_high",
+    "input_background": "highlight_low",
+    "text": "text",
+    "text_secondary": "subtle",
+    "text_muted": "muted",
+    "text_colored_button": "base",
+    "border": "highlight_high",
+    "bluetooth_accent": "foam",
+    "audio_accent": "iris",
+    "dev_accent": "pine",
+    "danger": "love",
+    "warning": "gold",
+    "success": "pine"
+  }
+}

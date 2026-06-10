@@ -13,6 +13,7 @@ use crate::ui::components::dropdown::DropdownEvent as DdEvt;
 use crate::ui::components::slider::{Slider, SliderEvent, SliderState};
 use crate::ui::components::status_strip::status_strip;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
+use crate::ui::theme::TextStyleSet;
 use crate::ui::{h_flex, v_flex};
 use gpui::{
     App, Context, Div, Entity, EventEmitter, FocusHandle, Focusable, Render, SharedString,
@@ -390,7 +391,7 @@ impl AudioDeviceRow {
     /// Title row: device name on the left, action buttons on the right.
     fn render_title_row(&self, cx: &mut Context<Self>) -> Div {
         let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let text_styles = TextStyleSet::default();
 
         let (mute_label, mute_bg, mute_hover, mute_text) = if self.muted {
             (
@@ -453,7 +454,7 @@ impl AudioDeviceRow {
                                     wk.wake();
                                 }
                             },
-                            text_styles,
+                            &text_styles,
                         ))
                         .child(self.render_default_button(cx))
                         .when(self.is_combined_sink, |el| {
@@ -472,7 +473,7 @@ impl AudioDeviceRow {
     /// Device name with optional "Default" badge and merge icon for combined sinks.
     fn render_device_name(&self, cx: &App) -> Div {
         let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let text_styles = TextStyleSet::default();
         h_flex()
             .gap_2()
             .when(self.is_combined_sink, |el| {
@@ -501,7 +502,7 @@ impl AudioDeviceRow {
     /// Volume row: slider spanning full width, with text field at the right end.
     fn render_volume_row(&self, cx: &mut Context<Self>) -> Div {
         let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let text_styles = TextStyleSet::default();
         let vol_color = if self.muted {
             colors.text_muted
         } else {
@@ -532,7 +533,7 @@ impl AudioDeviceRow {
         let kind = self.kind;
         let wk = self.wakeup;
         let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let text_styles = TextStyleSet::default();
 
         action_btn(
             format!("btn-default-{}", self.index),
@@ -551,7 +552,7 @@ impl AudioDeviceRow {
                 };
                 wk.wake();
             },
-            text_styles,
+            &text_styles,
         )
     }
 
@@ -561,7 +562,7 @@ impl AudioDeviceRow {
         let module_index = self.combined_module_index;
         let wk = self.wakeup;
         let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let text_styles = TextStyleSet::default();
 
         action_btn(
             format!("btn-delete-{}", self.index),
@@ -575,7 +576,7 @@ impl AudioDeviceRow {
                     wk.wake();
                 }
             },
-            text_styles,
+            &text_styles,
         )
     }
 }

@@ -16,6 +16,7 @@ use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use crate::ui::theme;
+use crate::ui::theme::TextStyleSet;
 use crate::ui::{h_flex, v_flex};
 
 // ── Test page entity ───────────────────────────────────────────────────────
@@ -59,7 +60,7 @@ impl Focusable for DevTestPage {
 impl Render for DevTestPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = &theme::theme(cx).colors;
-        let text_styles = &theme::theme(cx).text_styles;
+        let text_styles = TextStyleSet::default();
         let is_dark = theme::theme(cx).appearance == theme::Appearance::Dark;
 
         let focus_handle = self.text_field.read(cx).focus_handle(cx);
@@ -76,11 +77,11 @@ impl Render for DevTestPage {
                         "Text Field Test",
                         "Sandbox for testing UI components",
                         colors,
-                        text_styles,
+                        &text_styles,
                     ))
                     .child(h_flex().gap_2().children(vec![
-                        dark_theme_btn(is_dark, colors, text_styles),
-                        light_theme_btn(is_dark, colors, text_styles),
+                        dark_theme_btn(is_dark, colors, &text_styles),
+                        light_theme_btn(is_dark, colors, &text_styles),
                     ]))
                     .with_fade_in_up("dev-test-header", 1),
             )
