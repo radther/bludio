@@ -15,7 +15,8 @@ use crate::ui::components::dropdown::{Dropdown, DropdownEvent};
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::toggle::toggle_switch;
 use crate::ui::theme::{
-    TextStyleSet, ThemeColors, ThemeMode, dark_theme_ids, light_theme_ids, theme_display_name,
+    TextStyleSet, ThemeColors, ThemeMode, dark_theme_ids, light_theme_ids, text_styles,
+    theme_display_name,
 };
 use crate::ui::{h_flex, v_flex};
 
@@ -145,7 +146,7 @@ impl Render for SettingsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = TextStyleSet::default();
+        let text_styles = text_styles(cx);
 
         v_flex()
             .flex_1()
@@ -187,7 +188,7 @@ impl SettingsPage {
     ) -> gpui::Div {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = TextStyleSet::default();
+        let text_styles = text_styles(cx);
         let is_light = settings(cx).theme_mode == ThemeMode::Light;
         let entity = cx.entity().clone();
 
@@ -224,7 +225,7 @@ impl SettingsPage {
     ) -> gpui::Div {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = TextStyleSet::default();
+        let text_styles = text_styles(cx);
         let disable_animations = settings(cx).disable_animations;
         let entity = cx.entity().clone();
 

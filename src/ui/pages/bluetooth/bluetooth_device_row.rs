@@ -11,7 +11,7 @@ use crate::ui::components::button::action_btn;
 use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::status_strip::status_strip;
 use crate::ui::pages::bluetooth::BluetoothPageCommand;
-use crate::ui::theme::TextStyleSet;
+use crate::ui::theme::text_styles;
 use crate::ui::{h_flex, v_flex};
 use bluer::Address;
 use futures::channel::mpsc::UnboundedSender;
@@ -77,7 +77,7 @@ impl Render for BluetoothDeviceRow {
         let connected = self.connected;
 
         let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = TextStyleSet::default();
+        let text_styles = text_styles(cx);
 
         let pairing_status = self.pairing_status.as_ref();
 

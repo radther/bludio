@@ -12,6 +12,6 @@ mod loader;
 mod registry;
 mod types;
 
-pub(crate) use crate::backend::settings::{ThemeMode, theme};
+pub(crate) use crate::backend::settings::{ThemeMode, text_styles, theme};
 pub(crate) use registry::{dark_theme_ids, light_theme_ids, theme_display_name, theme_for_id};
 pub(crate) use types::*;

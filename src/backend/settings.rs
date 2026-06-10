@@ -9,7 +9,7 @@ use gpui::{App, BorrowAppContext, Global};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::ui::theme::{Theme, theme_for_id};
+use crate::ui::theme::{TextStyleSet, Theme, theme_for_id};
 
 // ── Theme mode ─────────────────────────────────────────────────────────────
 
@@ -139,6 +139,18 @@ pub(crate) fn theme(cx: &App) -> &Arc<Theme> {
 /// Panics if `GlobalSettings` has not been initialized.
 pub(crate) fn settings(cx: &App) -> &Settings {
     &cx.global::<GlobalSettings>().settings
+}
+
+/// Retrieve the current text styles.
+///
+/// Panics if `GlobalSettings` has not been initialized.
+///
+/// Today this returns the default set. When text styles become a user
+/// setting, this will read from the settings global instead.
+pub(crate) fn text_styles(_cx: &App) -> &'static TextStyleSet {
+    static DEFAULT: std::sync::LazyLock<TextStyleSet> =
+        std::sync::LazyLock::new(TextStyleSet::default);
+    &DEFAULT
 }
 
 /// Background save channel — a single thread handles all settings writes.
