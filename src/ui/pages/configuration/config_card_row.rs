@@ -8,6 +8,7 @@ use crate::backend::audio::pulse::PaWakeup;
 use crate::backend::audio::{AudioCommand, CardInfo};
 use crate::ui::StyledExt;
 use crate::ui::components::dropdown::DropdownEvent as DdEvt;
+use crate::ui::theme::text_styles;
 use crate::ui::{h_flex, v_flex};
 use gpui::{
     App, Context, Entity, FocusHandle, Focusable, Render, SharedString, Subscription, Window, div,
@@ -207,7 +208,7 @@ impl Focusable for CardRow {
 impl Render for CardRow {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let text_styles = text_styles(cx);
         v_flex()
             .id(SharedString::from(format!("card-{}", self.card_index)))
             .px_8()

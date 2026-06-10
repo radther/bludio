@@ -9,7 +9,7 @@ use gpui::{App, BorrowAppContext, Global};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::ui::theme::{Theme, theme_for_id};
+use crate::ui::theme::{TextStyleSet, Theme, theme_for_id};
 
 // ── Theme mode ─────────────────────────────────────────────────────────────
 
@@ -94,8 +94,8 @@ impl Global for GlobalSettings {}
 
 impl GlobalSettings {
     /// Initialize from loaded settings, computing the active theme.
-    pub(crate) fn new(settings: Settings) -> Self {
-        let active_theme = Self::compute_theme(&settings);
+    pub(crate) fn new(mut settings: Settings) -> Self {
+        let active_theme = Self::compute_theme(&mut settings);
         Self {
             settings,
             active_theme,
@@ -103,15 +103,25 @@ impl GlobalSettings {
     }
 
     /// Recompute the active theme from current settings.
-    fn compute_theme(settings: &Settings) -> Arc<Theme> {
+    /// Falls back to default themes if the saved ID is not in the registry.
+    fn compute_theme(settings: &mut Settings) -> Arc<Theme> {
         let id = match settings.theme_mode {
             ThemeMode::Light => &settings.light_theme_id,
             ThemeMode::Dark => &settings.dark_theme_id,
         };
-        let mut theme = theme_for_id(id)
-            .unwrap_or_else(|| theme_for_id("rose-pine-dawn").expect("default theme must exist"));
-        Arc::make_mut(&mut theme).font_family = settings.font_family.clone().into();
-        theme
+        if let Some(theme) = theme_for_id(id) {
+            return theme;
+        }
+        // Fallback: update the settings with the default theme ID
+        let fallback_id = match settings.theme_mode {
+            ThemeMode::Light => "rose-pine-dawn",
+            ThemeMode::Dark => "rose-pine",
+        };
+        match settings.theme_mode {
+            ThemeMode::Light => settings.light_theme_id = fallback_id.to_string(),
+            ThemeMode::Dark => settings.dark_theme_id = fallback_id.to_string(),
+        }
+        theme_for_id(fallback_id).expect("default theme must exist")
     }
 }
 
@@ -129,6 +139,18 @@ pub(crate) fn theme(cx: &App) -> &Arc<Theme> {
 /// Panics if `GlobalSettings` has not been initialized.
 pub(crate) fn settings(cx: &App) -> &Settings {
     &cx.global::<GlobalSettings>().settings
+}
+
+/// Retrieve the current text styles.
+///
+/// Panics if `GlobalSettings` has not been initialized.
+///
+/// Today this returns the default set. When text styles become a user
+/// setting, this will read from the settings global instead.
+pub(crate) fn text_styles(_cx: &App) -> &'static TextStyleSet {
+    static DEFAULT: std::sync::LazyLock<TextStyleSet> =
+        std::sync::LazyLock::new(TextStyleSet::default);
+    &DEFAULT
 }
 
 /// Background save channel — a single thread handles all settings writes.
@@ -153,7 +175,7 @@ where
 {
     cx.update_global::<GlobalSettings, _>(|global, _cx| {
         f(&mut global.settings);
-        global.active_theme = GlobalSettings::compute_theme(&global.settings);
+        global.active_theme = GlobalSettings::compute_theme(&mut global.settings);
     });
 
     let settings_to_save = cx.global::<GlobalSettings>().settings.clone();

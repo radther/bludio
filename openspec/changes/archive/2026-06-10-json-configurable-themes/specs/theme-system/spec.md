@@ -1,12 +1,4 @@
-# Theme System
-
-**Purpose:** Centralized design token system providing semantic color tokens, text style roles, and light/dark theme switching. Themes are loaded from JSON files at build time (built-in) and startup (user). All UI components reference theme values rather than hardcoded colors.
-
-**Status:** Implemented (see `src/ui/theme/` module)
-
----
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Theme provides semantic color tokens
 The system SHALL provide a `ThemeColors` struct with named color fields for background levels, text, accent colors, borders, and status indicators. All UI components MUST reference theme colors rather than hardcoded values.
@@ -111,7 +103,7 @@ The system SHALL allow the active theme to be set at runtime via `update_setting
 - **THEN** there SHALL be no per-theme Rust files
 
 ### Requirement: Theme struct is simplified
-The `Theme` struct SHALL contain only `id`, `appearance`, `display_name`, and `colors`. The `font_family` and `text_styles` fields SHALL be removed from `Theme`. The font family SHALL be applied globally at the root element from `settings(cx).font_family`. The `text_styles` SHALL be accessed via a shared default or constructed on demand.
+The `Theme` struct SHALL contain only `id`, `appearance`, and `colors`. The `font_family` and `text_styles` fields SHALL be removed from `Theme`. The font family SHALL be applied globally at the root element from `settings(cx).font_family`. The `text_styles` SHALL be accessed via a shared default or constructed on demand.
 
 #### Scenario: Theme no longer contains font_family
 - **WHEN** a `Theme` is loaded from JSON
@@ -122,3 +114,13 @@ The `Theme` struct SHALL contain only `id`, `appearance`, `display_name`, and `c
 - **WHEN** a `Theme` is loaded from JSON
 - **THEN** it SHALL NOT have a `text_styles` field
 - **THEN** components SHALL use `TextStyleSet::default()` or a shared global for text styles
+
+## REMOVED Requirements
+
+### Requirement: Theme provides font configuration
+**Reason**: Font family is now a user setting in `Settings`, not a theme property. Text styles are not theme-specific.
+**Migration**: Access the active font family via `settings(cx).font_family`. Apply it at the root element. Access text styles via `TextStyleSet::default()` or a shared global.
+
+### Requirement: Active font family is applied at the root
+**Reason**: This requirement is now handled by the settings system, not the theme system.
+**Migration**: The `BludioApp` root render applies `.font_family(settings(cx).font_family.clone())`. No theme involvement is needed.

@@ -1,0 +1,36 @@
+{
+  "id": "high-contrast-dark",
+  "display_name": "High Contrast Dark",
+  "colors": {
+    "white": "#ffffff",
+    "black": "#000000",
+    "near_black": "#141414",
+    "dark_gray": "#333333",
+    "light_gray": "#b2b2b2",
+    "cyan": "#1affff",
+    "green": "#1aff1a",
+    "red": "#ff1a1a",
+    "yellow": "#ffff1a",
+    "element_hover": "#4c4c4c",
+    "audio_accent": "#a64dff"
+  },
+  "theme": {
+    "background": "black",
+    "surface": "near_black",
+    "background_hover": "dark_gray",
+    "element_background": "dark_gray",
+    "element_hover": "element_hover",
+    "input_background": "near_black",
+    "text": "white",
+    "text_secondary": "light_gray",
+    "text_muted": "light_gray",
+    "text_colored_button": "black",
+    "border": "white",
+    "bluetooth_accent": "cyan",
+    "audio_accent": "audio_accent",
+    "dev_accent": "green",
+    "danger": "red",
+    "warning": "yellow",
+    "success": "green"
+  }
+}

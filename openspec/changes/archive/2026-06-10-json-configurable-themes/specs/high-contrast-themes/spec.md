@@ -1,10 +1,4 @@
-# High Contrast Themes
-
-## Purpose
-
-Accessibility-optimized theme variants that maximize luminance contrast for users with visual impairments. Includes High Contrast Light and High Contrast Dark options, loaded from JSON theme files.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: High Contrast Light theme exists
 The system SHALL provide a "High Contrast Light" theme variant with a palette that maximizes luminance contrast. The theme SHALL be loaded from `assets/themes/light/high-contrast-light.json`. The theme SHALL have the stable ID `"high-contrast-light"` and SHALL be categorized as a light theme.
@@ -52,3 +46,13 @@ The system SHALL include the high-contrast themes in the Light Theme and Dark Th
 - **THEN** `BludioApp` SHALL call `update_settings()` to save the new dark theme ID
 - **THEN** if the current mode is Dark, the active theme SHALL become High Contrast Dark
 - **THEN** the UI SHALL re-render with the high-contrast palette
+
+## REMOVED Requirements
+
+### Requirement: High Contrast Light theme constructor
+**Reason**: Themes are no longer constructed via Rust functions. They are loaded from JSON files.
+**Migration**: The High Contrast Light theme is defined in `assets/themes/light/high-contrast-light.json`.
+
+### Requirement: High Contrast Dark theme constructor
+**Reason**: Themes are no longer constructed via Rust functions. They are loaded from JSON files.
+**Migration**: The High Contrast Dark theme is defined in `assets/themes/dark/high-contrast-dark.json`.

@@ -8,6 +8,7 @@
 //! (`EventEmitter` pattern).
 
 use crate::ui::StyledExt;
+use crate::ui::theme::text_styles;
 use gpui::{
     AbsoluteLength, Anchor, App, Bounds, Context, CursorStyle, DispatchPhase, Entity, EventEmitter,
     FocusHandle, Focusable, FontWeight, Hsla, IntoElement, KeyDownEvent, MouseUpEvent, Pixels,
@@ -126,7 +127,7 @@ struct DropdownComponent {
 impl DropdownComponent {
     fn new(entity: Entity<Dropdown>, cx: &App) -> Self {
         let colors = &crate::ui::theme::theme(cx).colors;
-        let text_styles = &crate::ui::theme::theme(cx).text_styles;
+        let text_styles = text_styles(cx);
         Self {
             entity,
             bg: colors.element_background,

@@ -1,0 +1,28 @@
+{
+  "id": "extreme-high-contrast-dark",
+  "display_name": "Extreme High Contrast Dark",
+  "colors": {
+    "black": "#000000",
+    "almost_black": "#1a1a1a",
+    "white": "#ffffff"
+  },
+  "theme": {
+    "background": "black",
+    "surface": "almost_black",
+    "background_hover": "almost_black",
+    "element_background": "almost_black",
+    "element_hover": "black",
+    "input_background": "almost_black",
+    "text": "white",
+    "text_secondary": "white",
+    "text_muted": "white",
+    "text_colored_button": "black",
+    "border": "white",
+    "bluetooth_accent": "white",
+    "audio_accent": "white",
+    "dev_accent": "white",
+    "danger": "white",
+    "warning": "white",
+    "success": "white"
+  }
+}

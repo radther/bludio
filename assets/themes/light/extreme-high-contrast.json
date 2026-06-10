@@ -1,0 +1,28 @@
+{
+  "id": "extreme-high-contrast",
+  "display_name": "Extreme High Contrast",
+  "colors": {
+    "white": "#ffffff",
+    "almost_white": "#e6e6e6",
+    "black": "#000000"
+  },
+  "theme": {
+    "background": "white",
+    "surface": "almost_white",
+    "background_hover": "almost_white",
+    "element_background": "almost_white",
+    "element_hover": "white",
+    "input_background": "almost_white",
+    "text": "black",
+    "text_secondary": "black",
+    "text_muted": "black",
+    "text_colored_button": "white",
+    "border": "black",
+    "bluetooth_accent": "black",
+    "audio_accent": "black",
+    "dev_accent": "black",
+    "danger": "black",
+    "warning": "black",
+    "success": "black"
+  }
+}

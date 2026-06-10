@@ -18,7 +18,7 @@
 //! accessed via `crate::settings::theme(cx)`. Runtime changes go through
 //! `crate::settings::update_settings()`.
 
-use gpui::{FontWeight, Hsla, SharedString};
+use gpui::{FontWeight, Hsla};
 
 // ── Appearance ─────────────────────────────────────────────────────────────
 
@@ -119,19 +119,17 @@ impl Default for TextStyleSet {
 
 // ── Theme ──────────────────────────────────────────────────────────────────
 
-/// The full theme definition: appearance, colors, font family, and text styles.
+/// The full theme definition: appearance, colors, and display metadata.
 #[derive(Clone, Debug)]
 pub(crate) struct Theme {
     /// Stable identifier for registry lookups.
-    /// Kept so a Theme value knows its own ID for future introspection.
-    #[allow(dead_code)]
-    pub id: &'static str,
+    pub id: String,
+    /// Human-readable name shown in the UI.
+    pub display_name: String,
     /// Only read by the dev test page (debug builds); kept for parity.
     #[allow(dead_code)]
     pub appearance: Appearance,
-    pub font_family: SharedString,
     pub colors: ThemeColors,
-    pub text_styles: TextStyleSet,
 }
 
 // ── Theme accessors ────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@
 use gpui::{IntoElement, Render, SharedString, Window, div, prelude::*};
 
 use crate::ui::StyledExt;
-use crate::ui::theme::{self};
+use crate::ui::theme::{self, text_styles};
 
 /// A minimal tooltip view that renders a single line of text.
 struct TooltipLabel {
@@ -16,7 +16,7 @@ struct TooltipLabel {
 impl Render for TooltipLabel {
     fn render(&mut self, _window: &mut Window, cx: &mut gpui::Context<Self>) -> impl IntoElement {
         let colors = &theme::theme(cx).colors;
-        let text_styles = &theme::theme(cx).text_styles;
+        let text_styles = text_styles(cx);
         div()
             .px_2()
             .py_1()

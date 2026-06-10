@@ -1,10 +1,4 @@
-# Settings Persistence
-
-## Purpose
-
-Persistent storage for user application preferences. Loads settings from disk at startup and saves whenever settings change via a single centralized write path.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Settings are loaded at application startup
 The system SHALL load user settings from a JSON file at application startup. If the file is missing or cannot be parsed, the system SHALL use default values: theme mode Light, light theme ID `"rose-pine-dawn"`, dark theme ID `"rose-pine"`, `disable_animations` false, and `font_family` `"Noto Sans"`. After loading settings, the system SHALL compute the active theme by looking up the appropriate theme ID in the dynamic theme registry.
@@ -31,19 +25,6 @@ The system SHALL load user settings from a JSON file at application startup. If 
 - **THEN** `font_family` SHALL be `"Noto Sans"`
 - **THEN** the active theme SHALL be the default theme from the dynamic registry
 - **THEN** no error SHALL be displayed
-
-### Requirement: Missing theme ID falls back to default
-The system SHALL detect when a saved theme ID does not exist in the dynamic registry (e.g., a user theme was deleted). In this case, the system SHALL fall back to the default theme: `"rose-pine-dawn"` for light mode and `"rose-pine"` for dark mode.
-
-#### Scenario: Saved light theme ID is missing
-- **WHEN** the settings file contains a light theme ID that is not in the registry
-- **THEN** the system SHALL fall back to `"rose-pine-dawn"`
-- **THEN** the settings file SHALL be updated with the fallback ID
-
-#### Scenario: Saved dark theme ID is missing
-- **WHEN** the settings file contains a dark theme ID that is not in the registry
-- **THEN** the system SHALL fall back to `"rose-pine"`
-- **THEN** the settings file SHALL be updated with the fallback ID
 
 ### Requirement: Settings are saved when changed
 The system SHALL write the current settings to the JSON file whenever a setting changes. The write SHALL be synchronous and SHALL overwrite the existing file. This includes changes to `disable_animations` and `font_family`. Theme changes are saved as theme IDs in the settings file.
@@ -104,3 +85,18 @@ The system SHALL write `disable_animations` and `font_family` to the settings JS
 #### Scenario: Font is changed
 - **WHEN** the user selects a different font
 - **THEN** the settings file SHALL be updated with the new `font_family` value
+
+## ADDED Requirements
+
+### Requirement: Missing theme ID falls back to default
+The system SHALL detect when a saved theme ID does not exist in the dynamic registry (e.g., a user theme was deleted). In this case, the system SHALL fall back to the default theme: `"rose-pine-dawn"` for light mode and `"rose-pine"` for dark mode.
+
+#### Scenario: Saved light theme ID is missing
+- **WHEN** the settings file contains a light theme ID that is not in the registry
+- **THEN** the system SHALL fall back to `"rose-pine-dawn"`
+- **THEN** the settings file SHALL be updated with the fallback ID
+
+#### Scenario: Saved dark theme ID is missing
+- **WHEN** the settings file contains a dark theme ID that is not in the registry
+- **THEN** the system SHALL fall back to `"rose-pine"`
+- **THEN** the settings file SHALL be updated with the fallback ID

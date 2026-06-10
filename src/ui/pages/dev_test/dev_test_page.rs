@@ -16,6 +16,7 @@ use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::text_field::{TextField, TextFieldEvent};
 use crate::ui::theme;
+use crate::ui::theme::text_styles;
 use crate::ui::{h_flex, v_flex};
 
 // ── Test page entity ───────────────────────────────────────────────────────
@@ -59,7 +60,7 @@ impl Focusable for DevTestPage {
 impl Render for DevTestPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let colors = &theme::theme(cx).colors;
-        let text_styles = &theme::theme(cx).text_styles;
+        let text_styles = text_styles(cx);
         let is_dark = theme::theme(cx).appearance == theme::Appearance::Dark;
 
         let focus_handle = self.text_field.read(cx).focus_handle(cx);

@@ -1,10 +1,4 @@
-# Theme Registry
-
-## Purpose
-
-A dynamic, lookup-optimized registry mapping stable theme string IDs to theme instances. Themes are loaded from JSON files: built-in themes embedded via `include_str!` at compile time and user themes scanned from `~/.config/bludio/themes/` at startup. Enables ID-based theme selection, display name lookup, and categorizes themes by light/dark mode for settings UI dropdowns.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Each theme has a stable string ID
 The system SHALL assign a unique string ID to every theme. The ID SHALL be stored on the `Theme` struct and SHALL be accessible via `theme.id`. IDs are read from the JSON `id` field at load time.
@@ -27,17 +21,6 @@ The system SHALL provide a dynamic theme registry that maps each theme ID to an 
 #### Scenario: Lookup missing theme by ID
 - **WHEN** the registry is queried with an unknown ID
 - **THEN** it SHALL return `None`
-
-### Requirement: Dynamic registry is populated at startup
-The registry SHALL be populated once at application startup by loading all built-in JSON themes and all valid user themes from `~/.config/bludio/themes/`. The registry SHALL be accessible via a `LazyLock` or similar mechanism.
-
-#### Scenario: Registry contains all built-in themes
-- **WHEN** the application starts
-- **THEN** the registry SHALL contain all built-in themes loaded from `assets/themes/`
-
-#### Scenario: Registry contains user themes
-- **WHEN** the user has valid custom themes in `~/.config/bludio/themes/`
-- **THEN** the registry SHALL contain those themes alongside the built-in ones
 
 ### Requirement: High Contrast Light is registered as a light theme
 The system SHALL load the `"high-contrast-light"` theme from `assets/themes/light/high-contrast-light.json` and register it in the dynamic theme registry. The ID SHALL be included in the list of light theme IDs.
@@ -66,13 +49,6 @@ The system SHALL provide human-friendly display names for themes via the `displa
 - **WHEN** a user adds a custom theme with `"display_name": "My Custom Theme"`
 - **THEN** the Settings page SHALL show "My Custom Theme" in the dropdown
 
-### Requirement: Registry provides display name lookup
-The system SHALL provide a function that returns the `display_name` for a given theme ID from the registry.
-
-#### Scenario: Display name lookup
-- **WHEN** the system calls `theme_display_name("rose-pine-dawn")`
-- **THEN** it SHALL return the display name from the loaded JSON theme file
-
 ### Requirement: Theme registry categorizes themes by mode
 The system SHALL maintain separate lists of light theme IDs and dark theme IDs within the dynamic registry, populated according to the directory each theme was loaded from. The Settings page SHALL populate its dropdowns with only relevant themes.
 
@@ -85,3 +61,23 @@ The system SHALL maintain separate lists of light theme IDs and dark theme IDs w
 - **WHEN** the system requests the list of dark theme IDs
 - **THEN** it SHALL contain `"rose-pine"`, `"high-contrast-dark"`, and any user dark themes
 - **THEN** it SHALL NOT contain any light theme IDs
+
+## ADDED Requirements
+
+### Requirement: Dynamic registry is populated at startup
+The registry SHALL be populated once at application startup by loading all built-in JSON themes and all valid user themes from `~/.config/bludio/themes/`. The registry SHALL be accessible via a `LazyLock` or similar mechanism.
+
+#### Scenario: Registry contains all built-in themes
+- **WHEN** the application starts
+- **THEN** the registry SHALL contain all built-in themes loaded from `assets/themes/`
+
+#### Scenario: Registry contains user themes
+- **WHEN** the user has valid custom themes in `~/.config/bludio/themes/`
+- **THEN** the registry SHALL contain those themes alongside the built-in ones
+
+### Requirement: Registry provides display name lookup
+The system SHALL provide a function that returns the `display_name` for a given theme ID from the registry.
+
+#### Scenario: Display name lookup
+- **WHEN** the system calls `theme_display_name("rose-pine-dawn")`
+- **THEN** it SHALL return the display name from the loaded JSON theme file

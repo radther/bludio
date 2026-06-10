@@ -14,7 +14,10 @@ use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::components::dropdown::{Dropdown, DropdownEvent};
 use crate::ui::components::page_header::page_header;
 use crate::ui::components::toggle::toggle_switch;
-use crate::ui::theme::{TextStyleSet, ThemeColors, ThemeMode, dark_theme_ids, light_theme_ids};
+use crate::ui::theme::{
+    TextStyleSet, ThemeColors, ThemeMode, dark_theme_ids, light_theme_ids, text_styles,
+    theme_display_name,
+};
 use crate::ui::{h_flex, v_flex};
 
 // ── Events ───────────────────────────────────────────────────────────────────
@@ -48,11 +51,11 @@ impl SettingsPage {
     pub(crate) fn new(cx: &mut Context<Self>) -> Self {
         let light_items = light_theme_ids()
             .iter()
-            .map(|id| theme_display_name(id).to_string())
+            .map(|id| theme_display_name(id).unwrap_or(id).to_string())
             .collect::<Vec<_>>();
         let dark_items = dark_theme_ids()
             .iter()
-            .map(|id| theme_display_name(id).to_string())
+            .map(|id| theme_display_name(id).unwrap_or(id).to_string())
             .collect::<Vec<_>>();
         let font_items = vec!["Noto Sans".to_string(), "OpenDyslexic".to_string()];
 
@@ -143,7 +146,7 @@ impl Render for SettingsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = &theme.text_styles;
+        let text_styles = text_styles(cx);
 
         v_flex()
             .flex_1()
@@ -185,7 +188,7 @@ impl SettingsPage {
     ) -> gpui::Div {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = &theme.text_styles;
+        let text_styles = text_styles(cx);
         let is_light = settings(cx).theme_mode == ThemeMode::Light;
         let entity = cx.entity().clone();
 
@@ -222,7 +225,7 @@ impl SettingsPage {
     ) -> gpui::Div {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = &theme.text_styles;
+        let text_styles = text_styles(cx);
         let disable_animations = settings(cx).disable_animations;
         let entity = cx.entity().clone();
 
@@ -390,17 +393,6 @@ fn mode_button(
                 cx.emit(SettingsEvent::ModeChanged(mode));
             }),
         )
-}
-
-/// Human-friendly display name for a theme ID.
-fn theme_display_name(id: &str) -> &'static str {
-    match id {
-        "rose-pine-dawn" => "Rose Pine Dawn",
-        "rose-pine" => "Rose Pine",
-        "high-contrast-light" => "High Contrast Light",
-        "high-contrast-dark" => "High Contrast Dark",
-        _ => "Unknown Theme",
-    }
 }
 
 /// Find the index of a theme ID within a list of IDs.

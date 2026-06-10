@@ -10,6 +10,7 @@ use crate::backend::subsystem::SubsystemStatus;
 use crate::ui::common::animation::FadeInAnimationExt;
 use crate::ui::components::page_header::page_header;
 use crate::ui::pages::configuration::config_card_row::CardRow;
+use crate::ui::theme::text_styles;
 use crate::ui::{h_flex, v_flex};
 use gpui::{Context, Entity, Render, Window, div, prelude::*, px};
 
@@ -91,7 +92,7 @@ impl Render for ConfigurationPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = &theme.text_styles;
+        let text_styles = text_styles(cx);
 
         v_flex()
             .flex_1()

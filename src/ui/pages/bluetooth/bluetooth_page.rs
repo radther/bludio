@@ -14,6 +14,7 @@ use crate::ui::components::loading_bar::loading_bar;
 use crate::ui::components::page_header::page_header;
 use crate::ui::pages::bluetooth::BluetoothPageCommand;
 use crate::ui::pages::bluetooth::bluetooth_device_row::BluetoothDeviceRow;
+use crate::ui::theme::text_styles;
 use crate::ui::{h_flex, v_flex};
 use futures::channel::mpsc::UnboundedSender;
 use gpui::{ClickEvent, Context, CursorStyle, Entity, Render, Window, div, prelude::*, px};
@@ -124,7 +125,7 @@ impl Render for BluetoothPage {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = crate::ui::theme::theme(cx);
         let colors = &theme.colors;
-        let text_styles = &theme.text_styles;
+        let text_styles = text_styles(cx);
 
         let discovering = self.discovering;
         let connected_count = self.rows.iter().filter(|r| r.read(cx).connected).count();
