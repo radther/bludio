@@ -56,3 +56,7 @@ pub fn check() -> gpui::Svg {
 pub fn merge() -> gpui::Svg {
     icon("merge")
 }
+
+pub fn power() -> gpui::Svg {
+    icon("power")
+}

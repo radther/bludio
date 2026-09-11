@@ -220,11 +220,18 @@ impl BludioApp {
                 tooltip: "Text Field Test",
             },
         ];
-        let actions = vec![TabAction {
-            icon: icons::refresh_ccw,
-            tooltip: "Restart Audio Stack",
-            action_id: "restart-audiostack".into(),
-        }];
+        let actions = vec![
+            TabAction {
+                icon: icons::refresh_ccw,
+                tooltip: "Restart Audio Stack",
+                action_id: "restart-audiostack".into(),
+            },
+            TabAction {
+                icon: icons::power,
+                tooltip: "Close",
+                action_id: "close".into(),
+            },
+        ];
         let tab_bar = cx.new(|cx| TabBar::new(tabs, actions, 0, cx));
         let tab_bar_sub = cx.subscribe(&tab_bar, {
             move |this, _tb, event: &TabBarEvent, cx| match event {
@@ -234,6 +241,9 @@ impl BludioApp {
                 TabBarEvent::ActionButtonClicked(action_id) => match action_id.as_str() {
                     "restart-audiostack" => {
                         Self::handle_restart_audiostack(this, cx);
+                    }
+                    "close" => {
+                        cx.quit();
                     }
                     _ => {
                         eprintln!("[app] Unknown tab bar action: {action_id}");
